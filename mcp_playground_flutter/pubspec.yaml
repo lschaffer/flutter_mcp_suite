@@ -22,20 +22,20 @@ dependencies:
     #path: ../mcp_playground_dart  # local demo mode
   universal_io: ^2.3.1
   http: ^1.6.0
-  uuid: ^4.5.3
+  uuid: ^4.6.0
   shared_preferences: ^2.5.5
-  openai_dart: ^7.0.0
-  anthropic_sdk_dart: ^6.0.0
-  ollama_dart: ^2.4.0
-  llamadart: ^0.8.14
+  openai_dart: ^8.0.0
+  anthropic_sdk_dart: ^7.0.0
+  ollama_dart: ^2.5.0
+  llamadart: ^0.8.17
   flutter_markdown_plus: ^1.0.12
-  file_picker: ^11.0.2
-  googleai_dart: ^9.0.0
+  file_picker: ^11.0.3
+  googleai_dart: ^11.0.0
   url_launcher: ^6.3.2
-  path: ^1.9.0
+  path: ^1.9.1
   path_provider: ^2.1.6
   flutter_widget_from_html: ^0.17.2
-  archive: ^4.0.2
+  archive: ^4.0.9
 
 dev_dependencies:
   flutter_test:

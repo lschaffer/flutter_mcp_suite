@@ -9,11 +9,11 @@ environment:
 dependencies:
   mcp_playground_dart:
     path: ../../../mcp_playground_dart
-  llamadart: ^0.8.14
+  llamadart: ^0.8.17
   yaml: ^3.1.2
   http: ^1.6.0
-  path: ^1.9.0
-  uuid: ^4.5.3
+  path: ^1.9.1
+  uuid: ^4.6.0
 
 dependency_overrides:
   mcp_playground_dart:
