@@ -1,0 +1,535 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:genui/genui.dart';
+import 'package:http/http.dart' as http;
+import 'package:json_schema_builder/json_schema_builder.dart';
+import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+
+import 'env_loader.dart';
+
+/// The weather channels the user can select in the generated form.
+const List<String> _weatherChannels = [
+  'temperature_2m',
+  'wind_speed_10m',
+  'wind_direction_10m',
+  'cloud_cover',
+  'precipitation',
+];
+
+const Map<String, int> _durationHours = {
+  '24h': 24,
+  '48h': 48,
+  '72h': 72,
+  '7 days': 168,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 1. Weather forecast tool (Open-Meteo, no API key required)
+// ═══════════════════════════════════════════════════════════════
+
+/// A Dart-native MCP tool returning a structured weather forecast as JSON.
+class WeatherForecastTool extends McpLocalTool {
+  @override
+  String get name => 'get_weather_forecast';
+
+  @override
+  String get description =>
+      'Fetch an hourly weather forecast from Open-Meteo for a city. Returns '
+      'JSON with a list of timestamps and the selected weather channels '
+      '(temperature_2m, wind_speed_10m, wind_direction_10m, cloud_cover, '
+      'precipitation).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'city': {'type': 'string', 'description': 'City name, e.g. "Vienna".'},
+      'hours': {
+        'type': 'integer',
+        'description': 'Number of forecast hours (default 24, max 168).',
+      },
+      'channels': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'description': 'The selected weather channels.',
+      },
+    },
+    'required': ['city'],
+  };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    try {
+      final city = (arguments['city'] as String? ?? 'Vienna').trim();
+      final hours = (arguments['hours'] as num?)?.toInt() ?? 24;
+      final channels =
+          (arguments['channels'] as List?)?.map((e) => e.toString()).toList() ??
+          const ['temperature_2m'];
+
+      // Resolve coordinates via geocoding.
+      double lat = 48.2082;
+      double lng = 16.3738;
+      String resolvedName = city;
+      final geoUrl =
+          'https://geocoding-api.open-meteo.com/v1/search'
+          '?name=${Uri.encodeComponent(city)}&count=1&language=en&format=json';
+      final geoResp = await http
+          .get(Uri.parse(geoUrl))
+          .timeout(const Duration(seconds: 15));
+      if (geoResp.statusCode == 200) {
+        final geoData = jsonDecode(geoResp.body) as Map<String, dynamic>;
+        final results = geoData['results'] as List?;
+        if (results != null && results.isNotEmpty) {
+          final first = results.first as Map;
+          lat = (first['latitude'] as num).toDouble();
+          lng = (first['longitude'] as num).toDouble();
+          resolvedName = '${first['name']}, ${first['country'] ?? ''}';
+        }
+      }
+
+      final weatherUrl =
+          'https://api.open-meteo.com/v1/forecast'
+          '?latitude=$lat&longitude=$lng'
+          '&hourly=${channels.join(',')}'
+          '&forecast_hours=$hours&timezone=auto';
+      final resp = await http
+          .get(Uri.parse(weatherUrl))
+          .timeout(const Duration(seconds: 15));
+      if (resp.statusCode != 200) {
+        return MCPToolResult(
+          content: [
+            MCPContent(
+              type: 'text',
+              text: 'Error: Weather API failed (HTTP ${resp.statusCode}).',
+            ),
+          ],
+          isError: true,
+        );
+      }
+
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final hourly = data['hourly'] as Map<String, dynamic>?;
+      final times = (hourly?['time'] as List?)?.cast<String>() ?? const [];
+
+      final resultChannels = <Map<String, dynamic>>[];
+      for (final channel in channels) {
+        final values = hourly?[channel] as List?;
+        if (values == null) continue;
+        resultChannels.add({
+          'label': channel,
+          'values': values.map((v) => (v as num).toDouble()).toList(),
+        });
+      }
+
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text: jsonEncode({
+              'location': resolvedName,
+              'times': times,
+              'channels': resultChannels,
+            }),
+          ),
+        ],
+        isError: false,
+      );
+    } catch (e) {
+      return MCPToolResult(
+        content: [
+          MCPContent(type: 'text', text: 'Weather execution error: $e'),
+        ],
+        isError: true,
+      );
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 2. Weather form catalog item
+// ═══════════════════════════════════════════════════════════════
+
+final weatherFormSchema = S.object(
+  description: 'A form for requesting a weather forecast.',
+  properties: {
+    'title': S.string(description: 'Optional heading for the form.'),
+  },
+);
+
+final weatherFormItem = CatalogItem(
+  name: 'WeatherForm',
+  dataSchema: weatherFormSchema,
+  widgetBuilder: (itemContext) => _WeatherFormWidget(itemContext: itemContext),
+);
+
+class _WeatherFormWidget extends StatefulWidget {
+  const _WeatherFormWidget({required this.itemContext});
+
+  final CatalogItemContext itemContext;
+
+  @override
+  State<_WeatherFormWidget> createState() => _WeatherFormWidgetState();
+}
+
+class _WeatherFormWidgetState extends State<_WeatherFormWidget> {
+  final TextEditingController _cityController = TextEditingController();
+  String _duration = '24h';
+  final Set<String> _channels = {'temperature_2m'};
+
+  @override
+  void dispose() {
+    _cityController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final city = _cityController.text.trim();
+    widget.itemContext.dispatchEvent(
+      UserActionEvent(
+        name: 'get_weather_forecast',
+        sourceComponentId: widget.itemContext.id,
+        context: <String, Object?>{
+          'city': city.isEmpty ? 'Vienna' : city,
+          'hours': _durationHours[_duration] ?? 24,
+          'channels': _channels.toList(),
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _cityController,
+          decoration: InputDecoration(
+            labelText: 'City',
+            hintText: 'e.g. Vienna',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _duration,
+          decoration: InputDecoration(
+            labelText: 'Forecast duration',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          items: [
+            for (final duration in _durationHours.keys)
+              DropdownMenuItem(value: duration, child: Text(duration)),
+          ],
+          onChanged: (value) {
+            if (value != null) setState(() => _duration = value);
+          },
+        ),
+        const SizedBox(height: 12),
+        Text('Weather channels', style: theme.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final channel in _weatherChannels)
+              FilterChip(
+                label: Text(channel),
+                selected: _channels.contains(channel),
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _channels.add(channel);
+                    } else {
+                      _channels.remove(channel);
+                    }
+                  });
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.cloud_outlined),
+          label: const Text('Get forecast'),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 3. Weather chart catalog item (fl_chart multi-line)
+// ═══════════════════════════════════════════════════════════════
+
+final weatherChartSchema = S.object(
+  description: 'A weather forecast chart plus a textual list.',
+  properties: {
+    'title': S.string(),
+    'times': S.list(items: S.string()),
+    'channels': S.list(
+      items: S.object(
+        properties: {
+          'label': S.string(),
+          'values': S.list(items: S.number()),
+        },
+      ),
+    ),
+  },
+  required: ['title', 'times', 'channels'],
+);
+
+final weatherChartItem = CatalogItem(
+  name: 'WeatherChart',
+  dataSchema: weatherChartSchema,
+  widgetBuilder: _buildWeatherChart,
+);
+
+Widget _buildWeatherChart(CatalogItemContext itemContext) {
+  final data = Map<String, Object?>.from(itemContext.data as Map);
+  final title = data['title']?.toString() ?? 'Weather forecast';
+  final times = (data['times'] as List?)?.cast<String>() ?? const <String>[];
+  final rawChannels = (data['channels'] as List?) ?? const [];
+
+  final channels = <({String label, List<double> values})>[];
+  for (final raw in rawChannels) {
+    final map = Map<String, Object?>.from(raw as Map);
+    channels.add((
+      label: map['label']?.toString() ?? '',
+      values:
+          (map['values'] as List?)
+              ?.map((v) => (v as num).toDouble())
+              .toList() ??
+          const <double>[],
+    ));
+  }
+
+  final theme = Theme.of(itemContext.buildContext);
+  const palette = [
+    Color(0xFF3B82F6),
+    Color(0xFF10B981),
+    Color(0xFFF59E0B),
+    Color(0xFF8B5CF6),
+    Color(0xFFEF4444),
+    Color(0xFF06B6D4),
+  ];
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 220,
+        child: LineChart(
+          LineChartData(
+            minY: _minValue(channels) - 1,
+            maxY: _maxValue(channels) + 1,
+            lineBarsData: [
+              for (var i = 0; i < channels.length; i++)
+                LineChartBarData(
+                  spots: [
+                    for (var j = 0; j < channels[i].values.length; j++)
+                      FlSpot(j.toDouble(), channels[i].values[j]),
+                  ],
+                  isCurved: true,
+                  color: palette[i % palette.length],
+                  barWidth: 2.5,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                    show: false,
+                    color: palette[i % palette.length].withValues(alpha: 0.08),
+                  ),
+                ),
+            ],
+            gridData: const FlGridData(show: true),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 36),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: _bottomInterval(times.length),
+                  getTitlesWidget: (value, meta) {
+                    final index = value.toInt();
+                    if (index < 0 || index >= times.length) {
+                      return const Text('');
+                    }
+                    final label = times[index];
+                    final short = label.length > 5
+                        ? label.substring(label.length - 5)
+                        : label;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(short, style: const TextStyle(fontSize: 9)),
+                    );
+                  },
+                ),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 12,
+        children: [
+          for (var i = 0; i < channels.length; i++)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: palette[i % palette.length],
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(channels[i].label, style: const TextStyle(fontSize: 11)),
+              ],
+            ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        height: 120,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: times.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final values = channels
+                .map(
+                  (c) =>
+                      '${c.label}: ${c.values.length > index ? c.values[index] : '-'}',
+                )
+                .join('  ');
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                '${times[index].replaceFirst('T', ' ')}  $values',
+                style: const TextStyle(fontSize: 11),
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
+
+double _minValue(List<({String label, List<double> values})> channels) {
+  var min = double.infinity;
+  for (final channel in channels) {
+    for (final value in channel.values) {
+      if (value < min) min = value;
+    }
+  }
+  return min.isFinite ? min : 0;
+}
+
+double _maxValue(List<({String label, List<double> values})> channels) {
+  var max = double.negativeInfinity;
+  for (final channel in channels) {
+    for (final value in channel.values) {
+      if (value > max) max = value;
+    }
+  }
+  return max.isFinite ? max : 1;
+}
+
+double _bottomInterval(int length) {
+  if (length <= 0) return 1;
+  if (length <= 12) return 1;
+  if (length <= 48) return 6;
+  return 12;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 4. Catalog + example screen
+// ═══════════════════════════════════════════════════════════════
+
+/// Builds a GenUI catalog with the basic widgets plus the weather form and
+/// weather chart items.
+Catalog buildWeatherGenuiCatalog() {
+  final base = BasicCatalogItems.asNoAssetCatalog();
+  return base.copyWith(newItems: [weatherFormItem, weatherChartItem]);
+}
+
+const String _weatherSystemPrompt = '''
+You are a helpful weather assistant backed by a live forecast tool.
+
+Follow these steps when the user asks for a weather forecast:
+1. If the city, forecast duration, or weather channels are missing, render a
+   single WeatherForm component so the user can provide them.
+2. When the parameters are known (for example after a user action submission),
+   call the get_weather_forecast tool with the submitted city, hours and
+   channels.
+3. Render the forecast returned by the tool as a WeatherChart component.
+''';
+
+/// The GenUI-based weather example screen.
+class GenuiWeatherScreen extends StatefulWidget {
+  /// Creates a [GenuiWeatherScreen].
+  const GenuiWeatherScreen({super.key});
+
+  @override
+  State<GenuiWeatherScreen> createState() => _GenuiWeatherScreenState();
+}
+
+class _GenuiWeatherScreenState extends State<GenuiWeatherScreen> {
+  late final McpGenuiChatController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialLlm = LlmConfig(
+      provider: EnvLoader.getProvider(),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
+      apiKey: EnvLoader.get('LLM_API_KEY'),
+      baseUrl: EnvLoader.get('LLM_URL'),
+    );
+    _controller = McpGenuiChatController(
+      llmConfig: initialLlm,
+      tools: [WeatherForecastTool()],
+      catalog: buildWeatherGenuiCatalog(),
+      systemPrompt: _weatherSystemPrompt,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GenuiChatView(
+      controller: _controller,
+      title: 'GenUI Weather',
+      inputHint: 'Ask about the weather, e.g. "What is the forecast?"',
+    );
+  }
+}

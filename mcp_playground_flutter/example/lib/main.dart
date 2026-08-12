@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
 import 'env_loader.dart';
 import 'example_local_tools.dart';
+import 'genui_weather_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +37,50 @@ class McpPlaygroundExampleApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const McpPlaygroundScreen(),
+      home: const ExampleHome(),
+    );
+  }
+}
+
+/// A small launcher that lets the user pick between the classic playground and
+/// the GenUI-based weather example.
+class ExampleHome extends StatelessWidget {
+  const ExampleHome({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('MCP Playground Examples')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton.icon(
+              icon: const Icon(Icons.smart_toy_outlined),
+              label: const Text('Classic Playground'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const McpPlaygroundScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.cloud_outlined),
+              label: const Text('GenUI Weather'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const GenuiWeatherScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -72,7 +116,7 @@ class McpPlaygroundScreen extends StatelessWidget {
 
       // --- Chart tools ---
       CreateChartPngTool(), // JSON config -> rendered via fl_chart in host
-      Chart2PngTool(),      // Canvas-based -> returns direct PNG image
+      Chart2PngTool(), // Canvas-based -> returns direct PNG image
     ];
 
     // Load initial LLM configuration if configured in .env
@@ -103,10 +147,13 @@ class McpPlaygroundScreen extends StatelessWidget {
       ),
     ];
 
-    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
     return McpPlayground(
-      initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
+      initialLlmConfig: initialLlm.provider != LlmProvider.none
+          ? initialLlm
+          : null,
       customLocalTools: demoLocalTools,
       initialLocalMcpServers: isDesktop ? initialLocalServers : null,
       messageContentBuilder: (context, message) {
@@ -122,14 +169,26 @@ class McpPlaygroundScreen extends StatelessWidget {
           final decoded = jsonDecode(contentText);
           if (decoded is! Map<String, dynamic>) return null;
 
-          final chartType = ((decoded['chart_type'] ?? decoded['chartType']) as String? ?? 'line').trim().toLowerCase();
-          final labels = ((decoded['labels'] ?? decoded['xAxis']) as List?)?.cast<String>() ?? [];
-          final dataList = ((decoded['data'] ?? decoded['yAxis']) as List?)?.map((d) => (d as num).toDouble()).toList() ?? [];
+          final chartType =
+              ((decoded['chart_type'] ?? decoded['chartType']) as String? ??
+                      'line')
+                  .trim()
+                  .toLowerCase();
+          final labels =
+              ((decoded['labels'] ?? decoded['xAxis']) as List?)
+                  ?.cast<String>() ??
+              [];
+          final dataList =
+              ((decoded['data'] ?? decoded['yAxis']) as List?)
+                  ?.map((d) => (d as num).toDouble())
+                  .toList() ??
+              [];
 
           if (labels.isEmpty || dataList.isEmpty) return null;
 
           final theme = Theme.of(context);
-          final title = (decoded['title'] ?? decoded['chartTitle'] ?? 'Chart').toString();
+          final title = (decoded['title'] ?? decoded['chartTitle'] ?? 'Chart')
+              .toString();
 
           return Container(
             margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -142,7 +201,7 @@ class McpPlaygroundScreen extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: Column(
@@ -170,17 +229,28 @@ class McpPlaygroundScreen extends StatelessWidget {
     );
   }
 
-  Widget _renderFlChart(String type, List<String> labels, List<double> data, ThemeData theme) {
+  Widget _renderFlChart(
+    String type,
+    List<String> labels,
+    List<double> data,
+    ThemeData theme,
+  ) {
     if (type == 'pie') {
       final List<PieChartSectionData> sections = [];
       for (int i = 0; i < data.length; i++) {
-        sections.add(PieChartSectionData(
-          color: Colors.primaries[i % Colors.primaries.length],
-          value: data[i],
-          title: '${labels.length > i ? labels[i] : ""}\n${data[i]}',
-          radius: 60,
-          titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-        ));
+        sections.add(
+          PieChartSectionData(
+            color: Colors.primaries[i % Colors.primaries.length],
+            value: data[i],
+            title: '${labels.length > i ? labels[i] : ""}\n${data[i]}',
+            radius: 60,
+            titleStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        );
       }
       return PieChart(PieChartData(sections: sections, centerSpaceRadius: 40));
     }
@@ -188,17 +258,19 @@ class McpPlaygroundScreen extends StatelessWidget {
     if (type == 'bar') {
       final List<BarChartGroupData> groups = [];
       for (int i = 0; i < data.length; i++) {
-        groups.add(BarChartGroupData(
-          x: i,
-          barRods: [
-            BarChartRodData(
-              toY: data[i],
-              color: theme.colorScheme.primary,
-              width: 16,
-              borderRadius: BorderRadius.circular(4),
-            )
-          ],
-        ));
+        groups.add(
+          BarChartGroupData(
+            x: i,
+            barRods: [
+              BarChartRodData(
+                toY: data[i],
+                color: theme.colorScheme.primary,
+                width: 16,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ],
+          ),
+        );
       }
 
       return BarChart(
@@ -206,7 +278,9 @@ class McpPlaygroundScreen extends StatelessWidget {
           barGroups: groups,
           gridData: const FlGridData(show: false),
           titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: true, reservedSize: 32),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -215,15 +289,22 @@ class McpPlaygroundScreen extends StatelessWidget {
                   if (idx >= 0 && idx < labels.length) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 6.0),
-                      child: Text(labels[idx], style: const TextStyle(fontSize: 10)),
+                      child: Text(
+                        labels[idx],
+                        style: const TextStyle(fontSize: 10),
+                      ),
                     );
                   }
                   return const Text('');
                 },
               ),
             ),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
         ),
       );
@@ -248,11 +329,13 @@ class McpPlaygroundScreen extends StatelessWidget {
               show: true,
               color: theme.colorScheme.primary.withValues(alpha: 0.15),
             ),
-          )
+          ),
         ],
         gridData: const FlGridData(show: false),
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: true, reservedSize: 32),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -261,15 +344,22 @@ class McpPlaygroundScreen extends StatelessWidget {
                 if (idx >= 0 && idx < labels.length) {
                   return Padding(
                     padding: const EdgeInsets.only(top: 6.0),
-                    child: Text(labels[idx], style: const TextStyle(fontSize: 10)),
+                    child: Text(
+                      labels[idx],
+                      style: const TextStyle(fontSize: 10),
+                    ),
                   );
                 }
                 return const Text('');
               },
             ),
           ),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
       ),
     );
