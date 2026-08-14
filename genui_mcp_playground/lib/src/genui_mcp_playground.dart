@@ -550,10 +550,13 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800, maxHeight: 700),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: SizedBox(
+          width: 820,
+          height: 720,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
             child: SettingsDrawer(
               controller: _controller,
             ),
@@ -1094,6 +1097,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
           ),
         );
       case GenuiChatEntryKind.assistant:
+        if (entry.text.trim().isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
           child: Row(

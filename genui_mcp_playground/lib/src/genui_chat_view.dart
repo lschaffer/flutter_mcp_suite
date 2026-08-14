@@ -99,6 +99,7 @@ class _GenuiChatViewState extends State<GenuiChatView> {
       case GenuiChatEntryKind.user:
         return _bubble(context, entry.text, isUser: true);
       case GenuiChatEntryKind.assistant:
+        if (entry.text.trim().isEmpty) return const SizedBox.shrink();
         return _bubble(context, entry.text, isUser: false);
       case GenuiChatEntryKind.surface:
         if (entry.surfaceId != null) {

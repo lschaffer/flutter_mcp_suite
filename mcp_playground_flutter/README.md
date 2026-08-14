@@ -10,14 +10,17 @@ An interactive AI Agent Playground widget for Flutter — connect to any LLM pro
 ## ✨ Features
 
 - **Multi-LLM support** – OpenAI, Anthropic Claude, Google Gemini, Ollama (local), Mistral AI, and any OpenAI-compatible endpoint.
-- **GenUI (A2UI) widget rendering** – Model-generated interactive UI widgets rendered directly inline inside the playground chat view using the `genui` protocol.
+- **Embedded on-device models** – Run local GGUF models via `llamadart` without external network dependencies.
 - **HTTP MCP Server registry** – Browse [PulseMCP](https://pulsemcp.com) and [Smithery](https://smithery.ai) catalogs or add custom remote MCP servers.
 - **Local MCP subprocesses** – Install, configure, and launch local stdio MCP servers (Node.js, Python) directly within the application (supported in desktop mode).
-- **Dart-native local tools** – Extend with custom Dart-native tools (e.g., Weather, SSH, Chart-generation tools, and GenUI form/chart catalogs; see the [example](example) implementation).
+- **Dart-native local tools** – Extend with custom Dart-native tools (e.g., Weather, SSH, Chart-generation tools; see the [example](example) implementation).
 - **Agentic tool loop** – Automatic iterative tool calling with duplicate-call detection, iteration limits, and safety guards.
 - **Save/Load configurations** – Persist LLM settings, tool selections, system prompts, and server lists via `SharedPreferences` or a custom `McpPlaygroundStorageDelegate`.
 - **Agent Inspector** – Side-by-side conversation + internal state inspector for debugging agent behavior (can be toggled or disabled via `showAgentInspector`).
 - **Cross-platform** – Works on Android, iOS, Web, macOS, Windows, and Linux.
+
+> [!NOTE]
+> For dynamic generative UI rendering via Google's GenUI (`A2UI`) protocol, see the dedicated [`genui_mcp_playground`](../genui_mcp_playground) package.
 
 ---
 
@@ -59,9 +62,6 @@ The main widget. Drop it into your app to get a full AI playground UI.
 | `initialLocalMcpServers` | `List<LocalMcpServerSetup>?` | `null` | Pre-configured list of local Node.js or Python MCP servers to auto-initialize/install. |
 | `storageDelegate` | `McpPlaygroundStorageDelegate?` | `null` | Custom persistence layer for settings. Uses `SharedPreferences` if omitted. |
 | `customLocalTools` | `List<McpLocalTool>?` | `null` | Custom Dart-native tool implementations. See [`McpLocalTool`](https://github.com/lschaffer/mcp_playground/blob/master/mcp_playground_dart/lib/src/mcp/local_tools.dart). |
-| `enableGenUi` | `bool` | `false` | Enable GenUI (A2UI) widget rendering mode within the chat view. |
-| `genuiCatalogItems` | `List<GenuiCatalogItemDefinition>?` | `null` | Custom GenUI catalog item definitions registered for model UI rendering. |
-| `genuiCatalog` | `Catalog?` | `null` | Custom GenUI `Catalog` instance. |
 | `showAgentInspector` | `bool` | `true` | Show/hide the Agent Inspector panel and toolbar toggle button. |
 | `disableConfigDialog` | `bool` | `false` | Disable opening the settings dialog when LLM is not configured. |
 | `messageContentBuilder` | `Widget? Function(BuildContext, ChatMessage)?` | `null` | Optional builder callback to intercept message layouts and render custom widgets (e.g., interactive charts). |
@@ -102,17 +102,6 @@ McpPlayground(
     ),
   ],
   storageDelegate: MyCustomStorageDelegate(),
-)
-```
-
-#### With GenUI (A2UI) model-generated UI widgets
-
-```dart
-McpPlayground(
-  enableGenUi: true,
-  customLocalTools: [WeatherForecastTool()],
-  genuiCatalog: buildWeatherGenuiCatalog(),
-  showAgentInspector: true,
 )
 ```
 

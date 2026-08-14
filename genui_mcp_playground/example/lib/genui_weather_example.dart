@@ -487,7 +487,8 @@ Important Catalog Rules:
 Follow these steps strictly:
 1. When the user asks for a weather forecast without city/parameters, render a "WeatherForm" component.
 2. When the user submits a form action or parameters (city, hours, channels) are given:
-   - Call the `get_weather_forecast` tool immediately using those arguments.
+   - Invoke the `get_weather_forecast` tool call immediately with those arguments (e.g. city, hours, channels).
+   - Do NOT render a WeatherForm component again.
    - Do NOT ask questions or repeat instructions.
 3. After receiving the JSON tool result from `get_weather_forecast`:
    - Render a "WeatherChart" component with the forecast data:

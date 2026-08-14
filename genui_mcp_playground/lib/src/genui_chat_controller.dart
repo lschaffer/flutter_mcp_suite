@@ -192,6 +192,50 @@ class McpGenuiChatController extends ChangeNotifier {
     );
     _playgroundController?.addMessage(userMsg);
 
+    final actionInfo = _extractUserAction(message);
+    if (actionInfo != null) {
+      mp.McpLocalTool? directTool;
+      for (final t in _tools) {
+        if (t.name == actionInfo.name) {
+          directTool = t;
+          break;
+        }
+      }
+      if (directTool != null) {
+        final toolCallId = 'call_${directTool.name}_${DateTime.now().microsecondsSinceEpoch}';
+        final toolCallMsg = mp.ChatMessage(
+          id: toolCallId,
+          content: '',
+          role: mp.ChatRole.assistant,
+          timestamp: DateTime.now(),
+          type: mp.MessageType.toolCall,
+          toolName: directTool.name,
+          toolArguments: actionInfo.context,
+        );
+        _history.add(toolCallMsg);
+        _playgroundController?.addMessage(toolCallMsg);
+
+        final result = await _executeTool(
+          mp.LLMToolCall(
+            id: toolCallId,
+            name: directTool.name,
+            arguments: actionInfo.context,
+          ),
+        );
+        final toolRespMsg = mp.ChatMessage(
+          id: toolCallId,
+          content: result.content.map((c) => c.text ?? '').join('\n'),
+          role: mp.ChatRole.tool,
+          timestamp: DateTime.now(),
+          type: mp.MessageType.toolResponse,
+          toolName: directTool.name,
+          toolResult: result,
+        );
+        _history.add(toolRespMsg);
+        _playgroundController?.addMessage(toolRespMsg);
+      }
+    }
+
     try {
       for (var iteration = 0; iteration < maxToolIterations; iteration++) {
         mp.LLMResponse? finalResponse;
@@ -209,11 +253,16 @@ class McpGenuiChatController extends ChangeNotifier {
             iterationBuffer.write(chunk.textDelta);
             _transport.addChunk(chunk.textDelta);
             _syncSurfaces();
-            _upsertEntry(
-              iterationEntryId,
-              iterationBuffer.toString(),
-              GenuiChatEntryKind.assistant,
-            );
+            final cleanText = _sanitizeAssistantText(iterationBuffer.toString());
+            if (cleanText.isNotEmpty) {
+              _upsertEntry(
+                iterationEntryId,
+                cleanText,
+                GenuiChatEntryKind.assistant,
+              );
+            } else {
+              _removeEntry(iterationEntryId);
+            }
           }
           if (chunk.isDone) {
             finalResponse = chunk.finalResponse;
@@ -222,16 +271,27 @@ class McpGenuiChatController extends ChangeNotifier {
         }
 
         _syncSurfaces();
-        final iterationText = iterationBuffer.toString();
-        if (iterationText.isNotEmpty) {
+        final rawIterationText = iterationBuffer.toString();
+        if (rawIterationText.isNotEmpty) {
           final assistantMsg = mp.ChatMessage(
             id: iterationEntryId,
-            content: iterationText,
+            content: rawIterationText,
             role: mp.ChatRole.assistant,
             timestamp: DateTime.now(),
           );
           _history.add(assistantMsg);
           _playgroundController?.addMessage(assistantMsg);
+        }
+
+        final cleanText = _sanitizeAssistantText(rawIterationText);
+        if (cleanText.isNotEmpty) {
+          _upsertEntry(
+            iterationEntryId,
+            cleanText,
+            GenuiChatEntryKind.assistant,
+          );
+        } else {
+          _removeEntry(iterationEntryId);
         }
 
         final toolCalls = finalResponse?.toolCalls ?? const <mp.LLMToolCall>[];
@@ -326,73 +386,100 @@ class McpGenuiChatController extends ChangeNotifier {
     return _cachedSystemPrompt = buffer.toString();
   }
 
+  static final RegExp _a2uiJsonBlockRegex = RegExp(
+    r'```(?:json)?\s*[\s\S]*?```|\{\s*"version"\s*:\s*"v0\.9"[\s\S]*\}',
+    caseSensitive: false,
+  );
+
+  /// Strips A2UI JSON code blocks so they are not displayed in the chat view.
+  static String _sanitizeAssistantText(String raw) {
+    return raw.replaceAll(_a2uiJsonBlockRegex, '').trim();
+  }
+
+  /// Extracts user action name and context parameters from a GenUI [ChatMessage].
+  ({String name, Map<String, dynamic> context})? _extractUserAction(
+    ChatMessage message,
+  ) {
+    for (final part in message.parts) {
+      if (part is DataPart &&
+          part.mimeType == UiPartConstants.interactionMimeType) {
+        try {
+          final outer =
+              jsonDecode(utf8.decode(part.bytes)) as Map<String, Object?>;
+          final interactionStr = outer['interaction'] is String
+              ? outer['interaction'] as String
+              : null;
+          final decoded = interactionStr != null
+              ? jsonDecode(interactionStr) as Map<String, Object?>
+              : outer;
+          final action = decoded['action'] is Map<String, Object?>
+              ? decoded['action'] as Map<String, Object?>
+              : decoded;
+          final name =
+              action['name']?.toString() ?? decoded['name']?.toString();
+          final rawContext = action['context'] is Map<String, Object?>
+              ? action['context'] as Map<String, Object?>
+              : (decoded['context'] is Map<String, Object?>
+                  ? decoded['context'] as Map<String, Object?>
+                  : null);
+          if (name != null && name.isNotEmpty) {
+            final Map<String, dynamic> cleanContext = {};
+            if (rawContext != null) {
+              rawContext.forEach((k, v) => cleanContext[k] = v);
+            }
+            return (name: name, context: cleanContext);
+          }
+        } catch (_) {}
+      }
+    }
+    return null;
+  }
+
   /// Converts an incoming GenUI [ChatMessage] into a prompt string for the LLM.
-  ///
-  /// Plain text messages are passed through verbatim. UI interaction messages
-  /// (emitted by [UserActionEvent]s such as a form submit) are translated into
-  /// a natural-language instruction containing the submitted parameters.
   String _messageToPrompt(ChatMessage message) {
     final buffer = StringBuffer();
     if (message.text.trim().isNotEmpty) {
       buffer.writeln(message.text);
     }
 
-    for (final part in message.parts) {
-      if (part is DataPart &&
-          part.mimeType == UiPartConstants.interactionMimeType) {
-        try {
-          final decoded =
-              jsonDecode(utf8.decode(part.bytes)) as Map<String, Object?>;
-          final action = decoded['action'] is Map<String, Object?>
-              ? decoded['action'] as Map<String, Object?>
-              : decoded;
-          final name = action['name']?.toString() ?? decoded['name']?.toString();
-          final context = action['context'] is Map<String, Object?>
-              ? action['context'] as Map<String, Object?>
-              : (decoded['context'] is Map<String, Object?>
-                  ? decoded['context'] as Map<String, Object?>
-                  : null);
-          if (name != null && name.isNotEmpty) {
-            final paramsStr = jsonEncode(context ?? const <String, Object?>{});
-            buffer.writeln(
-              'The user submitted the UI action "$name" with parameters: $paramsStr.\n'
-              'Execute the tool "$name" now with these parameters:\n$paramsStr',
-            );
-          }
-        } catch (_) {
-          // Ignore malformed interaction payloads.
-        }
-      }
+    final action = _extractUserAction(message);
+    if (action != null) {
+      final paramsStr = jsonEncode(action.context);
+      buffer.writeln(
+        'The user submitted the UI form for action "${action.name}" with arguments: $paramsStr.\n'
+        'Call the tool "${action.name}" now with these arguments to fetch the result.',
+      );
     }
 
     final prompt = buffer.toString().trim();
     return prompt.isEmpty ? message.text : prompt;
   }
 
-  /// Extracts structured JSON for displaying form/action parameters in the user chat bubble.
+  /// Extracts structured summary for displaying form/action parameters in the user chat bubble.
   String _messageToDisplayJson(ChatMessage message) {
     if (message.text.trim().isNotEmpty) {
       return message.text.trim();
     }
-    for (final part in message.parts) {
-      if (part is DataPart &&
-          part.mimeType == UiPartConstants.interactionMimeType) {
-        try {
-          final decoded =
-              jsonDecode(utf8.decode(part.bytes)) as Map<String, Object?>;
-          final action = decoded['action'] is Map<String, Object?>
-              ? decoded['action'] as Map<String, Object?>
-              : decoded;
-          final context = action['context'] is Map<String, Object?>
-              ? action['context'] as Map<String, Object?>
-              : (decoded['context'] is Map<String, Object?>
-                  ? decoded['context'] as Map<String, Object?>
-                  : null);
-          if (context != null && context.isNotEmpty) {
-            return const JsonEncoder.withIndent('  ').convert(context);
-          }
-        } catch (_) {}
+    final action = _extractUserAction(message);
+    if (action != null) {
+      final context = action.context;
+      final city = context['city']?.toString() ?? '';
+      final hours = context['hours']?.toString() ?? '';
+      final channels = context['channels'] is List
+          ? (context['channels'] as List).join(', ')
+          : '';
+      final parts = <String>[
+        if (city.isNotEmpty) 'City: $city',
+        if (hours.isNotEmpty) 'Duration: ${hours}h',
+        if (channels.isNotEmpty) 'Channels: $channels',
+      ];
+      if (parts.isNotEmpty) {
+        return 'Forecast request: ${parts.join(' | ')}';
       }
+      if (context.isNotEmpty) {
+        return const JsonEncoder.withIndent('  ').convert(context);
+      }
+      return 'Action: ${action.name}';
     }
     return '';
   }
@@ -406,6 +493,14 @@ class McpGenuiChatController extends ChangeNotifier {
       _entries.add(entry);
     }
     notifyListeners();
+  }
+
+  void _removeEntry(String id) {
+    final index = _entries.indexWhere((e) => e.id == id);
+    if (index >= 0) {
+      _entries.removeAt(index);
+      notifyListeners();
+    }
   }
 
   String _newId() =>

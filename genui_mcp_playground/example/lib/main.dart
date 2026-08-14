@@ -20,14 +20,14 @@ class GenuiPlaygroundExampleApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
+          seedColor: const Color.fromARGB(255, 22, 75, 179),
           brightness: Brightness.light,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD0BCFF),
+          seedColor: const Color.fromARGB(255, 14, 30, 50),
           brightness: Brightness.dark,
         ),
       ),
