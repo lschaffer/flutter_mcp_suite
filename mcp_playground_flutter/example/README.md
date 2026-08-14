@@ -59,6 +59,9 @@ Here is how the playground and its configuration interfaces look:
 
 ## 📦 Features Demonstrated
 
+- **GenUI Weather Showcase (`enableGenUi: true`)**:
+  - Demonstrates embedding GenUI (A2UI) widgets directly in `McpPlayground`.
+  - The model outputs interactive form (`WeatherForm`) and multi-line interactive chart (`WeatherChart` via `fl_chart`) components.
 - **Custom Local Dart-native Tools**:
   - **Weather**: Fetch conditions and forecasts using the Open-Meteo API.
   - **SSH/SFTP**: List, read, download, upload files and execute commands.

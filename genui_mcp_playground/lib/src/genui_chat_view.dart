@@ -100,6 +100,11 @@ class _GenuiChatViewState extends State<GenuiChatView> {
         return _bubble(context, entry.text, isUser: true);
       case GenuiChatEntryKind.assistant:
         return _bubble(context, entry.text, isUser: false);
+      case GenuiChatEntryKind.surface:
+        if (entry.surfaceId != null) {
+          return _buildSurface(context, entry.surfaceId!);
+        }
+        return const SizedBox.shrink();
       case GenuiChatEntryKind.error:
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
@@ -154,10 +159,10 @@ class _GenuiChatViewState extends State<GenuiChatView> {
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
               decoration: BoxDecoration(
                 color: isUser
-                    ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                    : (isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.04)),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                  : (isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.black.withValues(alpha: 0.04)),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(text),

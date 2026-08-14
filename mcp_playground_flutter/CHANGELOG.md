@@ -1,11 +1,12 @@
 ## 0.3.0
 
-- **GenUI (A2UI) integration**: Added dynamic, model-generated UI support through the `genui` package. The LLM can now emit A2UI JSON that renders interactive widgets inline in the chat.
+- **GenUI (A2UI) integration**: Added dynamic, model-generated UI support through the `genui` package. The LLM can now emit A2UI JSON that renders interactive widgets inline in the main `McpPlayground` chat view via `enableGenUi: true`, `genuiCatalogItems`, and `genuiCatalog` parameters.
+- **Agent Inspector Toggle**: Added `showAgentInspector` parameter (defaults to `true`) and top AppBar toggle button to control Agent Inspector side pane visibility.
 - **`McpGenuiChatController`**: New `ChangeNotifier` controller bridging `mcp_playground_dart`'s `LLMService` to a GenUI conversation pipeline — streaming text chunks, parsing embedded A2UI JSON, and executing local tool calls in an agent loop (configurable `maxToolIterations`).
 - **`GenuiChatView`**: Self-contained chat widget rendering the transcript, active GenUI surfaces, and a message input.
 - **JSON-defined catalogs**: `buildGenuiCatalog()`, `GenuiCatalogItemDefinition`, and `GenuiCatalogRegistry` let host apps define custom widget components via JSON schema (or Dart definitions) with a `ChatMessage` bubble as the default item; unknown builders fall back to a generic JSON renderer.
 - **Exports**: Exported the new `src/genui/` module from the package's main library.
-- **Example**: Added `genui_weather_example.dart` demonstrating an Open-Meteo weather forecast tool with a dynamically generated chart UI.
+- **Example**: Updated `genui_weather_example.dart` demonstrating an Open-Meteo weather forecast tool with a dynamically generated form & chart UI directly inside `McpPlayground`.
 - **Dependencies**: Added `genui`, `genai_primitives`, and `json_schema_builder`.
 
 ## 0.2.2

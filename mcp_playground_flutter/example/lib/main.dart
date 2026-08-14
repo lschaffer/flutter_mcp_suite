@@ -6,7 +6,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
 import 'env_loader.dart';
 import 'example_local_tools.dart';
-import 'genui_weather_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,50 +36,7 @@ class McpPlaygroundExampleApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const ExampleHome(),
-    );
-  }
-}
-
-/// A small launcher that lets the user pick between the classic playground and
-/// the GenUI-based weather example.
-class ExampleHome extends StatelessWidget {
-  const ExampleHome({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('MCP Playground Examples')),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FilledButton.icon(
-              icon: const Icon(Icons.smart_toy_outlined),
-              label: const Text('Classic Playground'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const McpPlaygroundScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              icon: const Icon(Icons.cloud_outlined),
-              label: const Text('GenUI Weather'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const GenuiWeatherScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+      home: const McpPlaygroundScreen(),
     );
   }
 }
@@ -128,13 +84,13 @@ class McpPlaygroundScreen extends StatelessWidget {
     );
 
     // Initial local MCP servers setup with git and filesystem configs
-    const initialLocalServers = [
+    final List<LocalMcpServerSetup> initialLocalServers = [
       LocalMcpServerSetup(
         name: 'Filesystem',
-        type: 'nodejs',
+        type: 'node',
         method: 'npx',
         packageOrServerName: '@modelcontextprotocol/server-filesystem',
-        launchArguments: 'c:\\',
+        launchArguments: Directory.current.path,
         reinstall: false,
       ),
       LocalMcpServerSetup(
@@ -156,7 +112,15 @@ class McpPlaygroundScreen extends StatelessWidget {
           : null,
       customLocalTools: demoLocalTools,
       initialLocalMcpServers: isDesktop ? initialLocalServers : null,
+      initialEnabledTools: const [
+        'get_weather_forecast',
+        'get_current_weather',
+        'get_hourly_forecast',
+        'get_daily_forecast',
+        'geocode_weather_city',
+      ],
       messageContentBuilder: (context, message) {
+        if (message == null) return null;
         if (message.type != MessageType.toolResponse) return null;
         if (message.toolName != 'create_chart_png') return null;
         final contentText = message.content.trim();

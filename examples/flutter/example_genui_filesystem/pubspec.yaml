@@ -1,0 +1,42 @@
+name: mcp_playground_flutter_example_genui_filesystem
+description: "A GenUI example showcasing model-generated interactive filesystem explorer widgets inside GenuiMcpPlayground."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  genui_mcp_playground:
+    path: ../../../genui_mcp_playground
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  genui: ^0.10.2
+  json_schema_builder: ^0.1.3
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  http: ^1.6.0
+
+dependency_overrides:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  genui_mcp_playground:
+    path: ../../../genui_mcp_playground
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../../.env

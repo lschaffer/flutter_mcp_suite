@@ -3,21 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
-import 'playground_controller.dart';
-import 'src/widgets/chat_bubble.dart';
-import 'src/widgets/settings_drawer.dart';
-import 'src/widgets/registered_tools_dialog.dart';
-import 'src/widgets/agent_inspector.dart';
-import 'src/widgets/llm_config_form.dart';
-import 'src/mcp_localizations.dart';
-import 'src/widgets/sub_prompt_list_editor.dart';
-import 'src/widgets/skill_save_dialog.dart';
-import 'src/utils/mime_utils.dart';
-import 'src/widgets/initial_mcp_install_progress_dialog.dart';
-import 'src/services/embedded_llm/embedded_model.dart';
-import 'src/services/embedded_llm/embedded_model_manager.dart';
-import 'src/services/embedded_llm/embedded_llm_adapter.dart';
+import 'package:mcp_playground_dart/mcp_playground_dart.dart'
+    hide
+        LocalMCPClient,
+        LocalMcpRuntime,
+        LocalMcpException,
+        LocalInstallStep,
+        LocalInstallProgress;
+import 'package:mcp_playground_ui/mcp_playground_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 String _mimeFromExtension(String name) => mimeFromExtension(name);
@@ -50,11 +43,20 @@ class McpPlayground extends StatefulWidget {
   final String? locale;
 
   /// Optional builder to customize rendering of chat bubble message contents dynamically.
-  final Widget? Function(BuildContext context, ChatMessage message)?
+  final Widget? Function(BuildContext context, ChatMessage? message)?
   messageContentBuilder;
 
   /// Whether to print clean console logs for key events.
   final bool enableLogging;
+
+  /// Whether to show the Agent Inspector side panel and toggle button. Defaults to true.
+  final bool showAgentInspector;
+
+  /// Optional initial system prompt.
+  final String? initialSystemPrompt;
+
+  /// Optional list of tool names to pre-select as active on startup.
+  final List<String>? initialEnabledTools;
 
   /// Creates a new [McpPlayground] widget instance.
   const McpPlayground({
@@ -68,6 +70,9 @@ class McpPlayground extends StatefulWidget {
     this.locale,
     this.messageContentBuilder,
     this.enableLogging = false,
+    this.showAgentInspector = true,
+    this.initialSystemPrompt,
+    this.initialEnabledTools,
   });
 
   @override
@@ -93,6 +98,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
   bool _playgroundStarted = false;
   String? _loadedSetupId;
   double _chatFraction = 0.7;
+  bool _inspectorVisible = true;
 
   // Setup form states
   final _systemPromptCtrl = TextEditingController();
@@ -129,6 +135,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialSystemPrompt != null) {
+      _systemPromptCtrl.text = widget.initialSystemPrompt!;
+    }
     _controller = PlaygroundController(
       initialLlmConfig: widget.initialLlmConfig,
       initialServers: widget.initialServers,
@@ -140,6 +149,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
     _controller.addListener(_onStateChange);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.initialEnabledTools != null) {
+        _controller.updateEnabledTools(widget.initialEnabledTools!.toSet());
+      }
       await _checkAndInstallInitialLocalMcpServers();
       await _checkAndDownloadInitialEmbeddedModel();
     });
@@ -160,9 +172,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
     if (!isDesktop) return;
 
     // Wait until controller is done loading from storage
-    while (_controller.isLoading) {
+    while (_controller.isLoading && mounted) {
       await Future.delayed(const Duration(milliseconds: 100));
     }
+    if (!mounted) return;
 
     final localServersSetup = widget.initialLocalMcpServers;
     if (localServersSetup == null || localServersSetup.isEmpty) return;
@@ -315,6 +328,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
     final weatherTools = _controller.localTools
         .where(
           (t) =>
+              t.name == 'get_weather_forecast' ||
               t.name == 'get_current_weather' ||
               t.name == 'get_hourly_forecast' ||
               t.name == 'get_daily_forecast' ||
@@ -385,6 +399,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
     final otherTools = _controller.localTools
         .where(
           (t) =>
+              t.name != 'get_weather_forecast' &&
               t.name != 'get_current_weather' &&
               t.name != 'get_hourly_forecast' &&
               t.name != 'get_daily_forecast' &&
@@ -545,6 +560,17 @@ class _McpPlaygroundState extends State<McpPlayground> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      if (groupTools.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tools: ${groupTools.map((t) => t.name).join(', ')}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -584,12 +610,12 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   activeColor: const Color(0xFF00ACC1),
                   onChanged: (val) {
                     final target = val ?? false;
-                    setState(() {
-                      _controller.toggleToolsEnabled(
-                        groupTools.map((t) => t.name),
-                        target,
-                      );
-                    });
+                    _controller.toggleToolsEnabled(
+                      groupTools.map((t) => t.name),
+                      target,
+                    );
+                    setDialogState(() {});
+                    setState(() {});
                   },
                 ),
               ],
@@ -960,9 +986,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
   Future<void> _checkAndDownloadInitialEmbeddedModel() async {
     // Wait until controller is done loading from storage
-    while (_controller.isLoading) {
+    while (_controller.isLoading && mounted) {
       await Future.delayed(const Duration(milliseconds: 100));
     }
+    if (!mounted) return;
 
     final initialLlm = widget.initialLlmConfig;
     if (initialLlm == null || initialLlm.provider != LlmProvider.embedded) {
@@ -1713,25 +1740,23 @@ class _McpPlaygroundState extends State<McpPlayground> {
             ],
           ),
         ),
-        const Divider(height: 1),
-
-        // --- Main Conversation Area ---
+        const Divider(height: 1),        // --- Main Conversation Area ---
         Expanded(
           child: _controller.isLoading
               ? const Center(child: CircularProgressIndicator())
               : _controller.messages.isEmpty
-              ? _buildWelcomeWidget(theme)
-              : ListView.builder(
-                  controller: _scrollCtrl,
-                  padding: const EdgeInsets.only(bottom: 24),
-                  itemCount: _controller.messages.length,
-                  itemBuilder: (ctx, idx) {
-                    return ChatBubble(
-                      message: _controller.messages[idx],
-                      controller: _controller,
-                    );
-                  },
-                ),
+                  ? _buildWelcomeWidget(theme)
+                  : ListView(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.only(bottom: 24),
+                      children: [
+                        for (final msg in _controller.messages)
+                          ChatBubble(
+                            message: msg,
+                            controller: _controller,
+                          ),
+                      ],
+                    ),
         ),
 
         // --- Action Indicators (Generating / Errors) ---
@@ -1814,10 +1839,11 @@ class _McpPlaygroundState extends State<McpPlayground> {
   }
 
   Widget _buildInputBar(ThemeData theme) {
+    final isGen = _controller.isGenerating;
     final showButton =
         _inputCtrl.text.isNotEmpty ||
         _attachments.isNotEmpty ||
-        !_controller.isGenerating;
+        !isGen;
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -1845,7 +1871,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
                     .toList(),
                 minLines: 1,
                 maxLines: 6,
-                hintText: 'Type a message or ask a tool to run...',
+                hintText: isGen ? 'Agent is working...' : 'Type a message or ask a tool to run...',
               ),
               const SizedBox(height: 8),
               Row(
@@ -1853,18 +1879,17 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   IconButton(
                     icon: const Icon(Icons.attach_file_outlined),
                     tooltip: 'Attach Files / Images',
-                    onPressed: _controller.isGenerating
-                        ? null
-                        : _pickAttachments,
+                    onPressed: isGen ? null : _pickAttachments,
                   ),
                   const Spacer(),
-                  if (_controller.isGenerating)
-                    IconButton(
-                      icon: const Icon(Icons.stop_circle),
-                      iconSize: 24,
-                      tooltip: 'Stop execution',
-                      onPressed: () => _controller.cancelGeneration(),
-                      color: Colors.red,
+                  if (isGen)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12.0),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
                     )
                   else
                     IconButton(
@@ -2050,8 +2075,6 @@ class _McpPlaygroundState extends State<McpPlayground> {
     final l10n = _l10n;
 
     if (isWide) {
-      final showInspectorButton =
-          _playgroundStarted && MediaQuery.sizeOf(context).width < 900;
       return [
         IconButton(
           icon: const Icon(Icons.restart_alt),
@@ -2086,11 +2109,23 @@ class _McpPlaygroundState extends State<McpPlayground> {
           tooltip: l10n.get('catalogTooltip'),
           onPressed: () => RegisteredToolsDialog.show(context, _controller),
         ),
-        if (showInspectorButton)
+        if (widget.showAgentInspector)
           IconButton(
-            icon: const Icon(Icons.analytics_outlined),
+            icon: Icon(
+              _inspectorVisible
+                  ? Icons.analytics
+                  : Icons.analytics_outlined,
+            ),
             tooltip: l10n.get('agentInspector'),
-            onPressed: _showAgentInspectorDialog,
+            onPressed: () {
+              if (isWide && _playgroundStarted) {
+                setState(() {
+                  _inspectorVisible = !_inspectorVisible;
+                });
+              } else {
+                _showAgentInspectorDialog();
+              }
+            },
           ),
       ];
     }
@@ -2161,7 +2196,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
               ],
             ),
           ),
-          if (_playgroundStarted)
+          if (_playgroundStarted && widget.showAgentInspector)
             PopupMenuItem(
               value: 'inspector',
               child: Row(
@@ -2194,6 +2229,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
         : null;
 
     final l10n = _l10n;
+
+    final bool showInspectorPane =
+        isWide && widget.showAgentInspector && _inspectorVisible && _playgroundStarted;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -2246,13 +2284,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
           ],
         ),
       ),
-      body: isWide
+      body: showInspectorPane
           ? LayoutBuilder(
               builder: (context, constraints) {
                 final totalWidth = constraints.maxWidth;
-                if (!_playgroundStarted) {
-                  return bodyContent;
-                }
                 const minChatWidth = 300.0;
                 const minInspectorWidth = 250.0;
 

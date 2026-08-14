@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:genui/genui.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart' as mp;
+import 'package:mcp_playground_ui/mcp_playground_ui.dart';
 
 import 'genui_catalog.dart';
 
@@ -16,6 +17,9 @@ enum GenuiChatEntryKind {
 
   /// An error produced while handling a request.
   error,
+
+  /// An active GenUI surface widget.
+  surface,
 }
 
 /// A single entry in the GenUI chat transcript.
@@ -25,6 +29,7 @@ class GenuiChatEntry {
     required this.id,
     required this.kind,
     required this.text,
+    this.surfaceId,
   });
 
   /// Stable unique identifier.
@@ -35,6 +40,9 @@ class GenuiChatEntry {
 
   /// The text content of the entry.
   final String text;
+
+  /// The surface ID if this is a surface entry.
+  final String? surfaceId;
 }
 
 /// A [ChangeNotifier] that bridges [`mcp_playground_dart`](https://pub.dev/packages/mcp_playground_dart)'s
@@ -60,6 +68,7 @@ class McpGenuiChatController extends ChangeNotifier {
     String? catalogJson,
     List<GenuiCatalogItemDefinition>? catalogItems,
     this.maxToolIterations = 10,
+    this._playgroundController,
   }) {
     _llmConfig = llmConfig;
     _tools = List.of(tools);
@@ -75,6 +84,8 @@ class McpGenuiChatController extends ChangeNotifier {
     );
   }
 
+  final PlaygroundController? _playgroundController;
+
   late final mp.LlmConfig _llmConfig;
   late final List<mp.McpLocalTool> _tools;
   late final String? _systemPrompt;
@@ -89,9 +100,25 @@ class McpGenuiChatController extends ChangeNotifier {
 
   final List<GenuiChatEntry> _entries = [];
   final List<mp.ChatMessage> _history = [];
+  final Set<String> _knownSurfaces = {};
   String? _cachedSystemPrompt;
 
   bool _isGenerating = false;
+
+  void _syncSurfaces() {
+    for (final sId in _surfaceController.activeSurfaceIds) {
+      if (_knownSurfaces.add(sId)) {
+        _entries.add(
+          GenuiChatEntry(
+            id: 'surface_$sId',
+            kind: GenuiChatEntryKind.surface,
+            text: '',
+            surfaceId: sId,
+          ),
+        );
+      }
+    }
+  }
 
   /// The GenUI [SurfaceController] backing this chat.
   SurfaceController get surfaceController => _surfaceController;
@@ -138,22 +165,39 @@ class McpGenuiChatController extends ChangeNotifier {
     notifyListeners();
 
     final prompt = _messageToPrompt(message);
+    final userDisplay = _messageToDisplayJson(message);
+    if (message.text.isEmpty && userDisplay.isNotEmpty) {
+      _entries.add(
+        GenuiChatEntry(
+          id: _newId(),
+          kind: GenuiChatEntryKind.user,
+          text: userDisplay,
+        ),
+      );
+    }
+
+    final userMsg = mp.ChatMessage(
+      id: _newId(),
+      content: userDisplay.isNotEmpty ? userDisplay : prompt,
+      role: mp.ChatRole.user,
+      timestamp: DateTime.now(),
+    );
     _history.add(
       mp.ChatMessage(
-        id: _newId(),
+        id: userMsg.id,
         content: prompt,
         role: mp.ChatRole.user,
-        timestamp: DateTime.now(),
+        timestamp: userMsg.timestamp,
       ),
     );
-
-    final assistantEntryId = _newId();
-    final assistantBuffer = StringBuffer();
+    _playgroundController?.addMessage(userMsg);
 
     try {
       for (var iteration = 0; iteration < maxToolIterations; iteration++) {
         mp.LLMResponse? finalResponse;
         final mcpTools = _tools.map((t) => t.toMCPTool()).toList();
+        final iterationBuffer = StringBuffer();
+        final iterationEntryId = _newId();
 
         await for (final chunk in mp.LLMService.generateStream(
           config: _llmConfig,
@@ -162,60 +206,64 @@ class McpGenuiChatController extends ChangeNotifier {
           systemPrompt: _effectiveSystemPrompt,
         )) {
           if (chunk.textDelta.isNotEmpty) {
-            assistantBuffer.write(chunk.textDelta);
+            iterationBuffer.write(chunk.textDelta);
             _transport.addChunk(chunk.textDelta);
+            _syncSurfaces();
             _upsertEntry(
-              assistantEntryId,
-              assistantBuffer.toString(),
+              iterationEntryId,
+              iterationBuffer.toString(),
               GenuiChatEntryKind.assistant,
             );
           }
           if (chunk.isDone) {
             finalResponse = chunk.finalResponse;
+            _syncSurfaces();
           }
         }
 
-        final assistantText = assistantBuffer.toString();
-        if (assistantText.isNotEmpty) {
-          _history.add(
-            mp.ChatMessage(
-              id: _newId(),
-              content: assistantText,
-              role: mp.ChatRole.assistant,
-              timestamp: DateTime.now(),
-            ),
+        _syncSurfaces();
+        final iterationText = iterationBuffer.toString();
+        if (iterationText.isNotEmpty) {
+          final assistantMsg = mp.ChatMessage(
+            id: iterationEntryId,
+            content: iterationText,
+            role: mp.ChatRole.assistant,
+            timestamp: DateTime.now(),
           );
+          _history.add(assistantMsg);
+          _playgroundController?.addMessage(assistantMsg);
         }
 
         final toolCalls = finalResponse?.toolCalls ?? const <mp.LLMToolCall>[];
         if (toolCalls.isEmpty) break;
 
         for (final call in toolCalls) {
-          _history.add(
-            mp.ChatMessage(
-              id: _newId(),
-              content: '',
-              role: mp.ChatRole.assistant,
-              timestamp: DateTime.now(),
-              type: mp.MessageType.toolCall,
-              toolName: call.name,
-              toolArguments: call.arguments,
-            ),
+          final toolCallMsg = mp.ChatMessage(
+            id: call.id.isNotEmpty ? call.id : _newId(),
+            content: '',
+            role: mp.ChatRole.assistant,
+            timestamp: DateTime.now(),
+            type: mp.MessageType.toolCall,
+            toolName: call.name,
+            toolArguments: call.arguments,
           );
+          _history.add(toolCallMsg);
+          _playgroundController?.addMessage(toolCallMsg);
         }
 
         for (final call in toolCalls) {
           final result = await _executeTool(call);
-          _history.add(
-            mp.ChatMessage(
-              id: _newId(),
-              content: result.content.map((c) => c.text ?? '').join('\n'),
-              role: mp.ChatRole.tool,
-              timestamp: DateTime.now(),
-              type: mp.MessageType.toolResponse,
-              toolResult: result,
-            ),
+          final toolRespMsg = mp.ChatMessage(
+            id: call.id.isNotEmpty ? call.id : _newId(),
+            content: result.content.map((c) => c.text ?? '').join('\n'),
+            role: mp.ChatRole.tool,
+            timestamp: DateTime.now(),
+            type: mp.MessageType.toolResponse,
+            toolName: call.name,
+            toolResult: result,
           );
+          _history.add(toolRespMsg);
+          _playgroundController?.addMessage(toolRespMsg);
         }
       }
     } catch (error) {
@@ -265,6 +313,16 @@ class McpGenuiChatController extends ChangeNotifier {
       buffer.writeln('\n\n### Additional instructions');
       buffer.writeln(extra);
     }
+    if (_tools.isNotEmpty && !_llmConfig.useNativeToolCall) {
+      buffer.writeln('\n\nAvailable Tools:');
+      for (final tool in _tools) {
+        buffer.writeln('- Tool Name: ${tool.name}');
+        if (tool.description.isNotEmpty) {
+          buffer.writeln('  Description: ${tool.description}');
+        }
+        buffer.writeln('  Input Schema: ${jsonEncode(tool.inputSchema)}');
+      }
+    }
     return _cachedSystemPrompt = buffer.toString();
   }
 
@@ -285,15 +343,22 @@ class McpGenuiChatController extends ChangeNotifier {
         try {
           final decoded =
               jsonDecode(utf8.decode(part.bytes)) as Map<String, Object?>;
-          final action = decoded['action'] as Map<String, Object?>?;
-          final name = action?['name']?.toString();
-          final context = action?['context'] as Map<String, Object?>?;
-          buffer.writeln(
-            'A user action "$name" was submitted with the following '
-            'parameters: ${jsonEncode(context ?? const <String, Object?>{})}. '
-            'Use these parameters to call the appropriate tool and render the '
-            'resulting widget.',
-          );
+          final action = decoded['action'] is Map<String, Object?>
+              ? decoded['action'] as Map<String, Object?>
+              : decoded;
+          final name = action['name']?.toString() ?? decoded['name']?.toString();
+          final context = action['context'] is Map<String, Object?>
+              ? action['context'] as Map<String, Object?>
+              : (decoded['context'] is Map<String, Object?>
+                  ? decoded['context'] as Map<String, Object?>
+                  : null);
+          if (name != null && name.isNotEmpty) {
+            final paramsStr = jsonEncode(context ?? const <String, Object?>{});
+            buffer.writeln(
+              'The user submitted the UI action "$name" with parameters: $paramsStr.\n'
+              'Execute the tool "$name" now with these parameters:\n$paramsStr',
+            );
+          }
         } catch (_) {
           // Ignore malformed interaction payloads.
         }
@@ -302,6 +367,34 @@ class McpGenuiChatController extends ChangeNotifier {
 
     final prompt = buffer.toString().trim();
     return prompt.isEmpty ? message.text : prompt;
+  }
+
+  /// Extracts structured JSON for displaying form/action parameters in the user chat bubble.
+  String _messageToDisplayJson(ChatMessage message) {
+    if (message.text.trim().isNotEmpty) {
+      return message.text.trim();
+    }
+    for (final part in message.parts) {
+      if (part is DataPart &&
+          part.mimeType == UiPartConstants.interactionMimeType) {
+        try {
+          final decoded =
+              jsonDecode(utf8.decode(part.bytes)) as Map<String, Object?>;
+          final action = decoded['action'] is Map<String, Object?>
+              ? decoded['action'] as Map<String, Object?>
+              : decoded;
+          final context = action['context'] is Map<String, Object?>
+              ? action['context'] as Map<String, Object?>
+              : (decoded['context'] is Map<String, Object?>
+                  ? decoded['context'] as Map<String, Object?>
+                  : null);
+          if (context != null && context.isNotEmpty) {
+            return const JsonEncoder.withIndent('  ').convert(context);
+          }
+        } catch (_) {}
+      }
+    }
+    return '';
   }
 
   void _upsertEntry(String id, String text, GenuiChatEntryKind kind) {

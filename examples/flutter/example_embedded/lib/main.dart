@@ -67,6 +67,7 @@ class McpPlaygroundScreen extends StatelessWidget {
         initialLlmConfig: initialLlm,
         customLocalTools: demoLocalTools,
         messageContentBuilder: (context, message) {
+          if (message == null) return null;
           if (message.type != MessageType.toolResponse) return null;
           if (message.toolName != 'create_chart_png') return null;
           final contentText = message.content.trim();

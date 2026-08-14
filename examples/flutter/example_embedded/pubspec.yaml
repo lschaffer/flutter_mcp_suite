@@ -23,6 +23,10 @@ dependencies:
 dependency_overrides:
   mcp_playground_dart:
     path: ../../../mcp_playground_dart
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  mcp_playground_flutter:
+    path: ../../../mcp_playground_flutter
 
 dev_dependencies:
   flutter_test:

@@ -62,3 +62,22 @@ bool isTextFile(String mimeType, String filename) {
       name.endsWith('.ps1') ||
       name.endsWith('.log');
 }
+
+/// An attached file or image payload in a chat session.
+class McpChatAttachment {
+  /// File name.
+  final String name;
+
+  /// MIME type string (e.g. image/png, application/pdf).
+  final String mimeType;
+
+  /// Raw byte payload of the attachment.
+  final List<int> bytes;
+
+  /// Creates a [McpChatAttachment].
+  const McpChatAttachment({
+    required this.name,
+    required this.mimeType,
+    required this.bytes,
+  });
+}

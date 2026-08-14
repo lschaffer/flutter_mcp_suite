@@ -197,7 +197,13 @@ class McpPlaygroundLocalizations {
   static const LocalizationsDelegate<McpPlaygroundLocalizations> delegate =
       _McpPlaygroundLocalizationsDelegate();
 
-  static McpPlaygroundLocalizations of(BuildContext context) {
+  static McpPlaygroundLocalizations of(
+    BuildContext context, {
+    String? overrideLocale,
+  }) {
+    if (overrideLocale != null) {
+      return McpPlaygroundLocalizations(Locale(overrideLocale));
+    }
     return Localizations.of<McpPlaygroundLocalizations>(
           context,
           McpPlaygroundLocalizations,
@@ -228,3 +234,5 @@ class _McpPlaygroundLocalizationsDelegate
   @override
   bool shouldReload(_McpPlaygroundLocalizationsDelegate old) => false;
 }
+
+typedef McpLocalizations = McpPlaygroundLocalizations;

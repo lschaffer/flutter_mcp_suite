@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:genui/genui.dart';
 import 'package:http/http.dart' as http;
-import 'package:json_schema_builder/json_schema_builder.dart';
-import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+import 'package:genui_mcp_playground/genui_mcp_playground.dart';
 
 import 'env_loader.dart';
 
@@ -417,7 +416,7 @@ Widget _buildWeatherChart(CatalogItemContext itemContext) {
         child: ListView.separated(
           shrinkWrap: true,
           itemCount: times.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
+          separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) {
             final values = channels
                 .map(
@@ -477,59 +476,51 @@ Catalog buildWeatherGenuiCatalog() {
   return base.copyWith(newItems: [weatherFormItem, weatherChartItem]);
 }
 
-const String _weatherSystemPrompt = '''
-You are a helpful weather assistant backed by a live forecast tool.
+/// The system prompt instructing the model how to use weather GenUI widgets and tools.
+const String weatherGenuiSystemPrompt = '''
+You are a helpful weather assistant backed by the live `get_weather_forecast` tool.
 
-Follow these steps when the user asks for a weather forecast:
-1. If the city, forecast duration, or weather channels are missing, render a
-   single WeatherForm component so the user can provide them.
-2. When the parameters are known (for example after a user action submission),
-   call the get_weather_forecast tool with the submitted city, hours and
-   channels.
-3. Render the forecast returned by the tool as a WeatherChart component.
+Important Catalog Rules:
+- You ONLY have access to two custom components: "WeatherForm" and "WeatherChart".
+- Do NOT invent or use other component names like "Text", "Divider", "Header", "Column", "ChoicePicker", or "Button".
+
+Follow these steps strictly:
+1. When the user asks for a weather forecast without city/parameters, render a "WeatherForm" component.
+2. When the user submits a form action or parameters (city, hours, channels) are given:
+   - Call the `get_weather_forecast` tool immediately using those arguments.
+   - Do NOT ask questions or repeat instructions.
+3. After receiving the JSON tool result from `get_weather_forecast`:
+   - Render a "WeatherChart" component with the forecast data:
+   {
+     "title": "Weather forecast for <location>",
+     "times": [<list of ISO timestamps from tool result>],
+     "channels": [
+       { "label": "<channel_name>", "values": [<list of numeric values from tool result>] }
+     ]
+   }
 ''';
 
-/// The GenUI-based weather example screen.
-class GenuiWeatherScreen extends StatefulWidget {
+/// The GenUI-based weather example screen using the standard McpPlayground view.
+class GenuiWeatherScreen extends StatelessWidget {
   /// Creates a [GenuiWeatherScreen].
   const GenuiWeatherScreen({super.key});
 
   @override
-  State<GenuiWeatherScreen> createState() => _GenuiWeatherScreenState();
-}
-
-class _GenuiWeatherScreenState extends State<GenuiWeatherScreen> {
-  late final McpGenuiChatController _controller;
-
-  @override
-  void initState() {
-    super.initState();
+  Widget build(BuildContext context) {
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
       model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );
-    _controller = McpGenuiChatController(
-      llmConfig: initialLlm,
-      tools: [WeatherForecastTool()],
-      catalog: buildWeatherGenuiCatalog(),
-      systemPrompt: _weatherSystemPrompt,
-    );
-  }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GenuiChatView(
-      controller: _controller,
-      title: 'GenUI Weather',
-      inputHint: 'Ask about the weather, e.g. "What is the forecast?"',
+    return GenuiMcpPlayground(
+      initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
+      customLocalTools: [WeatherForecastTool()],
+      initialEnabledTools: const ['get_weather_forecast'],
+      initialSystemPrompt: weatherGenuiSystemPrompt,
+      genuiCatalog: buildWeatherGenuiCatalog(),
+      showAgentInspector: true,
     );
   }
 }

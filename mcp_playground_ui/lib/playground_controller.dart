@@ -254,7 +254,6 @@ class PlaygroundController extends ChangeNotifier {
   final Set<String> _enabledToolNames = {};
   final Set<String> _initializedClientIds = {};
   final bool enableLogging;
-  bool _isInitializing = false;
 
   /// Optional builder to customize rendering of chat bubble message contents dynamically.
   Widget? Function(BuildContext context, ChatMessage message)?
@@ -345,6 +344,12 @@ class PlaygroundController extends ChangeNotifier {
     _registerEmbeddedLlmHandlers();
     _mcpManager.addListener(notifyListeners);
     _initAndLoad();
+  }
+
+  /// Adds a message to the conversation history and notifies listeners.
+  void addMessage(ChatMessage message) {
+    _messages.add(message);
+    notifyListeners();
   }
 
   // --- Getters ---
@@ -557,13 +562,14 @@ class PlaygroundController extends ChangeNotifier {
         _servers.clear();
         _servers.addAll(savedServers);
       }
-      _isInitializing = true;
       final setups = await _storage.loadSetups();
       _savedSetups.clear();
       _savedSetups.addAll(setups);
 
-      // Startup starts with no tools preselected
+      // Load saved enabled tools, or start empty
+      final savedTools = await _storage.loadEnabledTools();
       _enabledToolNames.clear();
+      _enabledToolNames.addAll(savedTools);
 
       final savedClients = await _storage.loadInitializedClients();
       _initializedClientIds.addAll(savedClients);
@@ -572,7 +578,6 @@ class PlaygroundController extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Failed to load configuration: $e';
     } finally {
-      _isInitializing = false;
       _loading = false;
       notifyListeners();
     }
@@ -701,11 +706,6 @@ class PlaygroundController extends ChangeNotifier {
       if (clientDef.isConnected &&
           !_initializedClientIds.contains(clientDef.name)) {
         _initializedClientIds.add(clientDef.name);
-        if (!_isInitializing) {
-          for (final tool in clientDef.availableTools) {
-            _enabledToolNames.add(tool.name);
-          }
-        }
         changed = true;
       }
     }
