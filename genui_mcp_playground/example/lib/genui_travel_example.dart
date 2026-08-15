@@ -89,10 +89,22 @@ class SerpApiTravelSearchTool extends McpLocalTool {
           final places = (data['places_results'] as List?) ?? [];
           final knowledge = data['knowledge_graph'] as Map<String, dynamic>?;
 
+          final inlineImages = (data['inline_images'] as List?) ?? [];
           final results = <Map<String, dynamic>>[];
+          var imgIdx = 0;
 
           for (final p in places.take(6)) {
             if (p is Map<String, dynamic>) {
+              String? thumb = p['thumbnail'] as String? ?? p['image'] as String?;
+              if ((thumb == null || thumb.isEmpty) && imgIdx < inlineImages.length) {
+                final inline = inlineImages[imgIdx];
+                if (inline is Map) {
+                  thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+                }
+              }
+              thumb ??= _defaultPhotoForType(accomType, imgIdx);
+              imgIdx++;
+
               results.add({
                 'name': p['title'] ?? 'Place',
                 'type': accomType,
@@ -100,7 +112,7 @@ class SerpApiTravelSearchTool extends McpLocalTool {
                 'reviews': '${p['reviews'] ?? 100} reviews',
                 'price': p['price'] ?? '\$120 - \$220/night',
                 'address': p['address'] ?? destination,
-                'thumbnail': p['thumbnail'] ?? _defaultPhotoForType(accomType),
+                'thumbnail': thumb,
                 'link': p['links']?['website'] ?? p['link'] ?? 'https://www.google.com/search?q=${Uri.encodeComponent(p['title'] ?? '')}',
                 'snippet': p['description'] ?? p['snippet'] ?? 'Highly rated accommodation option.',
                 'amenities': ['WiFi', 'Verified Stay', 'Scenic Location'],
@@ -110,6 +122,16 @@ class SerpApiTravelSearchTool extends McpLocalTool {
 
           for (final org in organic.take(6)) {
             if (org is Map<String, dynamic>) {
+              String? thumb = org['thumbnail'] as String?;
+              if ((thumb == null || thumb.isEmpty) && imgIdx < inlineImages.length) {
+                final inline = inlineImages[imgIdx];
+                if (inline is Map) {
+                  thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+                }
+              }
+              thumb ??= _defaultPhotoForType(accomType, imgIdx);
+              imgIdx++;
+
               results.add({
                 'name': org['title'] ?? 'Travel Result',
                 'type': accomType,
@@ -117,7 +139,7 @@ class SerpApiTravelSearchTool extends McpLocalTool {
                 'reviews': '${org['reviews'] ?? 250} reviews',
                 'price': '\$100 - \$250/night',
                 'address': destination.isNotEmpty ? destination : 'Local Area',
-                'thumbnail': org['thumbnail'] ?? _defaultPhotoForType(accomType),
+                'thumbnail': thumb,
                 'link': org['link'] ?? 'https://www.google.com',
                 'snippet': org['snippet'] ?? '',
                 'amenities': ['Central Location', 'Great Reviews'],
@@ -150,6 +172,7 @@ class SerpApiTravelSearchTool extends McpLocalTool {
       }
     }
 
+    // Fallback curated live mock data if SerpAPI key is not configured or offline
     final mockResults = _generateCuratedAccommodations(destination, accomType);
     return MCPToolResult(
       content: [
@@ -171,20 +194,45 @@ class SerpApiTravelSearchTool extends McpLocalTool {
     );
   }
 
-  String _defaultPhotoForType(String type) {
-    switch (type) {
-      case 'camping':
-        return 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600&auto=format&fit=crop&q=80';
-      case 'apartment':
-        return 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&auto=format&fit=crop&q=80';
-      case 'resort':
-        return 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&auto=format&fit=crop&q=80';
-      case 'hostel':
-        return 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80';
-      case 'hotel':
-      default:
-        return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&auto=format&fit=crop&q=80';
-    }
+  static final Map<String, List<String>> _photoPools = {
+    'apartment': [
+      'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&auto=format&fit=crop&q=80',
+    ],
+    'hotel': [
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&auto=format&fit=crop&q=80',
+    ],
+    'camping': [
+      'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1510312305653-8ed496efae75?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1532339142463-fd0a8979791a?w=600&auto=format&fit=crop&q=80',
+    ],
+    'resort': [
+      'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1563911302283-d2bc129e7570?w=600&auto=format&fit=crop&q=80',
+    ],
+    'hostel': [
+      'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1520277739336-7bf67edfa768?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600&auto=format&fit=crop&q=80',
+    ],
+  };
+
+  String _defaultPhotoForType(String type, [int index = 0]) {
+    final pool = _photoPools[type] ?? _photoPools['hotel']!;
+    return pool[index % pool.length];
   }
 
   List<Map<String, dynamic>> _generateCuratedAccommodations(String destination, String type) {
