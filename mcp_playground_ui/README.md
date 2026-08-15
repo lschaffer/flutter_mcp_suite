@@ -6,21 +6,24 @@ Shared UI components, dialogs, drawers, controllers, and services for **MCP Play
 
 ## ✨ Features
 
-- **`PlaygroundController`** – Full lifecycle and state manager for agent conversations, tool execution, MCP server sync, and inspector tracing.
+- **`PlaygroundController`** – Full lifecycle and state manager for agent conversations, tool execution, MCP server synchronization, and inspector tracing.
+- **Workflow Automation & Execution** – Define, save, load, and run multi-step agent workflows (`WorkflowDef`, `WorkflowSaveDialog`, `WorkflowLoadDialog`, `WorkflowStep`, sub-prompt pipelines).
+- **Skills System & Skill Wizard** – Comprehensive skill authoring and discovery (`SkillsManagerDialog`, `SkillWizardDialog`, `SkillDetailsDialog`, `ActiveSkillBanner`, `SkillStorageAdapter`, ZIP import/export).
 - **LLM Configuration & Settings** – `LlmConfigForm`, `SettingsDrawer`, `SubPromptListEditor`.
 - **MCP Server & Tool Management** – `McpServerRegistryTab`, `EditMcpDialog`, `RemoteMcpDialog`, `RegisteredToolsDialog`, `ServerToolsDialog`.
 - **On-Device Embedded LLMs** – `EmbeddedModelManager`, `EmbeddedModelPickerWidget`, `HfDiscoverDialog`, `AddGgufDialog`.
-- **Skills System** – `SkillSaveDialog`, `SkillLoadDialog`, `SkillStorageAdapter`, ZIP import/export.
-- **Inspector Panel** – `AgentInspector` side pane for real-time observability of tool executions and system prompts.
-- **Localization** – English & German strings via `McpPlaygroundLocalizations` (`McpLocalizations`).
+- **Inspector Panel** – `AgentInspector` side pane for real-time observability of tool executions, raw JSON payloads, and system prompts.
+- **Localization** – Full English & German strings via `McpPlaygroundLocalizations` (`McpLocalizations`).
 
 ---
 
 ## 🎥 Demo
 
-Watch the AI Agent Playground in action using embedded model to call local dart tools:
+Watch the AI Agent Playground in action executing tasks with local tools and embedded models:
 
-![Genui MCP Demo ](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+![GenUI MCP Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+
+---
 
 ## 📦 Installation
 
@@ -28,6 +31,6 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  mcp_playground_ui: ^0.1.0
-  mcp_playground_dart: ^0.2.2
+  mcp_playground_ui: ^0.3.0
+  mcp_playground_dart: ^0.3.0
 ```
