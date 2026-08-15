@@ -6,6 +6,8 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'src/models/skill_def.dart';
+import 'src/models/workflow_def.dart';
 import 'src/utils/mime_utils.dart';
 import 'src/services/embedded_llm/embedded_llm_adapter.dart';
 import 'src/skills/file_system_skill_storage_adapter.dart';
@@ -30,6 +32,18 @@ abstract class McpPlaygroundStorageDelegate {
 
   /// Loads the list of user-created configuration setups.
   Future<List<SavedPlaygroundSetup>> loadSetups();
+
+  /// Saves the list of skills.
+  Future<void> saveSkills(List<SkillDef> skills) async {}
+
+  /// Loads the list of skills.
+  Future<List<SkillDef>> loadSkills() async => [];
+
+  /// Saves the list of saved workflows.
+  Future<void> saveWorkflows(List<PlaygroundWorkflow> workflows) async {}
+
+  /// Loads the list of saved workflows.
+  Future<List<PlaygroundWorkflow>> loadWorkflows() async => [];
 
   /// Saves the active enabled tool names.
   Future<void> saveEnabledTools(Set<String> tools) async {}
@@ -76,6 +90,8 @@ class SharedPreferencesStorageDelegate implements McpPlaygroundStorageDelegate {
   static const _kLlm = 'mcp_playground_llm_config';
   static const _kServers = 'mcp_playground_servers';
   static const _kSetups = 'mcp_playground_saved_setups';
+  static const _kSkills = 'mcp_playground_skills_list';
+  static const _kWorkflows = 'mcp_playground_workflows_list';
   static const _kEnabledTools = 'mcp_playground_enabled_tools';
   static const _kInitializedClients = 'mcp_playground_initialized_clients';
   static const _kCachedServerTools = 'mcp_playground_cached_server_tools';
@@ -144,6 +160,50 @@ class SharedPreferencesStorageDelegate implements McpPlaygroundStorageDelegate {
             (item) =>
                 SavedPlaygroundSetup.fromJson(item as Map<String, dynamic>),
           )
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> saveSkills(List<SkillDef> skills) async {
+    final prefs = await _instance;
+    final list = skills.map((s) => s.toJson()).toList();
+    await prefs.setString(_kSkills, jsonEncode(list));
+  }
+
+  @override
+  Future<List<SkillDef>> loadSkills() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_kSkills);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final list = jsonDecode(raw) as List;
+      return list
+          .map((item) => SkillDef.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> saveWorkflows(List<PlaygroundWorkflow> workflows) async {
+    final prefs = await _instance;
+    final list = workflows.map((w) => w.toJson()).toList();
+    await prefs.setString(_kWorkflows, jsonEncode(list));
+  }
+
+  @override
+  Future<List<PlaygroundWorkflow>> loadWorkflows() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_kWorkflows);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final list = jsonDecode(raw) as List;
+      return list
+          .map((item) => PlaygroundWorkflow.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (_) {
       return [];
@@ -286,6 +346,10 @@ class PlaygroundController extends ChangeNotifier {
   LlmConfig? _customLlmConfig;
 
   final List<SavedPlaygroundSetup> _savedSetups = [];
+  final List<SkillDef> _skills = [];
+  SkillDef? _activeSkill;
+  final List<PlaygroundWorkflow> _workflows = [];
+  String? _loadedWorkflowId;
   final MultiMCPManager _mcpManager = MultiMCPManager();
   final Uuid _uuid = const Uuid();
 
@@ -414,6 +478,68 @@ class PlaygroundController extends ChangeNotifier {
   Future<void> deleteSetup(String id) async {
     _savedSetups.removeWhere((s) => s.id == id);
     await _storage.saveSetups(_savedSetups);
+    notifyListeners();
+  }
+
+  // ── Skills Management ──
+  List<SkillDef> get skills => List.unmodifiable(_skills);
+  SkillDef? get activeSkill => _activeSkill;
+
+  void setActiveSkill(SkillDef? skill) {
+    _activeSkill = skill;
+    notifyListeners();
+  }
+
+  Future<void> saveSkill(SkillDef skill) async {
+    final idx = _skills.indexWhere((s) => s.id == skill.id);
+    if (idx >= 0) {
+      _skills[idx] = skill;
+    } else {
+      _skills.add(skill);
+    }
+    if (_activeSkill?.id == skill.id) {
+      _activeSkill = skill;
+    }
+    await _storage.saveSkills(_skills);
+    notifyListeners();
+  }
+
+  Future<void> deleteSkill(String id) async {
+    _skills.removeWhere((s) => s.id == id);
+    if (_activeSkill?.id == id) {
+      _activeSkill = null;
+    }
+    await _storage.saveSkills(_skills);
+    notifyListeners();
+  }
+
+  // ── Workflows Management ──
+  List<PlaygroundWorkflow> get workflows => List.unmodifiable(_workflows);
+  String? get loadedWorkflowId => _loadedWorkflowId;
+
+  void setLoadedWorkflowId(String? id) {
+    _loadedWorkflowId = id;
+    notifyListeners();
+  }
+
+  Future<void> saveWorkflow(PlaygroundWorkflow workflow) async {
+    final idx = _workflows.indexWhere((w) => w.id == workflow.id);
+    if (idx >= 0) {
+      _workflows[idx] = workflow;
+    } else {
+      _workflows.add(workflow);
+    }
+    _loadedWorkflowId = workflow.id;
+    await _storage.saveWorkflows(_workflows);
+    notifyListeners();
+  }
+
+  Future<void> deleteWorkflow(String id) async {
+    _workflows.removeWhere((w) => w.id == id);
+    if (_loadedWorkflowId == id) {
+      _loadedWorkflowId = null;
+    }
+    await _storage.saveWorkflows(_workflows);
     notifyListeners();
   }
 
@@ -565,6 +691,14 @@ class PlaygroundController extends ChangeNotifier {
       final setups = await _storage.loadSetups();
       _savedSetups.clear();
       _savedSetups.addAll(setups);
+
+      final loadedSkills = await _storage.loadSkills();
+      _skills.clear();
+      _skills.addAll(loadedSkills);
+
+      final loadedWorkflows = await _storage.loadWorkflows();
+      _workflows.clear();
+      _workflows.addAll(loadedWorkflows);
 
       // Load saved enabled tools, or start empty
       final savedTools = await _storage.loadEnabledTools();
@@ -722,8 +856,12 @@ class PlaygroundController extends ChangeNotifier {
       if (c.client.availableTools.isNotEmpty) {
         await _storage.saveCachedServerTools(c.name, c.client.availableTools);
         c.cachedTools = c.client.availableTools;
+        _initializedClientIds.add(c.name);
+        await _storage.saveInitializedClients(_initializedClientIds);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Playground] Failed to connect/discover tools for ${c.label}: $e');
+    }
   }
 
   Future<void> initializeAllUndiscoveredServers() async {
@@ -753,7 +891,11 @@ class PlaygroundController extends ChangeNotifier {
   }
 
   Future<void> connectServer(String id) async {
-    final clients = _mcpManager.clients.where((c) => c.name == id);
+    var clients = _mcpManager.clients.where((c) => c.name == id);
+    if (clients.isEmpty) {
+      await _syncMcpServers();
+      clients = _mcpManager.clients.where((c) => c.name == id);
+    }
     if (clients.isEmpty) return;
     final clientDef = clients.first;
     if (clientDef.isConnected) return;
@@ -987,6 +1129,11 @@ class PlaygroundController extends ChangeNotifier {
             : 'You are an agent equipped with tools. Focus on the user\'s task. '
                   'Use the tool schemas precisely. If you decide to call a tool, generate the tool call block. '
                   'Present final answers directly. Present code and logs inside clean formatting.';
+
+        // Append active skill instructions if present
+        if (_activeSkill != null && _activeSkill!.skillDef.trim().isNotEmpty) {
+          systemPrompt += '\n\n### Active Skill (${_activeSkill!.name}):\n${_activeSkill!.skillDef.trim()}';
+        }
 
         // Inject short instructions into the system prompt to guide tool execution and loop prevention
         systemPrompt +=

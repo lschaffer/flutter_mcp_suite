@@ -1410,7 +1410,11 @@ class _MistralPatchClient extends http.BaseClient {
 
     final streamed = await _inner.send(requestToSend);
 
-    if (!request.url.path.contains('chat/completions')) {
+    final bool isStreaming = (requestToSend is http.Request &&
+            requestToSend.body.contains('"stream":true')) ||
+        (requestToSend.headers['accept']?.contains('text/event-stream') ?? false);
+
+    if (!request.url.path.contains('chat/completions') || isStreaming) {
       return streamed;
     }
 

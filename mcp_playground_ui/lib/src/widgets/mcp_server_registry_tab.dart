@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:universal_io/io.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
@@ -959,14 +961,26 @@ class _McpServerRegistryTabState extends State<McpServerRegistryTab> {
     }
 
     // Generate base config
+    final defaultDir = kIsWeb ? '.' : Directory.current.path;
+    final Map<String, String> initialEnv = {};
+    for (final v in (registryItem['requiredEnvVars'] as List? ?? [])) {
+      if (v == 'allowed_dirs') {
+        initialEnv['allowed_dirs'] = defaultDir;
+      }
+    }
+    final rawLaunchArgs = (registryItem['launchArgs'] as List? ?? [])
+        .map((a) => a == '{{allowed_dirs}}' ? defaultDir : a.toString())
+        .join(' ');
+
     final config = McpServerConfig(
       id: const Uuid().v4(),
       name: registryItem['displayName'] as String,
-      url: (registryItem['launchArgs'] as List).join(' '),
+      url: rawLaunchArgs,
       isLocal: true,
       localType: registryItem['language'] as String,
       localInstallMethod: registryItem['installType'] as String,
       localPackage: registryItem['packageName'] as String,
+      localEnvVars: initialEnv.isNotEmpty ? initialEnv : null,
       isInstalled: false,
       enabled: true,
       description: registryItem['description'] as String,
@@ -1102,7 +1116,11 @@ class _EditLocalMcpDialogState extends State<EditLocalMcpDialog> {
     final s = widget.existing;
 
     _nameCtrl = TextEditingController(text: s?.name ?? '');
-    _urlCtrl = TextEditingController(text: s?.url ?? '');
+    var urlVal = s?.url ?? '';
+    if (urlVal == '{{allowed_dirs}}') {
+      urlVal = kIsWeb ? '.' : Directory.current.path;
+    }
+    _urlCtrl = TextEditingController(text: urlVal);
     _packageCtrl = TextEditingController(text: s?.localPackage ?? '');
     _commandCtrl = TextEditingController(text: s?.localCommand ?? '');
 
@@ -1112,7 +1130,11 @@ class _EditLocalMcpDialogState extends State<EditLocalMcpDialog> {
     final env = s?.localEnvVars ?? {};
     final requiredList = widget.requiredEnvVars ?? [];
     for (final key in requiredList) {
-      _envCtrls[key] = TextEditingController(text: env[key] ?? '');
+      var val = env[key] ?? '';
+      if (val.isEmpty && key == 'allowed_dirs') {
+        val = kIsWeb ? '.' : Directory.current.path;
+      }
+      _envCtrls[key] = TextEditingController(text: val);
     }
     // Add existing custom env vars if not in required list
     env.forEach((key, val) {

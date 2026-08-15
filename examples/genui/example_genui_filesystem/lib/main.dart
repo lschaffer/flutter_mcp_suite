@@ -24,14 +24,14 @@ class GenuiFilesystemExampleApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00ACC1),
+          seedColor: const Color(0xFFBF5827),
           brightness: Brightness.light,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00838F),
+          seedColor: const Color(0xFFEAA67C),
           brightness: Brightness.dark,
         ),
       ),
@@ -250,7 +250,7 @@ class _DirectoryExplorerWidgetState extends State<_DirectoryExplorerWidget> {
           // Header path navigation bar
           Row(
             children: [
-              const Icon(Icons.folder_open_outlined, color: Color(0xFF00ACC1)),
+              Icon(Icons.folder_open_outlined, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -441,11 +441,34 @@ Catalog buildFilesystemGenuiCatalog() {
 }
 
 const String filesystemGenuiSystemPrompt = '''
-You are an interactive filesystem assistant.
+You are an interactive filesystem assistant backed by GenUI components and diagnostic tools.
 
-When the user asks to view, explore, list, or inspect files/directories:
-1. Call the `list_directory_tree` tool to get the folder structure.
-2. Render the returned entries inside a `DirectoryExplorer` component so the user can interactively browse directories and inspect files.
+Important Catalog Rules:
+- You have access to a custom UI component named "DirectoryExplorer".
+- Whenever the user asks to list, view, explore, browse, or inspect files/directories:
+  1. Call the `list_directory_tree` tool to retrieve the directory entries.
+  2. ALWAYS render the returned result inside a "DirectoryExplorer" component so the user can interactively browse directories and inspect files.
+  3. Format the component data matching this structure:
+     {
+       "path": "<directory path from tool result>",
+       "totalCount": <totalCount number from tool result>,
+       "entries": [
+         {
+           "name": "<entry name>",
+           "path": "<full entry path>",
+           "isDirectory": <boolean true or false>,
+           "size": <size in bytes>
+         }
+       ]
+     }
+  4. Do NOT output a plain text or markdown listing when a "DirectoryExplorer" component can be rendered.
+
+Build Analysis & Attachments:
+- You are fully equipped to analyze, diagnose, and inspect attached builds, build logs, stack traces, compiler output, screenshots, and source code files.
+- When the user attaches a file/image or asks to analyze a build/failure:
+  1. Examine the attached build output or logs thoroughly.
+  2. Identify root causes, build breakages, missing dependencies, or syntax/runtime errors.
+  3. Provide clear, structured diagnosis and step-by-step fix recommendations.
 ''';
 
 // ═══════════════════════════════════════════════════════════════
@@ -470,6 +493,11 @@ class GenuiFilesystemScreen extends StatelessWidget {
         ListFilesystemDirTool(),
         ReadFileContentTool(),
       ],
+      initialEnabledTools: const [
+        'list_directory_tree',
+        'read_file_content',
+      ],
+      initialSystemPrompt: filesystemGenuiSystemPrompt,
       genuiCatalog: buildFilesystemGenuiCatalog(),
       showAgentInspector: true,
     );

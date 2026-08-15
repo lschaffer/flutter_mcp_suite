@@ -424,7 +424,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
 
     final bool cpuOnly = (_gpuLayersMap[model.filename] ?? 0) == 0;
-    if (Platform.isAndroid && cpuOnly && model.sizeBytes > _cpuSizeWarnBytes) {
+    if (!kIsWeb && Platform.isAndroid && cpuOnly && model.sizeBytes > _cpuSizeWarnBytes) {
       if (!context.mounted) return;
       final proceed = await showDialog<bool>(
         context: context,

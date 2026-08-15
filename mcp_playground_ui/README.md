@@ -16,6 +16,12 @@ Shared UI components, dialogs, drawers, controllers, and services for **MCP Play
 
 ---
 
+## 🎥 Demo
+
+Watch the AI Agent Playground in action using embedded model to call local dart tools:
+
+![Genui MCP Demo ](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+
 ## 📦 Installation
 
 Add to your `pubspec.yaml`:

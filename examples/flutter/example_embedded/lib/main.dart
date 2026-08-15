@@ -21,14 +21,14 @@ class McpPlaygroundExampleEmbeddedApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 83, 18, 234),
+          seedColor: const Color(0xFF0F7B6C),
           brightness: Brightness.light,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 92, 2, 83),
+          seedColor: const Color(0xFF47D1B8),
           brightness: Brightness.dark,
         ),
       ),

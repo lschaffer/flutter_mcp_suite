@@ -30,6 +30,7 @@ class GenuiChatEntry {
     required this.kind,
     required this.text,
     this.surfaceId,
+    this.attachments,
   });
 
   /// Stable unique identifier.
@@ -43,6 +44,9 @@ class GenuiChatEntry {
 
   /// The surface ID if this is a surface entry.
   final String? surfaceId;
+
+  /// Optional attachments attached to this message.
+  final List<mp.MessageAttachment>? attachments;
 }
 
 /// A [ChangeNotifier] that bridges [`mcp_playground_dart`](https://pub.dev/packages/mcp_playground_dart)'s
@@ -58,26 +62,25 @@ class McpGenuiChatController extends ChangeNotifier {
   ///
   /// Either [catalog] or [catalogJson] / [catalogItems] may be used to define
   /// the widgets the model is allowed to generate. When none are provided a
-  /// default catalog is built containing the GenUI basic catalog plus the
-  /// default chat-bubble item.
+  /// default catalog with standard GenUI widgets is created.
   McpGenuiChatController({
-    required mp.LlmConfig llmConfig,
+    required this._llmConfig,
     List<mp.McpLocalTool> tools = const [],
-    String? systemPrompt,
     Catalog? catalog,
-    String? catalogJson,
     List<GenuiCatalogItemDefinition>? catalogItems,
+    String? catalogJson,
+    this._systemPrompt,
     this.maxToolIterations = 10,
     this._playgroundController,
-  }) {
-    _llmConfig = llmConfig;
-    _tools = List.of(tools);
-    _systemPrompt = systemPrompt;
-    _catalog =
-        catalog ??
-        buildGenuiCatalog(catalogJson: catalogJson, catalogItems: catalogItems);
-    _surfaceController = SurfaceController(catalogs: [_catalog]);
+  }) : _tools = List.unmodifiable(tools),
+       _catalog =
+           catalog ??
+           buildGenuiCatalog(
+             catalogJson: catalogJson,
+             catalogItems: catalogItems,
+           ) {
     _transport = A2uiTransportAdapter(onSend: _handleSend);
+    _surfaceController = SurfaceController(catalogs: [_catalog]);
     _conversation = Conversation(
       controller: _surfaceController,
       transport: _transport,
@@ -85,23 +88,21 @@ class McpGenuiChatController extends ChangeNotifier {
   }
 
   final PlaygroundController? _playgroundController;
-
-  late final mp.LlmConfig _llmConfig;
-  late final List<mp.McpLocalTool> _tools;
-  late final String? _systemPrompt;
-  late final Catalog _catalog;
-
-  /// Maximum number of tool-call round trips per user request.
+  final mp.LlmConfig _llmConfig;
+  final List<mp.McpLocalTool> _tools;
+  final String? _systemPrompt;
+  final Catalog _catalog;
   final int maxToolIterations;
 
-  late final SurfaceController _surfaceController;
   late final A2uiTransportAdapter _transport;
+  late final SurfaceController _surfaceController;
   late final Conversation _conversation;
 
   final List<GenuiChatEntry> _entries = [];
   final List<mp.ChatMessage> _history = [];
   final Set<String> _knownSurfaces = {};
   String? _cachedSystemPrompt;
+  List<mp.MessageAttachment>? _pendingAttachments;
 
   bool _isGenerating = false;
 
@@ -143,26 +144,43 @@ class McpGenuiChatController extends ChangeNotifier {
       _surfaceController.contextFor(surfaceId);
 
   /// Sends a user message into the conversation.
-  void sendMessage(String text) {
+  void sendMessage(String text, {List<mp.MessageAttachment>? attachments}) {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _isGenerating) return;
+    if (trimmed.isEmpty && (attachments == null || attachments.isEmpty)) return;
+    if (_isGenerating) return;
+
+    _pendingAttachments = attachments != null && attachments.isNotEmpty
+        ? List.unmodifiable(attachments)
+        : null;
+
+    final entryText = trimmed.isNotEmpty
+        ? trimmed
+        : (attachments != null && attachments.isNotEmpty
+              ? 'Attached: ${attachments.map((a) => a.name).join(', ')}'
+              : '');
 
     _entries.add(
       GenuiChatEntry(
         id: _newId(),
         kind: GenuiChatEntryKind.user,
-        text: trimmed,
+        text: entryText,
+        attachments: attachments != null
+            ? List.unmodifiable(attachments)
+            : null,
       ),
     );
     notifyListeners();
 
-    _conversation.sendRequest(ChatMessage.user(trimmed));
+    _conversation.sendRequest(ChatMessage.user(entryText));
   }
 
   Future<void> _handleSend(ChatMessage message) async {
     if (_isGenerating) return;
     _isGenerating = true;
     notifyListeners();
+
+    final atts = _pendingAttachments;
+    _pendingAttachments = null;
 
     final prompt = _messageToPrompt(message);
     final userDisplay = _messageToDisplayJson(message);
@@ -176,18 +194,53 @@ class McpGenuiChatController extends ChangeNotifier {
       );
     }
 
+    // Preprocess text files and images directly into effective prompt & vision attachments
+    String effectivePrompt = prompt;
+    final List<mp.MessageAttachment> visionAttachments = [];
+
+    if (atts != null && atts.isNotEmpty) {
+      final buffer = StringBuffer(effectivePrompt);
+      for (final att in atts) {
+        final mime = att.mimeType.toLowerCase();
+        final name = att.name.toLowerCase();
+        final isText = isTextFile(mime, name);
+
+        if (isText && att.bytes != null) {
+          try {
+            final content = utf8.decode(att.bytes!);
+            buffer.writeln('\n\n[Attached File: ${att.name}]');
+            buffer.writeln('--- CONTENT START ---');
+            buffer.writeln(content);
+            buffer.writeln('--- CONTENT END ---');
+          } catch (_) {}
+        } else if (att.bytes != null &&
+            (mime.startsWith('image/') ||
+                name.endsWith('.jpg') ||
+                name.endsWith('.jpeg') ||
+                name.endsWith('.png') ||
+                name.endsWith('.webp') ||
+                name.endsWith('.gif'))) {
+          visionAttachments.add(att);
+          buffer.writeln('\n\n[Attached Image: ${att.name}]');
+        }
+      }
+      effectivePrompt = buffer.toString();
+    }
+
     final userMsg = mp.ChatMessage(
       id: _newId(),
-      content: userDisplay.isNotEmpty ? userDisplay : prompt,
+      content: userDisplay.isNotEmpty ? userDisplay : effectivePrompt,
       role: mp.ChatRole.user,
       timestamp: DateTime.now(),
+      attachments: visionAttachments.isNotEmpty ? visionAttachments : null,
     );
     _history.add(
       mp.ChatMessage(
         id: userMsg.id,
-        content: prompt,
+        content: effectivePrompt,
         role: mp.ChatRole.user,
         timestamp: userMsg.timestamp,
+        attachments: visionAttachments.isNotEmpty ? visionAttachments : null,
       ),
     );
     _playgroundController?.addMessage(userMsg);
@@ -202,7 +255,8 @@ class McpGenuiChatController extends ChangeNotifier {
         }
       }
       if (directTool != null) {
-        final toolCallId = 'call_${directTool.name}_${DateTime.now().microsecondsSinceEpoch}';
+        final toolCallId =
+            'call_${directTool.name}_${DateTime.now().microsecondsSinceEpoch}';
         final toolCallMsg = mp.ChatMessage(
           id: toolCallId,
           content: '',
@@ -253,7 +307,9 @@ class McpGenuiChatController extends ChangeNotifier {
             iterationBuffer.write(chunk.textDelta);
             _transport.addChunk(chunk.textDelta);
             _syncSurfaces();
-            final cleanText = _sanitizeAssistantText(iterationBuffer.toString());
+            final cleanText = _sanitizeAssistantText(
+              iterationBuffer.toString(),
+            );
             if (cleanText.isNotEmpty) {
               _upsertEntry(
                 iterationEntryId,
@@ -373,6 +429,11 @@ class McpGenuiChatController extends ChangeNotifier {
       buffer.writeln('\n\n### Additional instructions');
       buffer.writeln(extra);
     }
+    final activeSkill = _playgroundController?.activeSkill;
+    if (activeSkill != null && activeSkill.skillDef.trim().isNotEmpty) {
+      buffer.writeln('\n\n### Active Skill (${activeSkill.name}):');
+      buffer.writeln(activeSkill.skillDef.trim());
+    }
     if (_tools.isNotEmpty && !_llmConfig.useNativeToolCall) {
       buffer.writeln('\n\nAvailable Tools:');
       for (final tool in _tools) {
@@ -420,8 +481,8 @@ class McpGenuiChatController extends ChangeNotifier {
           final rawContext = action['context'] is Map<String, Object?>
               ? action['context'] as Map<String, Object?>
               : (decoded['context'] is Map<String, Object?>
-                  ? decoded['context'] as Map<String, Object?>
-                  : null);
+                    ? decoded['context'] as Map<String, Object?>
+                    : null);
           if (name != null && name.isNotEmpty) {
             final Map<String, dynamic> cleanContext = {};
             if (rawContext != null) {

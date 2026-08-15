@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:genui/genui.dart' hide ChatMessage;
 import 'package:mcp_playground_dart/mcp_playground_dart.dart' hide LocalMCPClient;
 import 'package:mcp_playground_ui/mcp_playground_ui.dart';
@@ -94,7 +95,6 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   late McpPlaygroundLocalizations _l10n;
 
   bool _playgroundStarted = false;
-  String? _loadedSetupId;
   double _chatFraction = 0.7;
   bool _inspectorVisible = true;
   McpGenuiChatController? _genuiController;
@@ -102,7 +102,8 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   // Setup form states
   final _systemPromptCtrl = TextEditingController();
   final _initialPromptCtrl = TextEditingController();
-  final bool _chatMode = false;
+  bool _chatMode = false;
+  bool _isGeneratingSystemPrompt = false;
 
   // Custom LLM Override state
   bool _useCustomLlm = false;
@@ -110,6 +111,8 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   final _customModelCtrl = TextEditingController();
   final _customApiKeyCtrl = TextEditingController();
   final _customBaseUrlCtrl = TextEditingController();
+
+  final Map<LlmProvider, _CustomProviderCache> _customProviderCache = {};
 
   final _customTempCtrl = TextEditingController(text: '0.2');
   final _customMaxTokensCtrl = TextEditingController(text: '0');
@@ -508,10 +511,11 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
 
     if (_genuiController!.isGenerating) return;
 
+    final atts = List<MessageAttachment>.from(_attachments);
     _inputCtrl.clear();
     _attachments.clear();
 
-    _genuiController!.sendMessage(text);
+    _genuiController!.sendMessage(text, attachments: atts);
   }
 
   Future<void> _pickAttachments() async {
@@ -588,30 +592,34 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     );
   }
 
-  void _showSaveSkillDialog() {
+  void _showSaveWorkflowDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => SkillSaveDialog(
+      builder: (ctx) => WorkflowSaveDialog(
         controller: _controller,
         unsentInput: _inputCtrl.text.trim().isNotEmpty
             ? _inputCtrl.text.trim()
-            : null,
+            : (_initialPromptCtrl.text.trim().isNotEmpty
+                ? _initialPromptCtrl.text.trim()
+                : null),
       ),
     );
   }
 
-  Future<void> _showLoadSkillDialog() async {
-    final result = await showDialog<SavedPlaygroundSetup>(
+  Future<void> _showLoadWorkflowDialog() async {
+    final result = await showDialog<PlaygroundWorkflow>(
       context: context,
-      builder: (ctx) => SkillLoadDialog(controller: _controller),
+      builder: (ctx) => WorkflowLoadDialog(controller: _controller),
     );
 
     if (result == null || !mounted) return;
 
     setState(() {
-      _loadedSetupId = result.id;
       _systemPromptCtrl.text = result.systemPrompt;
-      _initialPromptCtrl.text = result.initialPrompt;
+      _initialPromptCtrl.text = result.initialPrompt.isNotEmpty
+          ? result.initialPrompt
+          : result.steps.map((s) => s.text).join('\n++#++\n');
+      _chatMode = result.chatMode;
       _useCustomLlm = result.useCustomLlm;
 
       if (result.customLlmConfig != null) {
@@ -620,37 +628,348 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
       }
 
       _controller.updateEnabledTools(result.enabledToolNames.toSet());
+
+      if (result.activeSkillId != null) {
+        final match = _controller.skills
+            .where((s) => s.id == result.activeSkillId)
+            .toList();
+        if (match.isNotEmpty) {
+          _controller.setActiveSkill(match.first);
+        }
+      }
     });
+  }
+
+  Future<void> _showSkillsManagerDialog() async {
+    await SkillsManagerDialog.show(context, _controller);
+  }
+
+  Future<void> _showSkillWizardDialog() async {
+    final result = await showDialog<SkillDef>(
+      context: context,
+      builder: (ctx) => SkillWizardDialog(controller: _controller),
+    );
+    if (result != null) {
+      await _controller.saveSkill(result);
+      _controller.setActiveSkill(result);
+    }
+  }
+
+  void _showToolChecklistDialog() {
+    final isMobileView = MediaQuery.of(context).size.width < 600;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return ListenableBuilder(
+          listenable: _controller,
+          builder: (ctx2, _) {
+            return StatefulBuilder(
+              builder: (context, setDialogState) {
+                final groups = _getToolsetGroups();
+                final content = ListView(
+                  shrinkWrap: true,
+                  children: [
+                    ...groups.map((group) {
+                      final isEnabled = _isToolsetEnabled(group);
+                      return CheckboxListTile(
+                        title: Text(
+                          group.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          group.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        value: isEnabled,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            _toggleToolsetGroup(group, val ?? false);
+                          });
+                        },
+                      );
+                    }),
+                  ],
+                );
+
+                if (isMobileView) {
+                  return Dialog.fullscreen(
+                    child: Scaffold(
+                      appBar: AppBar(
+                        title: const Text('Select Tools'),
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Icons.check),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                      body: content,
+                    ),
+                  );
+                }
+
+                return AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  title: const Text(
+                    'Select Tools',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  content: SizedBox(width: 480, child: content),
+                  actions: [
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Done'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showIndividualToolsDialog(_ToolsetGroup group) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final enabled = _controller.enabledToolNames;
+            final sortedTools = List<MCPTool>.from(group.tools)
+              ..sort((a, b) => a.name.compareTo(b.name));
+            return AlertDialog(
+              title: Text(
+                'Select tools from ${group.name}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              content: SizedBox(
+                width: 400,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: sortedTools.map((t) {
+                    final isEnabled = enabled.contains(t.name);
+                    return CheckboxListTile(
+                      dense: true,
+                      title: Text(t.name, style: const TextStyle(fontSize: 13)),
+                      subtitle: t.description != null && t.description!.isNotEmpty
+                          ? Text(
+                              t.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                      value: isEnabled,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          _controller.toggleToolEnabled(t.name, val ?? false);
+                        });
+                        setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSelectedToolsDialog() {
+    final groups = _getToolsetGroups();
+    final enabled = _controller.enabledToolNames;
+    final enabledTools = groups
+        .expand((g) => g.tools)
+        .where((t) => enabled.contains(t.name))
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Selected Tools'),
+        content: SizedBox(
+          width: 320,
+          child: enabledTools.isEmpty
+              ? const Text('No tools selected.')
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: enabledTools.length,
+                  itemBuilder: (context, index) {
+                    final tool = enabledTools[index];
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.build, size: 16),
+                      title: Text(
+                        tool.name,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: tool.description != null &&
+                              tool.description!.isNotEmpty
+                          ? Text(
+                              tool.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyLlmDefaults() {
+    final def = _controller.llmConfig;
+    if (def.provider != LlmProvider.none) {
+      _customProvider = def.provider;
+      _customModelCtrl.text = def.model;
+      _customApiKeyCtrl.text = def.apiKey;
+      _customBaseUrlCtrl.text = def.baseUrl;
+      _customTempCtrl.text = def.temperature.toString();
+      _customMaxTokensCtrl.text = def.maxTokens.toString();
+      _customMaxToolOutputSizeCtrl.text = def.maxToolOutputSize.toString();
+      _customTokenWarningThresholdCtrl.text =
+          def.tokenWarningThreshold.toString();
+      _customTopKCtrl.text = def.topK?.toString() ?? '';
+      _customTopPCtrl.text = def.topP?.toString() ?? '';
+      _customRepeatPenaltyCtrl.text = def.repeatPenalty?.toString() ?? '';
+      _customSeedCtrl.text = def.seed?.toString() ?? '';
+      _customThinking = def.thinking;
+      _customIsSlm = def.isSlm;
+      _customIsMultiModal = def.isMultiModal;
+      _customUseNativeTool = def.useNativeToolCall;
+      _customUseStreaming = def.useStreaming;
+    }
+  }
+
+  Future<void> _generateSystemPrompt() async {
+    final activeConfig = _getActiveLlmConfig();
+    if (!activeConfig.isConfigured) return;
+
+    setState(() {
+      _isGeneratingSystemPrompt = true;
+    });
+
+    try {
+      final groups = _getToolsetGroups();
+      final enabledGroups = groups.where((g) => _isToolsetEnabled(g)).toList();
+
+      String promptText =
+          'Write a concise, professional system prompt (maximum 2-3 sentences) for a GenUI AI assistant. ';
+      if (enabledGroups.isNotEmpty) {
+        final toolDetails = enabledGroups
+            .map((g) => '${g.name}: ${g.description}')
+            .join('\n');
+        promptText +=
+            'The assistant is equipped with the following toolsets:\n$toolDetails\n\n';
+        promptText +=
+            'Focus on how the assistant should behave, be direct, and optimize usage of these tools. ';
+      } else {
+        promptText += 'Focus on being helpful, direct, and clear. ';
+      }
+      promptText +=
+          'Respond ONLY with the generated system prompt text, with no introduction, quotes, or explanations.';
+
+      final messages = [
+        ChatMessage(
+          id: const Uuid().v4(),
+          content: promptText,
+          role: ChatRole.user,
+          timestamp: DateTime.now(),
+        ),
+      ];
+
+      final response = await LLMService.generate(
+        config: activeConfig,
+        messages: messages,
+        tools: const [],
+        systemPrompt:
+            'You are a prompt engineering expert. You output only the final requested prompt text with no markdown formatting or surrounding quotes.',
+      );
+
+      if (response.text.isNotEmpty && mounted) {
+        setState(() {
+          String text = response.text.trim();
+          if (text.startsWith('"') && text.endsWith('"')) {
+            text = text.substring(1, text.length - 1);
+          }
+          if (text.startsWith("'") && text.endsWith("'")) {
+            text = text.substring(1, text.length - 1);
+          }
+          _systemPromptCtrl.text = text.trim();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate system prompt: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingSystemPrompt = false;
+        });
+      }
+    }
   }
 
   void _clearSetupInputs() {
     setState(() {
       _systemPromptCtrl.clear();
       _initialPromptCtrl.clear();
-      _loadedSetupId = null;
-
-      final allTools = _getToolsetGroups()
-          .expand((g) => g.tools)
-          .map((t) => t.name)
-          .toSet();
-      _controller.updateEnabledTools(allTools);
+      _controller.setLoadedWorkflowId(null);
+      _chatMode = false;
+      _controller.updateEnabledTools({});
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isWide = MediaQuery.sizeOf(context).width >= 900;
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
 
     final Widget bodyContent = _playgroundStarted
         ? _buildGenuiConversationView(theme)
         : _buildSetupView(theme);
 
-    final loadedSetupName = _loadedSetupId != null
-        ? _controller.savedSetups
-            .cast<SavedPlaygroundSetup?>()
-            .firstWhere((s) => s?.id == _loadedSetupId, orElse: () => null)
-            ?.name
+    final loadedWorkflow = _controller.loadedWorkflowId != null
+        ? _controller.workflows
+            .where((w) => w.id == _controller.loadedWorkflowId)
+            .firstOrNull
         : null;
 
     final l10n = _l10n;
@@ -687,8 +1006,8 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
             ),
             const SizedBox(width: 8),
             Text(
-              loadedSetupName != null
-                  ? '${l10n.get('playground')} - $loadedSetupName'
+              loadedWorkflow != null
+                  ? '${l10n.get('playground')} - ${loadedWorkflow.name}'
                   : l10n.get('playground'),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
@@ -801,25 +1120,73 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
 
   List<Widget> _buildAppBarActions(BuildContext context) {
     final l10n = _l10n;
-    final isWide = MediaQuery.sizeOf(context).width >= 900;
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
+
+    if (isWide) {
+      return [
+        IconButton(
+          icon: const Icon(Icons.restart_alt),
+          tooltip: l10n.get('resetTooltip'),
+          onPressed: _resetPlayground,
+        ),
+        if (!_playgroundStarted) ...[
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: l10n.get('clearTooltip'),
+            onPressed: _clearSetupInputs,
+          ),
+          IconButton(
+            icon: const Icon(Icons.alt_route),
+            tooltip: 'Load Workflow',
+            onPressed: _showLoadWorkflowDialog,
+          ),
+        ],
+        IconButton(
+          icon: const Icon(Icons.save_outlined),
+          tooltip: 'Save Workflow',
+          onPressed: _showSaveWorkflowDialog,
+        ),
+        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
+        IconButton(
+          icon: const Icon(Icons.bookmarks_outlined),
+          tooltip: 'Skills Manager',
+          onPressed: _showSkillsManagerDialog,
+        ),
+        IconButton(
+          icon: const Icon(Icons.auto_awesome),
+          tooltip: 'Skill Wizard',
+          onPressed: _showSkillWizardDialog,
+        ),
+        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
+        IconButton(
+          icon: const Icon(Icons.list_alt),
+          tooltip: l10n.get('catalogTooltip'),
+          onPressed: () => RegisteredToolsDialog.show(context, _controller),
+        ),
+        if (widget.showAgentInspector)
+          IconButton(
+            icon: Icon(
+              _inspectorVisible
+                  ? Icons.analytics
+                  : Icons.analytics_outlined,
+            ),
+            tooltip: l10n.get('agentInspector'),
+            onPressed: () {
+              if (isWide && _playgroundStarted) {
+                setState(() {
+                  _inspectorVisible = !_inspectorVisible;
+                });
+              } else {
+                _showAgentInspectorDialog();
+              }
+            },
+          ),
+      ];
+    }
 
     return [
-      if (_playgroundStarted && widget.showAgentInspector && isWide)
-        IconButton(
-          icon: Icon(
-            _inspectorVisible
-                ? Icons.view_sidebar_rounded
-                : Icons.view_sidebar_outlined,
-          ),
-          tooltip: l10n.get('agentInspector'),
-          onPressed: () {
-            setState(() {
-              _inspectorVisible = !_inspectorVisible;
-            });
-          },
-        ),
       IconButton(
-        icon: const Icon(Icons.refresh_rounded),
+        icon: const Icon(Icons.restart_alt),
         tooltip: l10n.get('resetTooltip'),
         onPressed: _resetPlayground,
       ),
@@ -829,10 +1196,14 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
         onSelected: (val) {
           if (val == 'clear') {
             _clearSetupInputs();
-          } else if (val == 'saveSkill') {
-            _showSaveSkillDialog();
-          } else if (val == 'loadSkill') {
-            _showLoadSkillDialog();
+          } else if (val == 'saveWorkflow') {
+            _showSaveWorkflowDialog();
+          } else if (val == 'loadWorkflow') {
+            _showLoadWorkflowDialog();
+          } else if (val == 'skillsManager') {
+            _showSkillsManagerDialog();
+          } else if (val == 'skillWizard') {
+            _showSkillWizardDialog();
           } else if (val == 'catalog') {
             RegisteredToolsDialog.show(context, _controller);
           } else if (val == 'inspector') {
@@ -852,26 +1223,48 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
               ),
             ),
             const PopupMenuItem(
-              value: 'loadSkill',
+              value: 'loadWorkflow',
               child: Row(
                 children: [
-                  Icon(Icons.bookmarks_outlined, size: 20),
+                  Icon(Icons.alt_route, size: 20),
                   SizedBox(width: 12),
-                  Text('Load Skill'),
+                  Text('Load Workflow'),
                 ],
               ),
             ),
           ],
           const PopupMenuItem(
-            value: 'saveSkill',
+            value: 'saveWorkflow',
             child: Row(
               children: [
                 Icon(Icons.save_outlined, size: 20),
                 SizedBox(width: 12),
-                Text('Save Skill'),
+                Text('Save Workflow'),
               ],
             ),
           ),
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            value: 'skillsManager',
+            child: Row(
+              children: [
+                Icon(Icons.bookmarks_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Skills Manager'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'skillWizard',
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 20),
+                SizedBox(width: 12),
+                Text('Skill Wizard'),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
           PopupMenuItem(
             value: 'catalog',
             child: Row(
@@ -899,117 +1292,293 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   }
 
   Widget _buildSetupView(ThemeData theme) {
-    return ListView(
+    final groups = _getToolsetGroups();
+    final enabledGroups = groups.where((g) => _isToolsetEnabled(g)).toList();
+    final l10n = _l10n;
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
-      children: [
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select Tools',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(height: 10),
+                  if (enabledGroups.isEmpty) ...[
+                    ElevatedButton.icon(
+                      onPressed: _showToolChecklistDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Choose active tools/toolsets'),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'No tools selected. Chat mode will be active.',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ] else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        ...enabledGroups.map((group) {
+                          IconData icon = Icons.extension_outlined;
+                          Color iconColor = theme.colorScheme.primary;
+                          if (group.isExternal) {
+                            icon = Icons.dns_outlined;
+                            iconColor = Colors.orange;
+                          } else if (group.isInstalled) {
+                            icon = Icons.hub_outlined;
+                            iconColor = Colors.teal;
+                          }
+                          return InputChip(
+                            avatar: Icon(icon, size: 14, color: iconColor),
+                            label: Text(
+                              group.name,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            deleteIcon: const Icon(Icons.close, size: 14),
+                            onDeleted: () {
+                              setState(() {
+                                final updated = Set<String>.from(_controller.enabledToolNames);
+                                for (final t in group.tools) {
+                                  updated.remove(t.name);
+                                }
+                                _controller.updateEnabledTools(updated);
+                              });
+                            },
+                            onPressed: () {
+                              _showIndividualToolsDialog(group);
+                            },
+                          );
+                        }),
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 14),
+                          label: const Text(
+                            'Select Tools',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onPressed: _showToolChecklistDialog,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.tune_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'System Prompt & Instructions',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _systemPromptCtrl,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    hintText:
-                        'Optional system prompt defining the GenUI agent role, behavior, and catalog instructions...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.all(12),
+          const SizedBox(height: 16),
+
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 4.0,
+              ),
+              child: CheckboxListTile(
+                value: _chatMode,
+                title: const Text(
+                  'Chat mode',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
                 ),
-              ],
+                subtitle: const Text(
+                  'Direct LLM chat — no system prompt, no tools. Fastest for simple tasks.',
+                  style: TextStyle(fontSize: 11),
+                ),
+                onChanged: (v) {
+                  setState(() {
+                    _chatMode = v ?? false;
+                  });
+                },
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (!_chatMode) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                const Text(
+                  'System Prompt',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                if (_getActiveLlmConfig().isConfigured)
+                  IconButton(
+                    icon: _isGeneratingSystemPrompt
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome_outlined, size: 20),
+                    tooltip: 'Generate System Prompt',
+                    onPressed: _isGeneratingSystemPrompt
+                        ? null
+                        : _generateSystemPrompt,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            TextFormField(
+              controller: _systemPromptCtrl,
+              maxLines: 5,
+              minLines: 2,
+              decoration: const InputDecoration(
+                hintText:
+                    'Enter instructions, catalog rules, persona details, or system guidelines...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          const Text(
+            'LLM Configuration',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<bool>(
+            segments: [
+              ButtonSegment(
+                value: false,
+                label: Text(
+                  'LLM 1 (${_controller.llmConfig.model.isNotEmpty ? _controller.llmConfig.model : 'default'})',
+                ),
+                icon: const Icon(Icons.psychology_outlined),
+              ),
+              const ButtonSegment(
+                value: true,
+                label: Text('Custom LLM Override'),
+                icon: Icon(Icons.tune_outlined),
+              ),
+            ],
+            selected: {_useCustomLlm},
+            onSelectionChanged: (val) {
+              setState(() {
+                _useCustomLlm = val.first;
+                if (_useCustomLlm && _customModelCtrl.text.isEmpty) {
+                  _applyLlmDefaults();
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+
+          if (_useCustomLlm)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.build_circle_outlined,
-                      color: theme.colorScheme.primary,
-                      size: 20,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        const Text(
+                          'Custom LLM Config',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _applyLlmDefaults,
+                          icon: const Icon(Icons.settings_backup_restore),
+                          label: const Text('Apply defaults from settings'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Enabled Toolsets & MCP Tools',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    const SizedBox(height: 12),
+                    LlmConfigForm(
+                      provider: _customProvider,
+                      onProviderChanged: (val) {
+                        _customProviderCache[_customProvider] =
+                            _CustomProviderCache(
+                              model: _customModelCtrl.text,
+                              apiKey: _customApiKeyCtrl.text,
+                              baseUrl: _customBaseUrlCtrl.text,
+                            );
+                        final cached = _customProviderCache[val];
+                        if (cached != null) {
+                          _customModelCtrl.text = cached.model;
+                          _customApiKeyCtrl.text = cached.apiKey;
+                          _customBaseUrlCtrl.text = cached.baseUrl;
+                        } else {
+                          _customModelCtrl.clear();
+                          _customApiKeyCtrl.clear();
+                          _customBaseUrlCtrl.clear();
+                        }
+                        setState(() {
+                          _customProvider = val;
+                        });
+                      },
+                      modelCtrl: _customModelCtrl,
+                      apiKeyCtrl: _customApiKeyCtrl,
+                      baseUrlCtrl: _customBaseUrlCtrl,
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                ..._getToolsetGroups().map((group) {
-                  final isEnabled = _isToolsetEnabled(group);
-                  return CheckboxListTile(
-                    title: Text(group.name),
-                    subtitle: Text(group.description),
-                    value: isEnabled,
-                    onChanged: (val) {
-                      _toggleToolsetGroup(group, val ?? false);
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  );
-                }),
-              ],
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: FilledButton.icon(
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text(
-              'Start GenUI Agent Playground',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            onPressed: _startPlayground,
+          ActiveSkillBanner(controller: _controller),
+
+          Text(
+            l10n.get('initialPrompt'),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          SubPromptListEditor(
+            controller: _initialPromptCtrl,
+            chatMode: _chatMode,
+            availableToolGroups: _getToolsetGroups()
+                .where((g) => _isToolsetEnabled(g))
+                .map(
+                  (g) => ToolGroup(
+                    name: g.name,
+                    toolNames: g.tools.map((t) => t.name).toList(),
+                  ),
+                )
+                .toList(),
+            minLines: 2,
+            maxLines: 8,
+            hintText:
+                'Enter an optional first message to execute immediately on launch...',
+          ),
+          const SizedBox(height: 16),
+
+          SizedBox(
+            height: 50,
+            child: FilledButton.icon(
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text(
+                'Start GenUI Agent Playground',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              onPressed: _startPlayground,
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 
@@ -1019,9 +1588,85 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     }
 
     final isGenerating = _genuiController!.isGenerating;
+    final groups = _getToolsetGroups();
+    final enabledToolsCount = groups
+        .expand((g) => g.tools)
+        .where((t) => _controller.enabledToolNames.contains(t.name))
+        .length;
 
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.edit_note, size: 16),
+                label: const Text('System Prompt (tap to edit)'),
+                onPressed: () {
+                  final promptCtrl = TextEditingController(
+                    text: _controller.systemPrompt,
+                  );
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Row(
+                        children: [
+                          Icon(Icons.edit_note, color: Color(0xFF0067C0)),
+                          SizedBox(width: 8),
+                          Text('Edit System Prompt'),
+                        ],
+                      ),
+                      content: SizedBox(
+                        width: 700,
+                        child: TextFormField(
+                          controller: promptCtrl,
+                          maxLines: 12,
+                          minLines: 6,
+                          decoration: const InputDecoration(
+                            hintText:
+                                'Enter instructions, catalog rules, persona details, or system guidelines...',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            setState(() {
+                              _controller.systemPrompt = promptCtrl.text;
+                              _systemPromptCtrl.text = promptCtrl.text;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.build_circle_outlined, size: 16),
+                label: Text('$enabledToolsCount tools selected'),
+                onPressed: _showSelectedToolsDialog,
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+
         Expanded(
           child: AnimatedBuilder(
             animation: _genuiController!,
@@ -1080,18 +1725,69 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
       case GenuiChatEntryKind.user:
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
+              if (entry.attachments != null && entry.attachments!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      for (final att in entry.attachments!)
+                        Chip(
+                          avatar: Icon(
+                            att.mimeType.startsWith('image/')
+                                ? Icons.image_outlined
+                                : Icons.description_outlined,
+                            size: 14,
+                          ),
+                          label: Text(att.name, style: const TextStyle(fontSize: 11)),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                        ),
+                    ],
                   ),
-                  child: Text(entry.text),
                 ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.content_copy_outlined,
+                      size: 14,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
+                    tooltip: 'Copy prompt',
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: entry.text));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Prompt copied to clipboard'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(entry.text),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1126,7 +1822,52 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
                         : Colors.black.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Text(entry.text),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(entry.text),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: entry.text));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Response copied to clipboard'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.content_copy_outlined,
+                                  size: 13,
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.6),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Copy',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1151,11 +1892,11 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
         return const SizedBox.shrink();
       case GenuiChatEntryKind.error:
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(12),
+            color: theme.colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             entry.text,
@@ -1245,6 +1986,10 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              ActiveSkillBanner(
+                controller: _controller,
+                padding: const EdgeInsets.only(bottom: 6.0),
+              ),
               _buildAttachmentPreviews(),
               SubPromptListEditor(
                 controller: _inputCtrl,
@@ -1304,6 +2049,18 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
       ),
     );
   }
+}
+
+class _CustomProviderCache {
+  final String model;
+  final String apiKey;
+  final String baseUrl;
+
+  _CustomProviderCache({
+    required this.model,
+    required this.apiKey,
+    required this.baseUrl,
+  });
 }
 
 class _ToolsetGroup {

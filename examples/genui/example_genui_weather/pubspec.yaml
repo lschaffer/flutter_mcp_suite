@@ -1,0 +1,39 @@
+name: example_genui_weather
+description: "Standalone dynamic GenUI weather generator example with custom forms, fl_chart visualizations, and JPG export."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  genui_mcp_playground:
+    path: ../../../genui_mcp_playground
+  mcp_playground_dart: ^0.2.3
+  mcp_playground_ui: ^0.1.1
+  http: ^1.6.0
+  fl_chart: ^1.2.0
+  genui: ^0.10.2
+  image: ^4.8.0
+  file_picker: ^11.0.3
+
+dependency_overrides:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  genui_mcp_playground:
+    path: ../../../genui_mcp_playground
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../../.env

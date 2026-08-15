@@ -203,6 +203,12 @@ class _ServerToolsDialogState extends State<ServerToolsDialog> {
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _connect,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry Connection'),
+            ),
           ],
         ),
       ),

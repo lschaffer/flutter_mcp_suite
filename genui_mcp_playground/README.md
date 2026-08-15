@@ -18,13 +18,21 @@ An interactive, dynamic **GenUI & Agentic MCP Playground** for Flutter.
 
 ---
 
+## 🎥 Demo
+
+Watch the dynamic GenUI Playground in action rendering interactive surfaces:
+
+![GenUI MCP Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+
+---
+
 ## 🚀 Installation
 
 Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  genui_mcp_playground: ^0.1.0
+  genui_mcp_playground: ^0.3.0
   genui: ^0.10.2
 ```
 
@@ -111,5 +119,6 @@ GenuiChatView(
 ## 📂 Example Projects
 
 Explore the runnable showcases in this repository:
-- **[`genui_mcp_playground/example`](example)** – Complete dynamic weather generator with form selectors and `fl_chart` integration.
+- **[`genui_mcp_playground/example`](example)** – Primary showcase: **Travel & Accommodation Planner** with SerpAPI Google search, date pickers, stay grids (hotels, apartments, camping), day-by-day itineraries, and JPG export.
+- **[`examples/genui/example_genui_weather`](../examples/genui/example_genui_weather)** – Dynamic weather generator with interactive form selectors, `fl_chart` visualizations, and JPG export.
 - **[`examples/genui/example_genui_filesystem`](../examples/genui/example_genui_filesystem)** – Interactive filesystem explorer with folder tree navigation and file viewer surfaces.

@@ -104,7 +104,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
   final _systemPromptCtrl = TextEditingController();
   final _initialPromptCtrl = TextEditingController();
   bool _chatMode = false;
-  bool _stopAfterToolCall = false;
+  final bool _stopAfterToolCall = false;
   bool _isGeneratingSystemPrompt = false;
 
   // Custom LLM Override state
@@ -804,32 +804,34 @@ class _McpPlaygroundState extends State<McpPlayground> {
     });
   }
 
-  void _showSaveSkillDialog() {
+  void _showSaveWorkflowDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => SkillSaveDialog(
+      builder: (ctx) => WorkflowSaveDialog(
         controller: _controller,
         unsentInput: _inputCtrl.text.trim().isNotEmpty
             ? _inputCtrl.text.trim()
-            : null,
+            : (_initialPromptCtrl.text.trim().isNotEmpty
+                  ? _initialPromptCtrl.text.trim()
+                  : null),
       ),
     );
   }
 
-  Future<void> _showLoadSkillDialog() async {
-    final result = await showDialog<SavedPlaygroundSetup>(
+  Future<void> _showLoadWorkflowDialog() async {
+    final result = await showDialog<PlaygroundWorkflow>(
       context: context,
-      builder: (ctx) => SkillLoadDialog(controller: _controller),
+      builder: (ctx) => WorkflowLoadDialog(controller: _controller),
     );
 
     if (result == null || !mounted) return;
 
     setState(() {
-      _loadedSetupId = result.id;
       _systemPromptCtrl.text = result.systemPrompt;
-      _initialPromptCtrl.text = result.initialPrompt;
+      _initialPromptCtrl.text = result.initialPrompt.isNotEmpty
+          ? result.initialPrompt
+          : result.steps.map((s) => s.text).join('\n++#++\n');
       _chatMode = result.chatMode;
-      _stopAfterToolCall = result.stopAfterToolCall;
       _useCustomLlm = result.useCustomLlm;
 
       if (result.customLlmConfig != null) {
@@ -855,84 +857,30 @@ class _McpPlaygroundState extends State<McpPlayground> {
       }
 
       _controller.updateEnabledTools(result.enabledToolNames.toSet());
+
+      if (result.activeSkillId != null) {
+        final match = _controller.skills
+            .where((s) => s.id == result.activeSkillId)
+            .toList();
+        if (match.isNotEmpty) {
+          _controller.setActiveSkill(match.first);
+        }
+      }
     });
+  }
 
-    debugPrint('[LoadSkill] systemPrompt: ${result.systemPrompt.length} chars');
-    debugPrint(
-      '[LoadSkill] initialPrompt: ${result.initialPrompt.length} chars',
+  Future<void> _showSkillsManagerDialog() async {
+    await SkillsManagerDialog.show(context, _controller);
+  }
+
+  Future<void> _showSkillWizardDialog() async {
+    final result = await showDialog<SkillDef>(
+      context: context,
+      builder: (ctx) => SkillWizardDialog(controller: _controller),
     );
-    debugPrint('[LoadSkill] tools: ${result.enabledToolNames.length}');
-
-    // If the skill declares a custom LLM, check if it matches the current playground LLM
-    // or if it's not configured/available (missing API key/model file).
-    if (_useCustomLlm && result.customLlmConfig != null) {
-      final custom = result.customLlmConfig!;
-      final defaults = _controller.llmConfig;
-
-      final isMatching = custom.provider == defaults.provider &&
-          custom.model == defaults.model;
-
-      bool isAvailable = true;
-      if (custom.provider == LlmProvider.embedded) {
-        if (custom.model.isEmpty || !File(custom.model).existsSync()) {
-          isAvailable = false;
-        }
-      } else {
-        // For cloud/API providers, if it matches defaults, we copy the API key/baseUrl
-        // if it's missing in the custom config.
-        LlmConfig verifiedCustom = custom;
-        if (custom.provider == defaults.provider) {
-          verifiedCustom = custom.copyWith(
-            apiKey: custom.apiKey.isEmpty ? defaults.apiKey : custom.apiKey,
-            baseUrl: custom.baseUrl.isEmpty ? defaults.baseUrl : custom.baseUrl,
-          );
-        }
-        isAvailable = verifiedCustom.isConfigured && isMatching;
-      }
-
-      if (!isAvailable) {
-        final l10n = _l10n;
-        final msg = l10n
-            .get('skillLlmNotConfigured')
-            .replaceAll('{provider}', custom.provider.displayName)
-            .replaceAll('{model}', custom.model);
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(l10n.get('llmWarning')),
-                content: Text(msg),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(l10n.get('close')),
-                  ),
-                ],
-              ),
-            );
-          }
-        });
-
-        setState(() {
-          _useCustomLlm = false;
-          _applyLlmDefaults();
-        });
-
-        debugPrint(
-          '[LoadSkill] Custom LLM (${custom.provider.displayName} / ${custom.model}) not available or matches default – falling back to default.',
-        );
-      }
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Loaded skill "${result.name}".'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    if (result != null) {
+      await _controller.saveSkill(result);
+      _controller.setActiveSkill(result);
     }
   }
 
@@ -1497,13 +1445,15 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 16),
           ],
 
-          // LLM Selector Selection
+          // LLM Configuration
           const Text(
             'LLM Configuration',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
+          const SizedBox(height: 8),
           SegmentedButton<bool>(
             segments: [
               ButtonSegment(
@@ -1704,12 +1654,27 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Edit System Prompt'),
-                      content: TextFormField(
-                        controller: promptCtrl,
-                        maxLines: 6,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Row(
+                        children: [
+                          Icon(Icons.edit_note, color: Color(0xFF0067C0)),
+                          SizedBox(width: 8),
+                          Text('Edit System Prompt'),
+                        ],
+                      ),
+                      content: SizedBox(
+                        width: 700,
+                        child: TextFormField(
+                          controller: promptCtrl,
+                          maxLines: 12,
+                          minLines: 6,
+                          decoration: const InputDecoration(
+                            hintText:
+                                'Enter instructions, persona details, or system guidelines...',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
                       actions: [
@@ -1740,23 +1705,20 @@ class _McpPlaygroundState extends State<McpPlayground> {
             ],
           ),
         ),
-        const Divider(height: 1),        // --- Main Conversation Area ---
+        const Divider(height: 1), // --- Main Conversation Area ---
         Expanded(
           child: _controller.isLoading
               ? const Center(child: CircularProgressIndicator())
               : _controller.messages.isEmpty
-                  ? _buildWelcomeWidget(theme)
-                  : ListView(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.only(bottom: 24),
-                      children: [
-                        for (final msg in _controller.messages)
-                          ChatBubble(
-                            message: msg,
-                            controller: _controller,
-                          ),
-                      ],
-                    ),
+              ? _buildWelcomeWidget(theme)
+              : ListView(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.only(bottom: 24),
+                  children: [
+                    for (final msg in _controller.messages)
+                      ChatBubble(message: msg, controller: _controller),
+                  ],
+                ),
         ),
 
         // --- Action Indicators (Generating / Errors) ---
@@ -1841,9 +1803,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
   Widget _buildInputBar(ThemeData theme) {
     final isGen = _controller.isGenerating;
     final showButton =
-        _inputCtrl.text.isNotEmpty ||
-        _attachments.isNotEmpty ||
-        !isGen;
+        _inputCtrl.text.isNotEmpty || _attachments.isNotEmpty || !isGen;
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -1856,6 +1816,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              ActiveSkillBanner(
+                controller: _controller,
+                padding: const EdgeInsets.only(bottom: 6.0),
+              ),
               _buildAttachmentPreviews(),
               SubPromptListEditor(
                 controller: _inputCtrl,
@@ -1871,7 +1835,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
                     .toList(),
                 minLines: 1,
                 maxLines: 6,
-                hintText: isGen ? 'Agent is working...' : 'Type a message or ask a tool to run...',
+                hintText: isGen
+                    ? 'Agent is working...'
+                    : 'Type a message or ask a tool to run...',
               ),
               const SizedBox(height: 8),
               Row(
@@ -2088,20 +2054,26 @@ class _McpPlaygroundState extends State<McpPlayground> {
             onPressed: _clearSetupInputs,
           ),
           IconButton(
-            icon: const Icon(Icons.bookmarks_outlined),
-            tooltip: 'Load Skill',
-            onPressed: _showLoadSkillDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.save_outlined),
-            tooltip: 'Save Skill',
-            onPressed: _showSaveSkillDialog,
+            icon: const Icon(Icons.alt_route),
+            tooltip: 'Load Workflow',
+            onPressed: _showLoadWorkflowDialog,
           ),
         ],
         IconButton(
           icon: const Icon(Icons.save_outlined),
-          tooltip: 'Save Skill',
-          onPressed: _showSaveSkillDialog,
+          tooltip: 'Save Workflow',
+          onPressed: _showSaveWorkflowDialog,
+        ),
+        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
+        IconButton(
+          icon: const Icon(Icons.bookmarks_outlined),
+          tooltip: 'Skills Manager',
+          onPressed: _showSkillsManagerDialog,
+        ),
+        IconButton(
+          icon: const Icon(Icons.auto_awesome),
+          tooltip: 'Skill Wizard',
+          onPressed: _showSkillWizardDialog,
         ),
         const VerticalDivider(width: 16, indent: 12, endIndent: 12),
         IconButton(
@@ -2112,9 +2084,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
         if (widget.showAgentInspector)
           IconButton(
             icon: Icon(
-              _inspectorVisible
-                  ? Icons.analytics
-                  : Icons.analytics_outlined,
+              _inspectorVisible ? Icons.analytics : Icons.analytics_outlined,
             ),
             tooltip: l10n.get('agentInspector'),
             onPressed: () {
@@ -2143,10 +2113,14 @@ class _McpPlaygroundState extends State<McpPlayground> {
         onSelected: (val) {
           if (val == 'clear') {
             _clearSetupInputs();
-          } else if (val == 'saveSkill') {
-            _showSaveSkillDialog();
-          } else if (val == 'loadSkill') {
-            _showLoadSkillDialog();
+          } else if (val == 'saveWorkflow') {
+            _showSaveWorkflowDialog();
+          } else if (val == 'loadWorkflow') {
+            _showLoadWorkflowDialog();
+          } else if (val == 'skillsManager') {
+            _showSkillsManagerDialog();
+          } else if (val == 'skillWizard') {
+            _showSkillWizardDialog();
           } else if (val == 'catalog') {
             RegisteredToolsDialog.show(context, _controller);
           } else if (val == 'inspector') {
@@ -2165,27 +2139,49 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 ],
               ),
             ),
-            PopupMenuItem(
-              value: 'loadSkill',
+            const PopupMenuItem(
+              value: 'loadWorkflow',
               child: Row(
                 children: [
-                  const Icon(Icons.bookmarks_outlined, size: 20),
-                  const SizedBox(width: 12),
-                  const Text('Load Skill'),
+                  Icon(Icons.alt_route, size: 20),
+                  SizedBox(width: 12),
+                  Text('Load Workflow'),
                 ],
               ),
             ),
           ],
-          PopupMenuItem(
-            value: 'saveSkill',
+          const PopupMenuItem(
+            value: 'saveWorkflow',
             child: Row(
               children: [
-                const Icon(Icons.save_outlined, size: 20),
-                const SizedBox(width: 12),
-                const Text('Save Skill'),
+                Icon(Icons.save_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Save Workflow'),
               ],
             ),
           ),
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            value: 'skillsManager',
+            child: Row(
+              children: [
+                Icon(Icons.bookmarks_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Skills Manager'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'skillWizard',
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 20),
+                SizedBox(width: 12),
+                Text('Skill Wizard'),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
           PopupMenuItem(
             value: 'catalog',
             child: Row(
@@ -2231,7 +2227,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
     final l10n = _l10n;
 
     final bool showInspectorPane =
-        isWide && widget.showAgentInspector && _inspectorVisible && _playgroundStarted;
+        isWide &&
+        widget.showAgentInspector &&
+        _inspectorVisible &&
+        _playgroundStarted;
 
     return Scaffold(
       key: _scaffoldKey,

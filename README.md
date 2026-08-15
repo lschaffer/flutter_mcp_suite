@@ -1,7 +1,7 @@
 # MCP Playground Monorepo
 
 > [!NOTE]
-> This project was created and is actively maintained using agentic coding tools. The core monorepo and its packages were built with **Google Antigravity IDE** (primarily powered by **Gemini 3.5 Flash**), and specific components (such as some examples) were developed using the **ZooCode** plugin with **DeepSeek-V4**. It stands as a real-world demonstration of building production-ready Dart packages and interactive Flutter libraries using agentic workflows.
+> This project was created and is actively maintained mostly using agentic coding tools. The core monorepo and its packages were built with **Google Antigravity IDE** (primarily powered by **Gemini 3.6 Flash**), and specific components (such as some examples) were developed using the **ZooCode** plugin with **DeepSeek-V4 Flash/Pro**. It stands as a real-world demonstration of building production-ready Dart packages and interactive Flutter libraries using agentic workflows.
 
 Welcome to the **MCP Playground** monorepo! This project is modularized into dedicated packages spanning headless pure-Dart execution, shared UI widgets, classic AI agent playground interfaces, and dynamic generative UI rendering via Google GenUI (`A2UI`).
 
@@ -23,7 +23,8 @@ Welcome to the **MCP Playground** monorepo! This project is modularized into ded
 We provide several runnable example applications across Flutter, GenUI, and headless Dart:
 
 ### 🎨 GenUI (Generative UI) Examples
-* **[Dynamic Weather Generator](genui_mcp_playground/example)**: Interactive weather generator demonstrating model-generated input forms, live chart visualizations, and native Dart tool integrations via `GenuiMcpPlayground`.
+* **[Travel & Accommodation Planner](genui_mcp_playground/example)**: Primary showcase — interactive travel and stay planner with SerpAPI live search, date range pickers, accommodation style chips (hotels, apartments, glamping), rich photo cards, day-by-day itineraries, and JPG export.
+* **[Dynamic Weather Generator](examples/genui/example_genui_weather)**: Interactive weather generator demonstrating model-generated input forms, live `fl_chart` visualizations, JPG export, and native Open-Meteo tool integrations.
 * **[Filesystem Explorer](examples/genui/example_genui_filesystem)**: Interactive GenUI filesystem explorer showcasing folder tree navigation and file content inspection surfaces.
 
 ### 📱 Flutter (Classic UI) Examples

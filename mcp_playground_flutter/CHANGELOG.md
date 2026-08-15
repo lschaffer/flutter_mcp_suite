@@ -1,3 +1,9 @@
+## 0.3.1
+
+- Bumped `mcp_playground_dart` to `^0.2.3` and `mcp_playground_ui` to `^0.1.1`.
+- Direct Windows `node.exe` execution for reliable local MCP server discovery.
+- Improved live streaming reliability and chat bubble copy functionality.
+
 ## 0.3.0
 
 - **Architecture modularization**: Extracted reusable Flutter UI components, dialogs, drawers, and state controllers into the [`mcp_playground_ui`](../mcp_playground_ui) shared package.

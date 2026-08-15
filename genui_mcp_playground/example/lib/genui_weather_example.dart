@@ -1,9 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:genui/genui.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:genui_mcp_playground/genui_mcp_playground.dart';
 
 import 'env_loader.dart';
@@ -263,7 +268,7 @@ class _WeatherFormWidgetState extends State<_WeatherFormWidget> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 3. Weather chart catalog item (fl_chart multi-line)
+// 3. Weather chart catalog item (fl_chart multi-line + JPG export)
 // ═══════════════════════════════════════════════════════════════
 
 final weatherChartSchema = S.object(
@@ -286,156 +291,307 @@ final weatherChartSchema = S.object(
 final weatherChartItem = CatalogItem(
   name: 'WeatherChart',
   dataSchema: weatherChartSchema,
-  widgetBuilder: _buildWeatherChart,
+  widgetBuilder: (itemContext) => _WeatherChartWidget(itemContext: itemContext),
 );
 
-Widget _buildWeatherChart(CatalogItemContext itemContext) {
-  final data = Map<String, Object?>.from(itemContext.data as Map);
-  final title = data['title']?.toString() ?? 'Weather forecast';
-  final times = (data['times'] as List?)?.cast<String>() ?? const <String>[];
-  final rawChannels = (data['channels'] as List?) ?? const [];
+class _WeatherChartWidget extends StatefulWidget {
+  final CatalogItemContext itemContext;
 
-  final channels = <({String label, List<double> values})>[];
-  for (final raw in rawChannels) {
-    final map = Map<String, Object?>.from(raw as Map);
-    channels.add((
-      label: map['label']?.toString() ?? '',
-      values:
-          (map['values'] as List?)
-              ?.map((v) => (v as num).toDouble())
-              .toList() ??
-          const <double>[],
-    ));
+  const _WeatherChartWidget({required this.itemContext});
+
+  @override
+  State<_WeatherChartWidget> createState() => _WeatherChartWidgetState();
+}
+
+class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
+  final GlobalKey _chartBoundaryKey = GlobalKey();
+  bool _isExporting = false;
+
+  Future<void> _exportChartToJpg(String title) async {
+    setState(() => _isExporting = true);
+    try {
+      final boundary =
+          _chartBoundaryKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      final uiImage = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await uiImage.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
+      if (byteData == null) return;
+
+      final image = img.Image.fromBytes(
+        width: uiImage.width,
+        height: uiImage.height,
+        bytes: byteData.buffer,
+        numChannels: 4,
+        order: img.ChannelOrder.rgba,
+      );
+
+      final jpgBytes = img.encodeJpg(image, quality: 92);
+      final sanitizedTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]+'),
+        '_',
+      );
+      final defaultFileName = '${sanitizedTitle}_chart.jpg';
+
+      final savePath = await FilePicker.saveFile(
+        dialogTitle: 'Export Chart Picture (JPG)',
+        fileName: defaultFileName,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+      );
+
+      if (savePath != null) {
+        final file = File(savePath);
+        await file.writeAsBytes(jpgBytes);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Chart exported to JPG: $savePath')),
+                ],
+              ),
+              backgroundColor: const Color(0xFF107C41),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export chart image: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
   }
 
-  final theme = Theme.of(itemContext.buildContext);
-  const palette = [
-    Color(0xFF3B82F6),
-    Color(0xFF10B981),
-    Color(0xFFF59E0B),
-    Color(0xFF8B5CF6),
-    Color(0xFFEF4444),
-    Color(0xFF06B6D4),
-  ];
+  @override
+  Widget build(BuildContext context) {
+    final data = Map<String, Object?>.from(widget.itemContext.data as Map);
+    final title = data['title']?.toString() ?? 'Weather forecast';
+    final times = (data['times'] as List?)?.cast<String>() ?? const <String>[];
+    final rawChannels = (data['channels'] as List?) ?? const [];
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
+    final channels = <({String label, List<double> values})>[];
+    for (final raw in rawChannels) {
+      final map = Map<String, Object?>.from(raw as Map);
+      channels.add((
+        label: map['label']?.toString() ?? '',
+        values:
+            (map['values'] as List?)
+                ?.map((v) => (v as num).toDouble())
+                .toList() ??
+            const <double>[],
+      ));
+    }
+
+    final theme = Theme.of(context);
+    const palette = [
+      Color(0xFF3B82F6),
+      Color(0xFF10B981),
+      Color(0xFFF59E0B),
+      Color(0xFF8B5CF6),
+      Color(0xFFEF4444),
+      Color(0xFF06B6D4),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Action Header with Export Button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: _isExporting ? null : () => _exportChartToJpg(title),
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_rounded, size: 16),
+              label: const Text('Export Picture (JPG)'),
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+              ),
+            ),
+          ],
         ),
-      ),
-      const SizedBox(height: 16),
-      SizedBox(
-        height: 220,
-        child: LineChart(
-          LineChartData(
-            minY: _minValue(channels) - 1,
-            maxY: _maxValue(channels) + 1,
-            lineBarsData: [
-              for (var i = 0; i < channels.length; i++)
-                LineChartBarData(
-                  spots: [
-                    for (var j = 0; j < channels[i].values.length; j++)
-                      FlSpot(j.toDouble(), channels[i].values[j]),
-                  ],
-                  isCurved: true,
-                  color: palette[i % palette.length],
-                  barWidth: 2.5,
-                  dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                    show: false,
-                    color: palette[i % palette.length].withValues(alpha: 0.08),
+        const SizedBox(height: 12),
+
+        // Visual chart with RepaintBoundary for high-res JPG export
+        RepaintBoundary(
+          key: _chartBoundaryKey,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.dividerColor.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 220,
+                  child: LineChart(
+                    LineChartData(
+                      minY: _minValue(channels) - 1,
+                      maxY: _maxValue(channels) + 1,
+                      lineBarsData: [
+                        for (var i = 0; i < channels.length; i++)
+                          LineChartBarData(
+                            spots: [
+                              for (
+                                var j = 0;
+                                j < channels[i].values.length;
+                                j++
+                              )
+                                FlSpot(j.toDouble(), channels[i].values[j]),
+                            ],
+                            isCurved: true,
+                            color: palette[i % palette.length],
+                            barWidth: 2.5,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: false,
+                              color: palette[i % palette.length].withValues(
+                                alpha: 0.08,
+                              ),
+                            ),
+                          ),
+                      ],
+                      gridData: const FlGridData(show: true),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: const AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 36,
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: _bottomInterval(times.length),
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (index < 0 || index >= times.length) {
+                                return const Text('');
+                              }
+                              final label = times[index];
+                              final short = label.length > 5
+                                  ? label.substring(label.length - 5)
+                                  : label;
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  short,
+                                  style: const TextStyle(fontSize: 9),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-            ],
-            gridData: const FlGridData(show: true),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 36),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: _bottomInterval(times.length),
-                  getTitlesWidget: (value, meta) {
-                    final index = value.toInt();
-                    if (index < 0 || index >= times.length) {
-                      return const Text('');
-                    }
-                    final label = times[index];
-                    final short = label.length > 5
-                        ? label.substring(label.length - 5)
-                        : label;
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(short, style: const TextStyle(fontSize: 9)),
-                    );
-                  },
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    for (var i = 0; i < channels.length; i++)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: palette[i % palette.length],
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            channels[i].label,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-              ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
+              ],
             ),
           ),
         ),
-      ),
-      const SizedBox(height: 8),
-      Wrap(
-        spacing: 12,
-        children: [
-          for (var i = 0; i < channels.length; i++)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: palette[i % palette.length],
-                    shape: BoxShape.circle,
-                  ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: times.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final values = channels
+                  .map(
+                    (c) =>
+                        '${c.label}: ${c.values.length > index ? c.values[index] : '-'}',
+                  )
+                  .join('  ');
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  '${times[index].replaceFirst('T', ' ')}  $values',
+                  style: const TextStyle(fontSize: 11),
                 ),
-                const SizedBox(width: 4),
-                Text(channels[i].label, style: const TextStyle(fontSize: 11)),
-              ],
-            ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      SizedBox(
-        height: 120,
-        child: ListView.separated(
-          shrinkWrap: true,
-          itemCount: times.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final values = channels
-                .map(
-                  (c) =>
-                      '${c.label}: ${c.values.length > index ? c.values[index] : '-'}',
-                )
-                .join('  ');
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                '${times[index].replaceFirst('T', ' ')}  $values',
-                style: const TextStyle(fontSize: 11),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 double _minValue(List<({String label, List<double> values})> channels) {
@@ -476,29 +632,36 @@ Catalog buildWeatherGenuiCatalog() {
   return base.copyWith(newItems: [weatherFormItem, weatherChartItem]);
 }
 
-/// The system prompt instructing the model how to use weather GenUI widgets and tools.
+/// The system prompt instructing the model how to use weather GenUI widgets, tools, and build/attachment analysis.
 const String weatherGenuiSystemPrompt = '''
-You are a helpful weather assistant backed by the live `get_weather_forecast` tool.
+You are an intelligent GenUI AI assistant backed by live MCP tools, interactive Flutter components, and diagnostic tools.
 
-Important Catalog Rules:
-- You ONLY have access to two custom components: "WeatherForm" and "WeatherChart".
-- Do NOT invent or use other component names like "Text", "Divider", "Header", "Column", "ChoicePicker", or "Button".
+Capabilities & Component Rules:
+- Weather Capabilities:
+  - You have access to custom GenUI components: "WeatherForm" and "WeatherChart".
+  - You have the `get_weather_forecast` tool for real-time and hourly weather forecasts.
+  - When the user asks for a weather forecast without city/parameters, render a "WeatherForm" component.
+  - When the user submits a weather form or provides parameters (city, hours, channels):
+    1. Invoke the `get_weather_forecast` tool immediately with those arguments.
+    2. Render a "WeatherChart" component with the forecast data:
+       {
+         "title": "Weather forecast for <location>",
+         "times": [<list of ISO timestamps from tool result>],
+         "channels": [
+           { "label": "<channel_name>", "values": [<list of numeric values from tool result>] }
+         ]
+       }
 
-Follow these steps strictly:
-1. When the user asks for a weather forecast without city/parameters, render a "WeatherForm" component.
-2. When the user submits a form action or parameters (city, hours, channels) are given:
-   - Invoke the `get_weather_forecast` tool call immediately with those arguments (e.g. city, hours, channels).
-   - Do NOT render a WeatherForm component again.
-   - Do NOT ask questions or repeat instructions.
-3. After receiving the JSON tool result from `get_weather_forecast`:
-   - Render a "WeatherChart" component with the forecast data:
-   {
-     "title": "Weather forecast for <location>",
-     "times": [<list of ISO timestamps from tool result>],
-     "channels": [
-       { "label": "<channel_name>", "values": [<list of numeric values from tool result>] }
-     ]
-   }
+- Build Analysis & Attachments:
+  - You are fully equipped to analyze, diagnose, and inspect attached builds, build logs, stack traces, compiler output, screenshots, and source code files.
+  - When the user attaches a file/image or asks to analyze a build/failure:
+    1. Examine the attached build output, errors, or logs thoroughly.
+    2. Identify root causes, build breakages, missing dependencies, or syntax/runtime errors.
+    3. Provide clear, structured diagnosis and step-by-step fix recommendations.
+
+General Guidelines:
+- Be concise, direct, and actionable.
+- Combine interactive UI components with insightful explanations whenever appropriate.
 ''';
 
 /// The GenUI-based weather example screen using the standard McpPlayground view.
@@ -516,7 +679,9 @@ class GenuiWeatherScreen extends StatelessWidget {
     );
 
     return GenuiMcpPlayground(
-      initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
+      initialLlmConfig: initialLlm.provider != LlmProvider.none
+          ? initialLlm
+          : null,
       customLocalTools: [WeatherForecastTool()],
       initialEnabledTools: const ['get_weather_forecast'],
       initialSystemPrompt: weatherGenuiSystemPrompt,

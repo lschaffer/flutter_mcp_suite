@@ -1,6 +1,6 @@
 name: genui_mcp_playground
 description: "Interactive GenUI AI Agent Playground widget for Flutter. Connect to LLMs, execute MCP tools, and render dynamic interactive generative UI widgets."
-version: 0.1.0
+version: 0.3.0
 homepage: https://github.com/lschaffer/mcp_playground
 repository: https://github.com/lschaffer/mcp_playground/tree/master/genui_mcp_playground
 
@@ -11,8 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  mcp_playground_dart: ^0.2.2
-  mcp_playground_ui: ^0.1.0
+  mcp_playground_dart: ^0.2.3
+  mcp_playground_ui: ^0.1.1
   genui: ^0.10.2
   genai_primitives: ^0.2.3
   json_schema_builder: ^0.1.3

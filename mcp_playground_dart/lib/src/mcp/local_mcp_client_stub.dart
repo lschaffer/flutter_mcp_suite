@@ -10,8 +10,8 @@ import 'mcp_client.dart';
 class LocalMCPClient extends MCPClient {
   final McpServerConfig serverConfig;
 
-  LocalMCPClient(this.serverConfig, {McpLogCallback? logCallback})
-    : super(serverConfig.url, logCallback: logCallback);
+  LocalMCPClient(this.serverConfig, {super.logCallback})
+    : super(serverConfig.url);
 
   @override
   bool get isConnected => false;
@@ -58,6 +58,7 @@ class LocalMcpRuntime {
 
   static Future<String?> detectUv() async => null;
   static Future<String?> detectNode() async => null;
+  static Future<String?> findNpxCli(String nodePath) async => null;
   static Future<String?> detectPython() async => null;
 
   static List<String> buildLaunchArgs(McpServerConfig server) => [];

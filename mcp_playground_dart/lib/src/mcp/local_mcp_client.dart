@@ -16,8 +16,8 @@ class LocalMCPClient extends MCPClient {
       StreamController<Map<String, dynamic>>.broadcast();
   StreamSubscription? _stdoutSub;
 
-  LocalMCPClient(this.serverConfig, {McpLogCallback? logCallback})
-    : super(serverConfig.url, logCallback: logCallback);
+  LocalMCPClient(this.serverConfig, {super.logCallback})
+    : super(serverConfig.url);
 
   void _log(String message, {bool isError = false}) {
     if (logCallback != null) {
@@ -58,32 +58,31 @@ class LocalMCPClient extends MCPClient {
         }
         exe = uvx;
         cmdArgs = [serverConfig.localPackage ?? serverConfig.name, ...args];
-      } else if (serverConfig.localInstallMethod == 'npm') {
+      } else if (serverConfig.localInstallMethod == 'npm' ||
+          serverConfig.localInstallMethod == 'npx') {
         final node = await LocalMcpRuntime.detectNode();
         if (node == null) {
           throw const LocalMcpException(
             'Node.js (18+) not found. Please install Node.js and restart the app.',
           );
         }
-        exe = LocalMcpRuntime.siblingTool(node, 'npx');
-        cmdArgs = [
-          '-y',
-          serverConfig.localPackage ?? serverConfig.name,
-          ...args,
-        ];
-      } else if (serverConfig.localInstallMethod == 'npx') {
-        final node = await LocalMcpRuntime.detectNode();
-        if (node == null) {
-          throw const LocalMcpException(
-            'Node.js (18+) not found. Please install Node.js and restart the app.',
-          );
+        final npxCli = await LocalMcpRuntime.findNpxCli(node);
+        if (npxCli != null && await File(npxCli).exists()) {
+          exe = node;
+          cmdArgs = [
+            npxCli,
+            '-y',
+            serverConfig.localPackage ?? serverConfig.name,
+            ...args,
+          ];
+        } else {
+          exe = LocalMcpRuntime.siblingTool(node, 'npx');
+          cmdArgs = [
+            '-y',
+            serverConfig.localPackage ?? serverConfig.name,
+            ...args,
+          ];
         }
-        exe = LocalMcpRuntime.siblingTool(node, 'npx');
-        cmdArgs = [
-          '-y',
-          serverConfig.localPackage ?? serverConfig.name,
-          ...args,
-        ];
       } else if (serverConfig.localCommand != null &&
           serverConfig.localCommand!.trim().isNotEmpty &&
           serverConfig.localInstallMethod != 'pip' &&
@@ -124,13 +123,10 @@ class LocalMCPClient extends MCPClient {
         }
       }
 
-      final bool runInShell =
-          Platform.isWindows &&
-          (exe.endsWith('.bat') ||
-              exe.endsWith('.cmd') ||
-              exe.contains('npx') ||
-              exe.contains('npm') ||
-              !p.basename(exe).contains('.'));
+      final bool isBatch = Platform.isWindows &&
+          (exe.toLowerCase().endsWith('.bat') ||
+              exe.toLowerCase().endsWith('.cmd'));
+      final bool runInShell = isBatch;
 
       _process = await Process.start(
         exe,
@@ -225,6 +221,17 @@ class LocalMCPClient extends MCPClient {
       if (msg['id'] == id) {
         sub.cancel();
         if (!completer.isCompleted) completer.complete(msg);
+      }
+    });
+
+    _process!.exitCode.then((code) {
+      if (!completer.isCompleted) {
+        sub.cancel();
+        completer.completeError(
+          LocalMcpException(
+            'Local MCP process exited with code $code before responding to "$method"',
+          ),
+        );
       }
     });
 
@@ -477,26 +484,91 @@ class LocalMcpRuntime {
     return env;
   }
 
+  static Future<String?> _resolveWindowsExe(String name) async {
+    if (!Platform.isWindows) return null;
+    try {
+      final result = await Process.run('where.exe', [name], runInShell: true);
+      if (result.exitCode == 0) {
+        final lines = (result.stdout as String)
+            .split(RegExp(r'\r?\n'))
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty && s.toLowerCase().endsWith('.exe'));
+        if (lines.isNotEmpty) {
+          return lines.first;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<String?> findNpxCli(String nodePath) async {
+    if (!p.isAbsolute(nodePath)) return null;
+    final dir = p.dirname(nodePath);
+    final candidates = [
+      p.join(dir, 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+      p.join(dir, 'node_modules', 'npm', 'bin', 'npx.js'),
+      p.join(dir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+      p.join(dir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npx.js'),
+    ];
+    for (final c in candidates) {
+      if (await File(c).exists()) return c;
+    }
+    return null;
+  }
+
   static Future<String?> detectUv() async {
+    if (Platform.isWindows) {
+      final whereUvx = await _resolveWindowsExe('uvx.exe');
+      if (whereUvx != null) return whereUvx;
+    }
     final shellResolved = await _resolveViaShell('uvx');
     final candidates = Platform.isWindows
-        ? ['uvx.exe', 'uvx']
+        ? [
+            p.join(Platform.environment['USERPROFILE'] ?? '', '.cargo', 'bin', 'uvx.exe'),
+            p.join(Platform.environment['LOCALAPPDATA'] ?? '', 'Programs', 'uv', 'uvx.exe'),
+            'uvx.exe',
+            'uvx',
+          ]
         : [?shellResolved, ..._unixCandidates('uvx')];
     for (final exe in candidates) {
       try {
         final result = await Process.run(exe, [
           '--version',
         ], runInShell: Platform.isWindows);
-        if (result.exitCode == 0) return exe;
+        if (result.exitCode == 0) {
+          if (Platform.isWindows && !p.isAbsolute(exe)) {
+            final resolved = await _resolveWindowsExe(exe);
+            if (resolved != null) return resolved;
+          }
+          return exe;
+        }
       } catch (_) {}
     }
     return null;
   }
 
   static Future<String?> detectNode() async {
+    if (Platform.isWindows) {
+      final whereNode = await _resolveWindowsExe('node.exe');
+      if (whereNode != null) {
+        try {
+          final res = await Process.run(whereNode, ['--version']);
+          if (res.exitCode == 0) {
+            final version = (res.stdout as String).trim();
+            final major = int.tryParse(version.replaceFirst(RegExp(r'^v'), '').split('.').first) ?? 0;
+            if (major >= 18) return whereNode;
+          }
+        } catch (_) {}
+      }
+    }
     final shellResolved = await _resolveViaShell('node');
     final candidates = Platform.isWindows
-        ? ['node.exe', 'node']
+        ? [
+            'C:\\Program Files\\nodejs\\node.exe',
+            'C:\\Program Files (x86)\\nodejs\\node.exe',
+            'node.exe',
+            'node',
+          ]
         : [?shellResolved, ..._unixCandidates('node')];
     for (final exe in candidates) {
       try {
@@ -510,7 +582,13 @@ class LocalMcpRuntime {
                 version.replaceFirst(RegExp(r'^v'), '').split('.').first,
               ) ??
               0;
-          if (major >= 18) return exe;
+          if (major >= 18) {
+            if (Platform.isWindows && !p.isAbsolute(exe)) {
+              final resolved = await _resolveWindowsExe(exe);
+              if (resolved != null) return resolved;
+            }
+            return exe;
+          }
         }
       } catch (_) {}
     }
@@ -548,6 +626,36 @@ class LocalMcpRuntime {
     return null;
   }
 
+  static List<String> _splitArgs(String command) {
+    final parts = <String>[];
+    var current = StringBuffer();
+    var inQuotes = false;
+    var quoteChar = '';
+
+    for (var i = 0; i < command.length; i++) {
+      final char = command[i];
+      if ((char == '"' || char == "'") && (i == 0 || command[i - 1] != '\\')) {
+        if (inQuotes && char == quoteChar) {
+          inQuotes = false;
+        } else if (!inQuotes) {
+          inQuotes = true;
+          quoteChar = char;
+        }
+      } else if (char == ' ' && !inQuotes) {
+        if (current.isNotEmpty) {
+          parts.add(current.toString());
+          current = StringBuffer();
+        }
+      } else {
+        current.write(char);
+      }
+    }
+    if (current.isNotEmpty) {
+      parts.add(current.toString());
+    }
+    return parts;
+  }
+
   static List<String> buildLaunchArgs(McpServerConfig server) {
     if (server.customLaunchCommand != null &&
         server.customLaunchCommand!.trim().isNotEmpty) {
@@ -564,18 +672,36 @@ class LocalMcpRuntime {
       return [];
     }
     final rawArgs = server.url.trim();
-    if (rawArgs.isEmpty) return [];
-
-    final args = rawArgs.split(' ').where((s) => s.trim().isNotEmpty).toList();
+    final args = rawArgs.isEmpty ? <String>[] : _splitArgs(rawArgs);
     final Map<String, String> vars = server.localEnvVars ?? {};
 
-    return args.map((arg) {
-      var output = arg;
-      for (final entry in vars.entries) {
-        output = output.replaceAll('{{${entry.key}}}', entry.value);
-      }
-      return output;
-    }).toList();
+    final processed = args
+        .map((arg) {
+          var output = arg;
+          for (final entry in vars.entries) {
+            output = output.replaceAll('{{${entry.key}}}', entry.value);
+          }
+          if (output.contains('{{allowed_dirs}}')) {
+            output = output.replaceAll(
+              '{{allowed_dirs}}',
+              Directory.current.path,
+            );
+          }
+          return output;
+        })
+        .where(
+          (s) => s.trim().isNotEmpty && !s.contains(RegExp(r'\{\{.*?\}\}')),
+        )
+        .toList();
+
+    // If server is filesystem and no args provided/resolved, default to current working directory
+    final pkg = (server.localPackage ?? server.name).toLowerCase();
+    if (processed.isEmpty &&
+        (pkg.contains('filesystem') || pkg.contains('server-filesystem'))) {
+      processed.add(Directory.current.path);
+    }
+
+    return processed;
   }
 
   static Future<String?> install(

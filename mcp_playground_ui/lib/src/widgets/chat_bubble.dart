@@ -1185,6 +1185,13 @@ class ChatBubble extends StatelessWidget {
 
   Future<void> _openHtmlInBrowser(BuildContext context, String html) async {
     try {
+      if (kIsWeb) {
+        final uri = Uri.parse(
+          'data:text/html;charset=utf-8,${Uri.encodeComponent(html)}',
+        );
+        await launchUrl(uri);
+        return;
+      }
       final dir = await getTemporaryDirectory();
       final file = io.File(
         '${dir.path}${io.Platform.pathSeparator}mcp_preview_${DateTime.now().millisecondsSinceEpoch}.html',

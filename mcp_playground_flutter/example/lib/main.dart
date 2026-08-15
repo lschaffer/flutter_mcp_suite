@@ -25,14 +25,14 @@ class McpPlaygroundExampleApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 83, 18, 234),
+          seedColor: const Color(0xFF0067C0),
           brightness: Brightness.light,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 92, 2, 83),
+          seedColor: const Color(0xFF60CDFF),
           brightness: Brightness.dark,
         ),
       ),
@@ -83,35 +83,37 @@ class McpPlaygroundScreen extends StatelessWidget {
       baseUrl: EnvLoader.get('LLM_URL'),
     );
 
-    // Initial local MCP servers setup with git and filesystem configs
-    final List<LocalMcpServerSetup> initialLocalServers = [
-      LocalMcpServerSetup(
-        name: 'Filesystem',
-        type: 'node',
-        method: 'npx',
-        packageOrServerName: '@modelcontextprotocol/server-filesystem',
-        launchArguments: Directory.current.path,
-        reinstall: false,
-      ),
-      LocalMcpServerSetup(
-        name: 'Git',
-        type: 'python',
-        method: 'uvx',
-        packageOrServerName: 'mcp-server-git',
-        launchArguments: '',
-        reinstall: false,
-      ),
-    ];
-
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+    // Initial local MCP servers setup with git and filesystem configs (desktop only)
+    final List<LocalMcpServerSetup>? initialLocalServers = isDesktop
+        ? [
+            LocalMcpServerSetup(
+              name: 'Filesystem',
+              type: 'node',
+              method: 'npx',
+              packageOrServerName: '@modelcontextprotocol/server-filesystem',
+              launchArguments: Directory.current.path,
+              reinstall: false,
+            ),
+            const LocalMcpServerSetup(
+              name: 'Git',
+              type: 'python',
+              method: 'uvx',
+              packageOrServerName: 'mcp-server-git',
+              launchArguments: '',
+              reinstall: false,
+            ),
+          ]
+        : null;
 
     return McpPlayground(
       initialLlmConfig: initialLlm.provider != LlmProvider.none
           ? initialLlm
           : null,
       customLocalTools: demoLocalTools,
-      initialLocalMcpServers: isDesktop ? initialLocalServers : null,
+      initialLocalMcpServers: initialLocalServers,
       initialEnabledTools: const [
         'get_weather_forecast',
         'get_current_weather',
