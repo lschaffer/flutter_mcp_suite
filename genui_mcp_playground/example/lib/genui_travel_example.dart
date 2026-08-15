@@ -75,97 +75,179 @@ class SerpApiTravelSearchTool extends McpLocalTool {
 
     if (apiKey.isNotEmpty) {
       try {
-        final uri = Uri.https('serpapi.com', '/search.json', {
-          'engine': 'google',
-          'q': query,
-          'api_key': apiKey,
-          'num': '8',
-        });
+        final results = <Map<String, dynamic>>[];
+        final targetSearch = destination.isNotEmpty ? '$accomType in $destination' : query;
 
-        final response = await http.get(uri).timeout(const Duration(seconds: 15));
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final organic = (data['organic_results'] as List?) ?? [];
-          final places = (data['places_results'] as List?) ?? [];
-          final knowledge = data['knowledge_graph'] as Map<String, dynamic>?;
+        // 1. Try SerpAPI Google Hotels Engine (best for real hotel photos & pricing)
+        if (accomType == 'hotel' || accomType == 'resort' || accomType == 'all') {
+          final hotelUri = Uri.https('serpapi.com', '/search.json', {
+            'engine': 'google_hotels',
+            'q': targetSearch,
+            'api_key': apiKey,
+            if (arguments['startDate'] != null) 'check_in_date': arguments['startDate'].toString(),
+            if (arguments['endDate'] != null) 'check_out_date': arguments['endDate'].toString(),
+          });
 
-          final inlineImages = (data['inline_images'] as List?) ?? [];
-          final results = <Map<String, dynamic>>[];
-          var imgIdx = 0;
+          final hotelResp = await http.get(hotelUri).timeout(const Duration(seconds: 12));
+          if (hotelResp.statusCode == 200) {
+            final hotelData = jsonDecode(hotelResp.body) as Map<String, dynamic>;
+            final properties = (hotelData['properties'] as List?) ?? [];
 
-          for (final p in places.take(6)) {
-            if (p is Map<String, dynamic>) {
-              String? thumb = p['thumbnail'] as String? ?? p['image'] as String?;
-              if ((thumb == null || thumb.isEmpty) && imgIdx < inlineImages.length) {
-                final inline = inlineImages[imgIdx];
-                if (inline is Map) {
-                  thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+            for (var i = 0; i < properties.length && results.length < 6; i++) {
+              final prop = properties[i];
+              if (prop is Map<String, dynamic>) {
+                final images = (prop['images'] as List?) ?? [];
+                String? photoUrl;
+                if (images.isNotEmpty && images.first is Map) {
+                  photoUrl = images.first['thumbnail'] as String? ?? images.first['original_image'] as String?;
                 }
-              }
-              thumb ??= _defaultPhotoForType(accomType, imgIdx);
-              imgIdx++;
+                photoUrl ??= prop['thumbnail'] as String? ?? _defaultPhotoForType(accomType, i);
 
-              results.add({
-                'name': p['title'] ?? 'Place',
-                'type': accomType,
-                'rating': (p['rating'] as num?)?.toDouble() ?? 4.5,
-                'reviews': '${p['reviews'] ?? 100} reviews',
-                'price': p['price'] ?? '\$120 - \$220/night',
-                'address': p['address'] ?? destination,
-                'thumbnail': thumb,
-                'link': p['links']?['website'] ?? p['link'] ?? 'https://www.google.com/search?q=${Uri.encodeComponent(p['title'] ?? '')}',
-                'snippet': p['description'] ?? p['snippet'] ?? 'Highly rated accommodation option.',
-                'amenities': ['WiFi', 'Verified Stay', 'Scenic Location'],
-              });
+                final rate = prop['rate_per_night'];
+                final priceStr = rate is Map ? (rate['lowest']?.toString() ?? rate['extracted_lowest']?.toString() ?? '€140') : (rate?.toString() ?? '€140');
+                final amenities = (prop['amenities'] as List?)?.map((e) => e.toString()).take(4).toList() ?? ['Free Wi-Fi', 'Breakfast', 'Great Location'];
+
+                results.add({
+                  'name': prop['name'] ?? 'Hotel',
+                  'type': accomType,
+                  'rating': (prop['overall_rating'] as num?)?.toDouble() ?? 4.7,
+                  'reviews': prop['reviews'] != null ? '${prop['reviews']} reviews' : 'Verified Stay',
+                  'price': priceStr.startsWith('€') || priceStr.startsWith('\$') ? '$priceStr/night' : '€$priceStr/night',
+                  'address': prop['hotel_class'] ?? destination,
+                  'thumbnail': photoUrl,
+                  'link': prop['link'] ?? 'https://www.google.com/travel/hotels',
+                  'snippet': prop['description'] ?? prop['deal'] ?? 'Highly rated accommodation option in $destination.',
+                  'amenities': amenities,
+                });
+              }
             }
           }
+        }
 
-          for (final org in organic.take(6)) {
-            if (org is Map<String, dynamic>) {
-              String? thumb = org['thumbnail'] as String?;
-              if ((thumb == null || thumb.isEmpty) && imgIdx < inlineImages.length) {
-                final inline = inlineImages[imgIdx];
-                if (inline is Map) {
-                  thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
-                }
+        // 2. Try Google Maps / Local Places Engine for apartments, camping, hostels, or fallback
+        if (results.isEmpty) {
+          final mapsUri = Uri.https('serpapi.com', '/search.json', {
+            'engine': 'google_maps',
+            'q': targetSearch,
+            'api_key': apiKey,
+            'type': 'search',
+          });
+
+          final mapsResp = await http.get(mapsUri).timeout(const Duration(seconds: 12));
+          if (mapsResp.statusCode == 200) {
+            final mapsData = jsonDecode(mapsResp.body) as Map<String, dynamic>;
+            final localPlaces = (mapsData['local_results'] as List?) ?? [];
+
+            for (var i = 0; i < localPlaces.length && results.length < 6; i++) {
+              final lp = localPlaces[i];
+              if (lp is Map<String, dynamic>) {
+                final photoUrl = lp['thumbnail'] as String? ?? _defaultPhotoForType(accomType, i);
+                results.add({
+                  'name': lp['title'] ?? 'Accommodation',
+                  'type': accomType,
+                  'rating': (lp['rating'] as num?)?.toDouble() ?? 4.6,
+                  'reviews': lp['reviews'] != null ? '${lp['reviews']} reviews' : 'Verified',
+                  'price': lp['price'] ?? '€90 - €180/night',
+                  'address': lp['address'] ?? destination,
+                  'thumbnail': photoUrl,
+                  'link': lp['website'] ?? lp['link'] ?? 'https://www.google.com/maps',
+                  'snippet': lp['description'] ?? lp['type'] ?? 'Top rated $accomType in $destination.',
+                  'amenities': ['WiFi', 'Central', 'Verified Stay'],
+                });
               }
-              thumb ??= _defaultPhotoForType(accomType, imgIdx);
-              imgIdx++;
-
-              results.add({
-                'name': org['title'] ?? 'Travel Result',
-                'type': accomType,
-                'rating': (org['rating'] as num?)?.toDouble() ?? 4.6,
-                'reviews': '${org['reviews'] ?? 250} reviews',
-                'price': '\$100 - \$250/night',
-                'address': destination.isNotEmpty ? destination : 'Local Area',
-                'thumbnail': thumb,
-                'link': org['link'] ?? 'https://www.google.com',
-                'snippet': org['snippet'] ?? '',
-                'amenities': ['Central Location', 'Great Reviews'],
-              });
             }
           }
+        }
 
-          if (results.isNotEmpty) {
-            return MCPToolResult(
-              content: [
-                MCPContent(
-                  type: 'text',
-                  text: jsonEncode({
-                    'status': 'success',
-                    'source': 'SerpAPI Google Search',
-                    'query': query,
-                    'destination': destination,
-                    'accommodationType': accomType,
-                    'knowledgeSummary': knowledge?['description'] ?? '',
-                    'count': results.length,
-                    'results': results,
-                  }),
-                ),
-              ],
-            );
+        // 3. Fallback to standard Google Search engine if Maps/Hotels returned no items
+        if (results.isEmpty) {
+          final uri = Uri.https('serpapi.com', '/search.json', {
+            'engine': 'google',
+            'q': query,
+            'api_key': apiKey,
+            'num': '8',
+          });
+
+          final response = await http.get(uri).timeout(const Duration(seconds: 12));
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body) as Map<String, dynamic>;
+            final places = (data['places_results'] as List?) ?? [];
+            final organic = (data['organic_results'] as List?) ?? [];
+            final inlineImages = (data['inline_images'] as List?) ?? [];
+
+            for (var i = 0; i < places.length && results.length < 6; i++) {
+              final p = places[i];
+              if (p is Map<String, dynamic>) {
+                String? thumb = p['thumbnail'] as String? ?? p['image'] as String?;
+                if ((thumb == null || thumb.isEmpty) && i < inlineImages.length) {
+                  final inline = inlineImages[i];
+                  if (inline is Map) {
+                    thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+                  }
+                }
+                thumb ??= _defaultPhotoForType(accomType, i);
+
+                results.add({
+                  'name': p['title'] ?? 'Place',
+                  'type': accomType,
+                  'rating': (p['rating'] as num?)?.toDouble() ?? 4.5,
+                  'reviews': '${p['reviews'] ?? 100} reviews',
+                  'price': p['price'] ?? '€120 - €220/night',
+                  'address': p['address'] ?? destination,
+                  'thumbnail': thumb,
+                  'link': p['links']?['website'] ?? p['link'] ?? 'https://www.google.com/search?q=${Uri.encodeComponent(p['title'] ?? '')}',
+                  'snippet': p['description'] ?? p['snippet'] ?? 'Highly rated accommodation option.',
+                  'amenities': ['WiFi', 'Verified Stay', 'Central'],
+                });
+              }
+            }
+
+            for (var i = 0; i < organic.length && results.length < 6; i++) {
+              final org = organic[i];
+              if (org is Map<String, dynamic>) {
+                String? thumb = org['thumbnail'] as String?;
+                if ((thumb == null || thumb.isEmpty) && i < inlineImages.length) {
+                  final inline = inlineImages[i];
+                  if (inline is Map) {
+                    thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+                  }
+                }
+                thumb ??= _defaultPhotoForType(accomType, i);
+
+                results.add({
+                  'name': org['title'] ?? 'Stay Option',
+                  'type': accomType,
+                  'rating': (org['rating'] as num?)?.toDouble() ?? 4.6,
+                  'reviews': '${org['reviews'] ?? 250} reviews',
+                  'price': '€100 - €250/night',
+                  'address': destination.isNotEmpty ? destination : 'Local Area',
+                  'thumbnail': thumb,
+                  'link': org['link'] ?? 'https://www.google.com',
+                  'snippet': org['snippet'] ?? '',
+                  'amenities': ['Central Location', 'Great Reviews'],
+                });
+              }
+            }
           }
+        }
+
+        if (results.isNotEmpty) {
+          return MCPToolResult(
+            content: [
+              MCPContent(
+                type: 'text',
+                text: jsonEncode({
+                  'status': 'success',
+                  'source': 'SerpAPI Google Hotels / Maps Search',
+                  'query': query,
+                  'destination': destination,
+                  'accommodationType': accomType,
+                  'count': results.length,
+                  'results': results,
+                }),
+              ),
+            ],
+          );
         }
       } catch (e) {
         debugPrint('[SerpApiTravelSearchTool] SerpAPI query failed ($e). Using curated fallback data.');
