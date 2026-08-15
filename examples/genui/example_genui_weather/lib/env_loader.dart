@@ -50,22 +50,24 @@ class EnvLoader {
   }
 
   static LlmProvider getProvider() {
-    final p = get('LLM_PROVIDER').toLowerCase();
-    switch (p) {
+    final val = get('LLM_PROVIDER').trim().toLowerCase();
+    switch (val) {
       case 'openai':
-        return LlmProvider.openAi;
-      case 'anthropic':
+        return LlmProvider.openai;
       case 'claude':
-        return LlmProvider.anthropic;
+      case 'anthropic':
+        return LlmProvider.claude;
       case 'gemini':
       case 'google':
         return LlmProvider.gemini;
       case 'ollama':
         return LlmProvider.ollama;
+      case 'openai-compatible':
+      case 'openaicompatible':
+      case 'custom':
+        return LlmProvider.openaiCompatible;
       case 'mistral':
         return LlmProvider.mistral;
-      case 'custom':
-        return LlmProvider.customOpenAi;
       default:
         return LlmProvider.none;
     }
