@@ -1,14 +1,10 @@
-## 0.3.1
-
-- Bumped `mcp_playground_dart` to `^0.2.3` and `mcp_playground_ui` to `^0.1.1`.
-- Direct Windows `node.exe` execution for reliable local MCP server discovery.
-- Improved live streaming reliability and chat bubble copy functionality.
-
 ## 0.3.0
 
 - **Architecture modularization**: Extracted reusable Flutter UI components, dialogs, drawers, and state controllers into the [`mcp_playground_ui`](../mcp_playground_ui) shared package.
 - **Standalone GenUI separation**: Moved GenUI generative UI surfaces, catalog builders, and controllers into the dedicated [`genui_mcp_playground`](../genui_mcp_playground) package.
 - **Agent Inspector Toggle**: Added `showAgentInspector` parameter (defaults to `true`) and top AppBar toggle button to control Agent Inspector side pane visibility.
+- **Direct Windows `node.exe` execution**: Reliable local MCP server process discovery on Windows.
+- **Live streaming & UI polish**: Improved live streaming reliability, copy buttons with snackbar feedback on all messages, and upgraded `mcp_playground_dart` to `^0.2.3` and `mcp_playground_ui` to `^0.1.1`.
 - **Clean re-exports**: Seamlessly re-exports `mcp_playground_ui` and `mcp_playground_dart` for backward compatibility.
 
 ## 0.2.2
