@@ -18,8 +18,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  mcp_playground_dart: ^0.2.3
-  mcp_playground_ui: ^0.1.1
+  mcp_playground_dart: ^0.3.0
+  mcp_playground_ui: ^0.3.0
   universal_io: ^2.3.1
   http: ^1.6.0
   uuid: ^4.6.0
