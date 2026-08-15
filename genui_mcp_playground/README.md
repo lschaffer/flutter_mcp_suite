@@ -22,7 +22,11 @@ An interactive, dynamic **GenUI & Agentic MCP Playground** for Flutter.
 
 Watch the dynamic GenUI Playground in action rendering interactive surfaces:
 
-![GenUI MCP Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+### 🏖️ GenUI Travel & Stay Planner
+![GenUI MCP Travel Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_mcp_travel_example.gif)
+
+### ⛅ GenUI Weather Generator
+![GenUI MCP Weather Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
 
 ---
 

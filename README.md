@@ -45,8 +45,10 @@ We provide several runnable example applications across Flutter, GenUI, and head
 
 ---
 
-## 🎥 Demo Video & Visuals
+## 🎥 Demo Videos & Visuals
 
-Watch the Flutter UI Playground executing terminal SSH tasks and charting stats:
+### 🏖️ GenUI Travel & Stay Planner
+![GenUI MCP Travel Demo](./screenshots/video/genui_mcp_travel_example.gif)
 
+### 💻 Flutter SSH & Terminal Tasks
 ![SSH MCP Demo](./screenshots/video/mcp_playground_ssh_chart_test.gif)
