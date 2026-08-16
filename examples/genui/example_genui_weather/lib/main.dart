@@ -127,10 +127,17 @@ class WeatherForecastTool extends McpLocalTool {
         }
       }
 
+      // Ensure weather_code and temperature_2m are included for rich weather cards.
+      final queryChannels = {
+        ...channels,
+        'weather_code',
+        'temperature_2m',
+      }.toList();
+
       final weatherUrl =
           'https://api.open-meteo.com/v1/forecast'
           '?latitude=$lat&longitude=$lng'
-          '&hourly=${channels.join(',')}'
+          '&hourly=${queryChannels.join(',')}'
           '&forecast_hours=$hours&timezone=auto';
       final resp = await http
           .get(Uri.parse(weatherUrl))
@@ -152,7 +159,7 @@ class WeatherForecastTool extends McpLocalTool {
       final times = (hourly?['time'] as List?)?.cast<String>() ?? const [];
 
       final resultChannels = <Map<String, dynamic>>[];
-      for (final channel in channels) {
+      for (final channel in queryChannels) {
         final values = hourly?[channel] as List?;
         if (values == null) continue;
         resultChannels.add({
@@ -434,6 +441,17 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
       ));
     }
 
+    // Filter out categorical weather_code from continuous line chart lines.
+    final chartChannels =
+        channels.where((c) => c.label != 'weather_code').toList();
+
+    // Channel lookups for individual card metrics
+    final tempChannel = channels.where((c) => c.label.contains('temperature')).firstOrNull;
+    final codeChannel = channels.where((c) => c.label == 'weather_code').firstOrNull;
+    final rainChannel = channels.where((c) => c.label.contains('precipitation') || c.label.contains('rain')).firstOrNull;
+    final windChannel = channels.where((c) => c.label.contains('wind_speed')).firstOrNull;
+    final cloudChannel = channels.where((c) => c.label.contains('cloud_cover')).firstOrNull;
+
     final theme = Theme.of(context);
     const palette = [
       Color(0xFF3B82F6),
@@ -483,10 +501,10 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
         RepaintBoundary(
           key: _chartBoundaryKey,
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: theme.dividerColor.withValues(alpha: 0.2),
               ),
@@ -496,21 +514,21 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 220,
+                  height: 200,
                   child: LineChart(
                     LineChartData(
-                      minY: _minValue(channels) - 1,
-                      maxY: _maxValue(channels) + 1,
+                      minY: _minValue(chartChannels) - 1,
+                      maxY: _maxValue(chartChannels) + 1,
                       lineBarsData: [
-                        for (var i = 0; i < channels.length; i++)
+                        for (var i = 0; i < chartChannels.length; i++)
                           LineChartBarData(
                             spots: [
                               for (
                                 var j = 0;
-                                j < channels[i].values.length;
+                                j < chartChannels[i].values.length;
                                 j++
                               )
-                                FlSpot(j.toDouble(), channels[i].values[j]),
+                                FlSpot(j.toDouble(), chartChannels[i].values[j]),
                             ],
                             isCurved: true,
                             color: palette[i % palette.length],
@@ -542,14 +560,11 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
                               if (index < 0 || index >= times.length) {
                                 return const Text('');
                               }
-                              final label = times[index];
-                              final short = label.length > 5
-                                  ? label.substring(label.length - 5)
-                                  : label;
+                              final timeInfo = _formatWeatherTime(times[index]);
                               return Padding(
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text(
-                                  short,
+                                  timeInfo.time,
                                   style: const TextStyle(fontSize: 9),
                                 ),
                               );
@@ -571,7 +586,7 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
                   spacing: 12,
                   runSpacing: 6,
                   children: [
-                    for (var i = 0; i < channels.length; i++)
+                    for (var i = 0; i < chartChannels.length; i++)
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -585,42 +600,409 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            channels[i].label,
+                            chartChannels[i].label,
                             style: const TextStyle(fontSize: 11),
                           ),
                         ],
                       ),
                   ],
                 ),
+                const SizedBox(height: 14),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.wb_sunny_outlined,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Hourly Weather Cards',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${times.length} intervals',
+                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 260,
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: GridView.builder(
+                      padding: const EdgeInsets.only(right: 6, bottom: 4),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 165,
+                            mainAxisExtent: 155,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: times.length,
+                      itemBuilder: (context, index) {
+                        final timeInfo = _formatWeatherTime(times[index]);
+                        final weatherCode =
+                            index < (codeChannel?.values.length ?? 0)
+                                ? codeChannel?.values[index]
+                                : null;
+                        final temp =
+                            index < (tempChannel?.values.length ?? 0)
+                                ? tempChannel?.values[index]
+                                : null;
+                        final rain =
+                            index < (rainChannel?.values.length ?? 0)
+                                ? rainChannel?.values[index]
+                                : null;
+                        final wind =
+                            index < (windChannel?.values.length ?? 0)
+                                ? windChannel?.values[index]
+                                : null;
+                        final cloud =
+                            index < (cloudChannel?.values.length ?? 0)
+                                ? cloudChannel?.values[index]
+                                : null;
+
+                        final condition = _resolveWeatherCondition(
+                          weatherCode: weatherCode,
+                          temp: temp,
+                          rain: rain,
+                          cloud: cloud,
+                          wind: wind,
+                          isNight: timeInfo.isNight,
+                        );
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: theme.dividerColor.withValues(alpha: 0.15),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Date & Time
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '${timeInfo.dayName} ${timeInfo.date}',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: theme.textTheme.bodySmall?.color,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    timeInfo.time,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              // Weather Icon Picture & Condition
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: condition.color.withValues(
+                                        alpha: 0.16,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      condition.icon,
+                                      color: condition.color,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      condition.label,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: condition.color,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              const Divider(height: 1, thickness: 0.5),
+                              const SizedBox(height: 4),
+                              // Selected channel values
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    for (
+                                      var i = 0;
+                                      i < chartChannels.length;
+                                      i++
+                                    ) ...[
+                                      if (index <
+                                          chartChannels[i].values.length)
+                                        () {
+                                          final c = chartChannels[i];
+                                          final metric = _formatMetric(
+                                            c.label,
+                                            c.values[index],
+                                            palette[i % palette.length],
+                                          );
+                                          return Row(
+                                            children: [
+                                              Icon(
+                                                metric.icon,
+                                                size: 11,
+                                                color: metric.color,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                metric.label,
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  color: theme
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.color,
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              Text(
+                                                metric.value,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }(),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 100,
-          child: ListView.builder(
-            itemCount: times.length,
-            itemBuilder: (context, index) {
-              final values = channels
-                  .map(
-                    (c) =>
-                        '${c.label}: ${index < c.values.length ? c.values[index].toStringAsFixed(1) : "-"}',
-                  )
-                  .join('  ');
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  '${times[index].replaceFirst('T', ' ')}  $values',
-                  style: const TextStyle(fontSize: 11),
-                ),
-              );
-            },
           ),
         ),
       ],
     );
   }
+}
+
+({IconData icon, String label, String value, Color color}) _formatMetric(
+  String channel,
+  double val,
+  Color fallbackColor,
+) {
+  final clean = channel.toLowerCase();
+  if (clean.contains('temperature')) {
+    return (
+      icon: Icons.thermostat_rounded,
+      label: 'Temp',
+      value: '${val.toStringAsFixed(1)}°C',
+      color: const Color(0xFF3B82F6),
+    );
+  }
+  if (clean.contains('precipitation') || clean.contains('rain')) {
+    return (
+      icon: Icons.water_drop_rounded,
+      label: 'Rain',
+      value: '${val.toStringAsFixed(1)} mm',
+      color: const Color(0xFF8B5CF6),
+    );
+  }
+  if (clean.contains('wind_speed')) {
+    return (
+      icon: Icons.air_rounded,
+      label: 'Wind',
+      value: '${val.toStringAsFixed(1)} km/h',
+      color: const Color(0xFF10B981),
+    );
+  }
+  if (clean.contains('wind_direction')) {
+    return (
+      icon: Icons.explore_outlined,
+      label: 'Dir',
+      value: '${val.toStringAsFixed(0)}°',
+      color: const Color(0xFF06B6D4),
+    );
+  }
+  if (clean.contains('cloud')) {
+    return (
+      icon: Icons.cloud_outlined,
+      label: 'Cloud',
+      value: '${val.toStringAsFixed(0)}%',
+      color: const Color(0xFFF59E0B),
+    );
+  }
+  return (
+    icon: Icons.speed_rounded,
+    label: channel.replaceAll('_', ' '),
+    value: val.toStringAsFixed(1),
+    color: fallbackColor,
+  );
+}
+
+({String time, String date, String dayName, bool isNight}) _formatWeatherTime(
+  String iso,
+) {
+  try {
+    final dt = DateTime.parse(iso);
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final dayName = weekdays[dt.weekday - 1];
+    final isNight = dt.hour < 6 || dt.hour >= 21;
+    return (
+      time: '$hour:$min',
+      date: '$day.$month',
+      dayName: dayName,
+      isNight: isNight,
+    );
+  } catch (_) {
+    final short = iso.length > 5 ? iso.substring(iso.length - 5) : iso;
+    return (time: short, date: '', dayName: '', isNight: false);
+  }
+}
+
+({IconData icon, Color color, String label}) _resolveWeatherCondition({
+  double? weatherCode,
+  double? temp,
+  double? rain,
+  double? cloud,
+  double? wind,
+  bool isNight = false,
+}) {
+  if (weatherCode != null) {
+    final code = weatherCode.toInt();
+    if (code == 0) {
+      return (
+        icon: isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+        color: isNight ? const Color(0xFF818CF8) : const Color(0xFFF59E0B),
+        label: isNight ? 'Clear' : 'Sunny',
+      );
+    }
+    if (code == 1 || code == 2) {
+      return (
+        icon: isNight ? Icons.nights_stay_rounded : Icons.wb_cloudy_rounded,
+        color: isNight ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8),
+        label: 'Partly Cloudy',
+      );
+    }
+    if (code == 3) {
+      return (
+        icon: Icons.cloud_rounded,
+        color: const Color(0xFF64748B),
+        label: 'Overcast',
+      );
+    }
+    if (code == 45 || code == 48) {
+      return (
+        icon: Icons.cloud_queue_rounded,
+        color: const Color(0xFF94A3B8),
+        label: 'Foggy',
+      );
+    }
+    if (code >= 51 && code <= 57) {
+      return (
+        icon: Icons.grain_rounded,
+        color: const Color(0xFF38BDF8),
+        label: 'Drizzle',
+      );
+    }
+    if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) {
+      return (
+        icon: Icons.water_drop_rounded,
+        color: const Color(0xFF3B82F6),
+        label: 'Rain',
+      );
+    }
+    if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
+      return (
+        icon: Icons.ac_unit_rounded,
+        color: const Color(0xFF06B6D4),
+        label: 'Snow',
+      );
+    }
+    if (code >= 95 && code <= 99) {
+      return (
+        icon: Icons.thunderstorm_rounded,
+        color: const Color(0xFF8B5CF6),
+        label: 'Thunderstorm',
+      );
+    }
+  }
+
+  // Heuristic fallbacks:
+  if (rain != null && rain > 0.2) {
+    return (
+      icon: Icons.water_drop_rounded,
+      color: const Color(0xFF3B82F6),
+      label: 'Rain',
+    );
+  }
+  if (cloud != null && cloud > 65) {
+    return (
+      icon: Icons.cloud_rounded,
+      color: const Color(0xFF64748B),
+      label: 'Cloudy',
+    );
+  }
+  if (cloud != null && cloud > 25) {
+    return (
+      icon: isNight ? Icons.nights_stay_rounded : Icons.wb_cloudy_rounded,
+      color: isNight ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8),
+      label: 'Partly Cloudy',
+    );
+  }
+  if (temp != null && temp < 0) {
+    return (
+      icon: Icons.ac_unit_rounded,
+      color: const Color(0xFF06B6D4),
+      label: 'Freezing',
+    );
+  }
+  return (
+    icon: isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+    color: isNight ? const Color(0xFF818CF8) : const Color(0xFFF59E0B),
+    label: isNight ? 'Clear' : 'Sunny',
+  );
 }
 
 double _minValue(List<({String label, List<double> values})> channels) {
