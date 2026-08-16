@@ -1,3 +1,9 @@
+## 0.3.1
+
+- Declared supported platforms explicitly in `pubspec.yaml` (Android, iOS, Linux, macOS, Web, Windows).
+- Fixed `repository` URL in `pubspec.yaml` to point to GitHub `main` branch.
+- Broadened `file_picker` dependency constraint to `'>=11.0.3 <13.0.0'` to support `file_picker` 12.0.0+.
+
 ## 0.3.0
 
 - Updated `WorkflowSaveDialog` to use Flutter 3.32+ `RadioGroup<bool>` ancestor, resolving deprecated `groupValue` warnings.

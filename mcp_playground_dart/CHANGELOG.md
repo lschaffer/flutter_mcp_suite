@@ -1,3 +1,7 @@
+## 0.3.1
+
+- Fixed `repository` URL in `pubspec.yaml` to point to GitHub `main` branch.
+
 ## 0.3.0
 
 - **Windows Stdio MCP Server Execution**: Switched Windows NPX server launching to direct `node.exe` execution with `npx-cli.js`, eliminating `cmd.exe` stdin pipe stalls during MCP `initialize` handshakes.

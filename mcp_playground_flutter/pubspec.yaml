@@ -1,7 +1,8 @@
 name: mcp_playground_flutter
 description: "Interactive AI Agent Playground widget for Flutter. Connect to any LLM provider, register Dart-native tools, remote HTTP MCP servers, and local Node.js or Python subprocesses."
-version: 0.3.0
+version: 0.3.1
 homepage: https://github.com/lschaffer/mcp_playground
+repository: https://github.com/lschaffer/mcp_playground/tree/main/mcp_playground_flutter
 
 platforms:
   android:
@@ -29,7 +30,7 @@ dependencies:
   ollama_dart: ^2.5.0
   llamadart: ^0.8.17
   flutter_markdown_plus: ^1.0.12
-  file_picker: ^11.0.3
+  file_picker: ">=11.0.3 <13.0.0"
   googleai_dart: ^11.0.0
   url_launcher: ^6.3.2
   path: ^1.9.1

@@ -1,3 +1,8 @@
+## 0.3.1
+
+- Added `repository` URL in `pubspec.yaml` pointing to GitHub `main` branch.
+- Broadened `file_picker` dependency constraint to `'>=11.0.3 <13.0.0'` to support `file_picker` 12.0.0+.
+
 ## 0.3.0
 
 - **Architecture modularization**: Extracted reusable Flutter UI components, dialogs, drawers, and state controllers into the [`mcp_playground_ui`](../mcp_playground_ui) shared package.
