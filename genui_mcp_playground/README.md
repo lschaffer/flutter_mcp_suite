@@ -18,6 +18,13 @@ An interactive, dynamic **GenUI & Agentic MCP Playground** for Flutter.
 
 ---
 
+> [!TIP]
+> **Recommended LLMs**: Rendering dynamic GenUI surfaces requires strict structured JSON output compliant with the GenUI (`A2UI`) protocol. A **medium-to-large sized model** (e.g., Gemini 3.6 Flash / Pro, GPT-4o / latest OpenAI models, Mistral Medium / Large, Llama 3.3 70B+, Gemma 27B, Claude 3.5 / 3.7 Sonnet) is recommended for reliable generative UI generation. Small embedded/on-device SLMs (e.g. 1B–3B parameter models) might not be adequate for complex GenUI catalog schemas.
+> 
+> If your primary use case requires small embedded or offline on-device models (e.g. GGUF via `llamadart`), consider using the lighter standard variant [`mcp_playground_flutter`](https://pub.dev/packages/mcp_playground_flutter).
+
+---
+
 ## 🎥 Demo
 
 Watch the dynamic GenUI Playground in action rendering interactive surfaces:
@@ -36,7 +43,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  genui_mcp_playground: ^0.3.0
+  genui_mcp_playground: ^0.3.1
   genui: ^0.10.2
 ```
 
