@@ -9,9 +9,15 @@ The assistant queries repository issues, categorizes tickets, suggests labels, a
 - Automated pull request code review drafting
 - Custom issue card preview using `messageContentBuilder`
 
+## 💡 Example Prompts
+Try asking the assistant:
+- *"Fetch and list the open GitHub issues currently awaiting triage."*
+- *"Triage issue #104: evaluate impact, suggest priority tags, and recommend assignee."*
+- *"Draft a structured PR review for the latest pull request with code suggestions."*
+
 ## Running
 ```bash
 cd examples/flutter/example_github_triage
 flutter pub get
-flutter run
+flutter run -d windows # or -d chrome
 ```

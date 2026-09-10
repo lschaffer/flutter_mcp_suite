@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+import 'env_loader.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EnvLoader.load();
   runApp(const GithubTriageApp());
 }
 
@@ -19,15 +21,21 @@ class GithubTriageApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF24292E),
+          seedColor: const Color(0xFF4A7C9D), // Fluent Pastel Slate Blue
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF58A6FF),
+          seedColor: const Color(0xFF86B5D8), // Fluent Frosted Ocean Blue
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       home: const GithubTriageScreen(),
@@ -40,31 +48,33 @@ class GithubTriageScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final List<McpLocalTool> tools = [
       ListRepoIssuesTool(),
       TriageIssueTool(),
       DraftPrReviewTool(),
     ];
 
-    const initialLlm = LlmConfig(
-      provider: LlmProvider.openai,
-      model: 'gpt-4o-mini',
-      apiKey: '',
-      useStreaming: true,
+    // Load initial LLM configuration if configured in .env
+    final initialLlm = LlmConfig(
+      provider: EnvLoader.getProvider(),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
+      apiKey: EnvLoader.get('LLM_API_KEY'),
+      baseUrl: EnvLoader.get('LLM_URL'),
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.hub, color: Color(0xFF2EA44F)),
-            SizedBox(width: 8),
-            Text('GitHub Triage & Code Review'),
+            Icon(Icons.hub, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('GitHub Triage & Code Review'),
           ],
         ),
       ),
       body: McpPlayground(
-        initialLlmConfig: initialLlm,
+        initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
         customLocalTools: tools,
         messageContentBuilder: (context, message) {
           if (message == null || message.type != MessageType.toolResponse) {

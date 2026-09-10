@@ -54,6 +54,20 @@ We provide several runnable example applications across Flutter, GenUI, and head
 
 ---
 
+## 💡 Example Prompts for UI Showcases
+
+Quick prompts to copy-paste and test the interactive tools and widgets in the new UI examples:
+
+| Example Application | Category | Try Asking / Prompting |
+| :--- | :--- | :--- |
+| **[Smart Home Studio](examples/genui/example_genui_smarthome)** | GenUI | `"Check current home climate status and show an interactive thermostat for the Living Room."`<br>`"Show all lights and switches with interactive toggles so I can adjust them."`<br>`"Analyze daily energy consumption and render a room-by-room bar chart."` |
+| **[Finance & Budget Planner](examples/genui/example_genui_finance)** | GenUI | `"Break down my monthly expenses and display an interactive category pie chart."`<br>`"Give me budget adjustment sliders to calculate projected annual savings."`<br>`"Simulate compound growth if I invest $500/month at 8% annual return over 10 years."` |
+| **[Data Visualizer Studio](examples/genui/example_genui_data_studio)** | GenUI | `"Load our quarterly sales dataset and show executive KPI cards for MRR, Churn, and ARPU."`<br>`"Display top enterprise accounts in an interactive data table."`<br>`"Plot monthly revenue growth over the past 12 months as a smooth curve chart."` |
+| **[Device Diagnostics Copilot](examples/flutter/example_device_diagnostics)** | Flutter MCP | `"Inspect my device telemetry, CPU cores, and memory allocation."`<br>`"Ping 1.1.1.1 and 8.8.8.8 to benchmark my network latency."`<br>`"Perform a complete system audit and export a diagnostic summary report."` |
+| **[Audio & Meeting Notes](examples/flutter/example_audio_notes)** | Flutter MCP | `"Load the latest team sync transcript and summarize key discussion points."`<br>`"Extract all action items from the meeting with owners, priorities, and deadlines."`<br>`"Compile executive meeting minutes and export the notes to markdown."` |
+| **[GitHub Issue Triage](examples/flutter/example_github_triage)** | Flutter MCP | `"Fetch and list open repository issues currently awaiting triage."`<br>`"Triage issue #42: classify severity, suggest labels, and assign a priority level."`<br>`"Draft a structured pull request code review with inline suggestions."` |
+
+
 ## 🎥 Demo Videos & Visuals
 
 ### 🏖️ GenUI Travel & Stay Planner

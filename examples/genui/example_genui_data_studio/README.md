@@ -12,9 +12,15 @@ Users can explore datasets, query aggregations, and dynamically stream interacti
 - FlChart line chart trends
 - Analytics and dataset discovery tools
 
+## 💡 Example Prompts
+Try asking the assistant:
+- *"Load our quarterly sales dataset and show executive KPI cards for MRR, churn rate, and net retention."*
+- *"Display the highest-spending enterprise accounts in an interactive data table."*
+- *"Plot our monthly revenue trajectory over the past 12 months as a smooth curve chart."*
+
 ## Running
 ```bash
 cd examples/genui/example_genui_data_studio
 flutter pub get
-flutter run
+flutter run -d windows # or -d chrome
 ```

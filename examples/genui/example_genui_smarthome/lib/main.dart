@@ -22,15 +22,21 @@ class GenuiSmartHomeApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0284C7),
+          seedColor: const Color(0xFF3E92B8), // Fluent Pastel Sky Blue
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF38BDF8),
+          seedColor: const Color(0xFF82CAED), // Fluent Frosted Powder Sky
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       home: const SmartHomeScreen(),
@@ -505,21 +511,22 @@ class SmartHomeScreen extends StatelessWidget {
       newItems: [thermostatItem, deviceGridItem, energyChartItem],
     );
 
+    // Load initial LLM configuration if configured in .env
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o-mini'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
-      useStreaming: true,
     );
 
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.home_filled, color: Color(0xFF0284C7)),
-            SizedBox(width: 8),
-            Text('GenUI Smart Home Studio'),
+            Icon(Icons.home_filled, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('GenUI Smart Home Studio'),
           ],
         ),
       ),

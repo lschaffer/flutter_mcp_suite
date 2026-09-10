@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
 
 class EnvLoader {
@@ -14,13 +14,21 @@ class EnvLoader {
     ];
 
     for (final path in possiblePaths) {
-      final file = File(path);
-      if (await file.exists()) {
-        final lines = await file.readAsLines();
-        _parseLines(lines);
-        return;
-      }
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final lines = await file.readAsLines();
+          _parseLines(lines);
+          return;
+        }
+      } catch (_) {}
     }
+
+    try {
+      final content = await rootBundle.loadString('../../../.env');
+      _parseLines(content.split('\n'));
+      return;
+    } catch (_) {}
 
     try {
       final content = await rootBundle.loadString('.env');
@@ -61,6 +69,9 @@ class EnvLoader {
         return LlmProvider.gemini;
       case 'ollama':
         return LlmProvider.ollama;
+      case 'openai-compatible':
+      case 'openaicompatible':
+        return LlmProvider.openaiCompatible;
       case 'mistral':
         return LlmProvider.mistral;
       default:

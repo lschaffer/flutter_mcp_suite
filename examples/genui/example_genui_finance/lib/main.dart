@@ -22,15 +22,21 @@ class GenuiFinanceApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF10B981),
+          seedColor: const Color(0xFF489E78), // Fluent Pastel Sage Green
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF34D399),
+          seedColor: const Color(0xFF86D5AD), // Fluent Frosted Mint Green
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       home: const FinanceScreen(),
@@ -412,21 +418,22 @@ class FinanceScreen extends StatelessWidget {
       newItems: [expensePieItem, budgetSliderItem],
     );
 
+    // Load initial LLM configuration if configured in .env
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o-mini'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
-      useStreaming: true,
     );
 
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.savings, color: Color(0xFF10B981)),
-            SizedBox(width: 8),
-            Text('GenUI Budget & Portfolio Studio'),
+            Icon(Icons.savings, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('GenUI Budget & Portfolio Studio'),
           ],
         ),
       ),

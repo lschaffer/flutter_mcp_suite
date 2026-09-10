@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+import 'env_loader.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EnvLoader.load();
   runApp(const AudioNotesApp());
 }
 
@@ -19,15 +21,21 @@ class AudioNotesApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
+          seedColor: const Color(0xFF8F7AB8), // Fluent Pastel Lavender
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD0BCFF),
+          seedColor: const Color(0xFFC4B2E3), // Fluent Frosted Lilac
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       home: const AudioNotesPlaygroundScreen(),
@@ -40,31 +48,33 @@ class AudioNotesPlaygroundScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final List<McpLocalTool> tools = [
       LoadMeetingTranscriptTool(),
       ExtractActionItemsTool(),
       ExportMeetingNotesTool(),
     ];
 
-    const initialLlm = LlmConfig(
-      provider: LlmProvider.openai,
-      model: 'gpt-4o-mini',
-      apiKey: '',
-      useStreaming: true,
+    // Load initial LLM configuration if configured in .env
+    final initialLlm = LlmConfig(
+      provider: EnvLoader.getProvider(),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
+      apiKey: EnvLoader.get('LLM_API_KEY'),
+      baseUrl: EnvLoader.get('LLM_URL'),
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.record_voice_over, color: Color(0xFF9C27B0)),
-            SizedBox(width: 8),
-            Text('Meeting Minutes & Action Items'),
+            Icon(Icons.record_voice_over, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Meeting Minutes & Action Items'),
           ],
         ),
       ),
       body: McpPlayground(
-        initialLlmConfig: initialLlm,
+        initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
         customLocalTools: tools,
         messageContentBuilder: (context, message) {
           if (message == null || message.type != MessageType.toolResponse) {

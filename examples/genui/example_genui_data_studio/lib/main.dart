@@ -22,15 +22,21 @@ class GenuiDataStudioApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
+          seedColor: const Color(0xFF5B64C5), // Fluent Pastel Iris
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF818CF8),
+          seedColor: const Color(0xFF9CA3F0), // Fluent Frosted Periwinkle
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          scrolledUnderElevation: 0,
         ),
       ),
       home: const DataStudioScreen(),
@@ -398,21 +404,22 @@ class DataStudioScreen extends StatelessWidget {
       newItems: [kpiGridItem, dataTableItem, trendChartItem],
     );
 
+    // Load initial LLM configuration if configured in .env
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o-mini'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
-      useStreaming: true,
     );
 
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.analytics, color: Color(0xFF6366F1)),
-            SizedBox(width: 8),
-            Text('GenUI Data Visualizer Studio'),
+            Icon(Icons.analytics, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('GenUI Data Visualizer Studio'),
           ],
         ),
       ),

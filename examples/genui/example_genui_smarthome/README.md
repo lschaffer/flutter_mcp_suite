@@ -12,9 +12,15 @@ The agent connects to smart home MCP tools, updates climate devices, and dynamic
 - Smart home state discovery and control tools
 - FlChart data visualizations
 
+## 💡 Example Prompts
+Try asking the assistant:
+- *"Check current smart home status and show an interactive thermostat card for the Living Room."*
+- *"Show all connected lights and appliances with toggle switches so I can adjust them."*
+- *"Analyze our energy usage today and render a room-by-room consumption bar chart."*
+
 ## Running
 ```bash
 cd examples/genui/example_genui_smarthome
 flutter pub get
-flutter run
+flutter run -d windows # or -d chrome
 ```
