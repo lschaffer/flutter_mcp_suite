@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -369,9 +368,7 @@ class PlaygroundController extends ChangeNotifier {
       _skillStorage = WebSkillStorageAdapter();
     } else {
       _skillStorage = FileSystemSkillStorageAdapter(
-        rootPath:
-            _skillsRootPath ??
-            '${Directory.systemTemp.path}${Platform.pathSeparator}mcp_playground_skills',
+        rootPath: _skillsRootPath ?? getDefaultSkillsRootPath(),
       );
     }
     return _skillStorage!;
@@ -766,7 +763,10 @@ class PlaygroundController extends ChangeNotifier {
 
   Future<void> _syncMcpServers() async {
     final isDesktop =
-        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
     final activeServers = _servers.where((s) {
       if (!s.enabled) return false;
       if (s.isLocal) {

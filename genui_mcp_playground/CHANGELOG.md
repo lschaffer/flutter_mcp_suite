@@ -1,5 +1,13 @@
-## 0.3.2
+## 0.3.3
 
+- **WASM & Web Platform Support**: Eliminated direct imports of `dart:io` in favor of `defaultTargetPlatform`, and upgraded to `mcp_playground_ui: ^0.3.3` with conditional exports to ensure full WebAssembly (WASM) compatibility.
+- **Dependency Lower Bounds Fix**: Fixed nullable type-promotion for `file_picker` in attachment selection, resolving `UNCHECKED_USE_OF_NULLABLE_VALUE` errors during `pub downgrade` analysis.
+- **Dependency Upgrades**:
+  - Upgraded `mcp_playground_ui` to `^0.3.3`.
+  - Upgraded `genai_primitives` to `^0.2.4`.
+  - Removed unused `universal_io` dependency.
+
+## 0.3.2
 - Upgraded dependencies:
   - `mcp_playground_dart` to `^0.3.2`
   - `mcp_playground_ui` to `^0.3.2`

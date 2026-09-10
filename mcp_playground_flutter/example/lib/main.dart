@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -84,7 +83,10 @@ class McpPlaygroundScreen extends StatelessWidget {
     );
 
     final isDesktop =
-        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
 
     // Initial local MCP servers setup with git and filesystem configs (desktop only)
     final List<LocalMcpServerSetup>? initialLocalServers = isDesktop
@@ -94,7 +96,7 @@ class McpPlaygroundScreen extends StatelessWidget {
               type: 'node',
               method: 'npx',
               packageOrServerName: '@modelcontextprotocol/server-filesystem',
-              launchArguments: Directory.current.path,
+              launchArguments: currentDirectoryPath(),
               reinstall: false,
             ),
             const LocalMcpServerSetup(

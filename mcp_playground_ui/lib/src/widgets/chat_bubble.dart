@@ -1,9 +1,6 @@
 import 'dart:convert';
-import 'dart:io' as io;
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
-import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/html_preview/html_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -1175,32 +1172,7 @@ class ChatBubble extends StatelessWidget {
 
   Future<void> _openHtmlInBrowser(BuildContext context, String html) async {
     try {
-      if (kIsWeb) {
-        final uri = Uri.parse(
-          'data:text/html;charset=utf-8,${Uri.encodeComponent(html)}',
-        );
-        await launchUrl(uri);
-        return;
-      }
-      final dir = await getTemporaryDirectory();
-      final file = io.File(
-        '${dir.path}${io.Platform.pathSeparator}mcp_preview_${DateTime.now().millisecondsSinceEpoch}.html',
-      );
-      await file.writeAsString(html);
-      final uri = Uri.file(file.path);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Could not open browser. File saved to temp directory.',
-              ),
-            ),
-          );
-        }
-      }
+      await openHtmlInBrowserPlatform(context, html);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

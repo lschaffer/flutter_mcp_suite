@@ -1,3 +1,10 @@
+## 0.3.3
+
+- Enabled WebAssembly (WASM) runtime support:
+  - Removed direct `dart:io` imports and replaced platform checks with `defaultTargetPlatform`.
+  - Upgraded `mcp_playground_ui` to `^0.3.3` with conditional exports and platform-agnostic helpers for Web/WASM.
+  - Removed `universal_io` and unnecessary `path_provider` dependencies.
+
 ## 0.3.2
 
 - Upgraded AI SDK dependencies and shared components:

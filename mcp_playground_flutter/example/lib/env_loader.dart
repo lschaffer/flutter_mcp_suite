@@ -1,21 +1,16 @@
-import 'dart:io';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+import 'env_file_reader.dart';
 
 class EnvLoader {
   static final Map<String, String> _env = {};
 
   static Future<void> load() async {
     String content = '';
-    try {
-      var file = File('.env');
-      if (!await file.exists()) {
-        file = File('../../.env');
-      }
-      if (await file.exists()) {
-        content = await file.readAsString();
-      }
-    } catch (_) {}
+    final diskContent = await readEnvFromDisk();
+    if (diskContent != null && diskContent.isNotEmpty) {
+      content = diskContent;
+    }
 
     if (content.trim().isEmpty) {
       try {

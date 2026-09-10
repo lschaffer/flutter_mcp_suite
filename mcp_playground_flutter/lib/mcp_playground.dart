@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -168,7 +167,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
   Future<void> _checkAndInstallInitialLocalMcpServers() async {
     final isDesktop =
-        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
     if (!isDesktop) return;
 
     // Wait until controller is done loading from storage
@@ -977,19 +979,19 @@ class _McpPlaygroundState extends State<McpPlayground> {
       description: '',
     );
 
-    final bool fileExists;
+    final bool modelFileExists;
     if (kIsWeb) {
-      fileExists = true;
+      modelFileExists = true;
     } else {
       final fullPath = await EmbeddedModelManager.instance.fullPathForFilename(
         filename,
       );
-      fileExists =
-          await File(fullPath).exists() ||
-          (model.url.isNotEmpty && await File(model.url).exists());
+      modelFileExists =
+          fileExists(fullPath) ||
+          (model.url.isNotEmpty && fileExists(model.url));
     }
 
-    if (fileExists) {
+    if (modelFileExists) {
       final updated = initialLlm.copyWith(model: filename);
       await _controller.updateLlmConfig(updated);
     } else {
@@ -1069,21 +1071,21 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
     final modelToLoad = model;
 
-    final bool fileExists;
+    final bool modelFileExists;
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList('web_downloaded_models') ?? [];
-      fileExists = list.contains(filename);
+      modelFileExists = list.contains(filename);
     } else {
       final fullPath = await EmbeddedModelManager.instance.fullPathForFilename(
         filename,
       );
-      fileExists =
-          await File(fullPath).exists() ||
-          (modelToLoad.url.isNotEmpty && await File(modelToLoad.url).exists());
+      modelFileExists =
+          fileExists(fullPath) ||
+          (modelToLoad.url.isNotEmpty && fileExists(modelToLoad.url));
     }
 
-    if (!fileExists) {
+    if (!modelFileExists) {
       if (modelToLoad.url.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2504,7 +2506,7 @@ class _ModelLoadProgressDialogState extends State<_ModelLoadProgressDialog> {
       if (kIsWeb) {
         fullPath = widget.model.url;
       } else {
-        fullPath = File(widget.model.url).existsSync()
+        fullPath = fileExists(widget.model.url)
             ? widget.model.url
             : await EmbeddedModelManager.instance.fullPathForFilename(
                 widget.model.filename,

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -165,7 +163,10 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
 
   Future<void> _checkAndInstallInitialLocalMcpServers() async {
     final isDesktop =
-        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
     if (!isDesktop) return;
 
     while (_controller.isLoading && mounted) {

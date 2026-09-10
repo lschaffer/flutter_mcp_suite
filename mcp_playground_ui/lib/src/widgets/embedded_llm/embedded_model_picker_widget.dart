@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import '../../utils/platform_file/platform_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
@@ -346,19 +346,16 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
       final isDesktop =
           !kIsWeb &&
-          (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+          (defaultTargetPlatform == TargetPlatform.windows ||
+              defaultTargetPlatform == TargetPlatform.macOS ||
+              defaultTargetPlatform == TargetPlatform.linux);
 
       if (isDesktop) {
         finalUrl = path;
       } else {
-        final modelsDir = await EmbeddedModelManager.instance
-            .getModelsDirectory();
-        final destFile = File('${modelsDir.path}/$filename');
-        if (!destFile.existsSync()) {
-          final sourceFile = File(path);
-          await sourceFile.copy(destFile.path);
-        }
-        finalUrl = destFile.path;
+        final modelsDirPath = await EmbeddedModelManager.instance
+            .getModelsDirectoryPath();
+        finalUrl = await copyToModelsDir(path, filename, modelsDirPath);
       }
 
       final model = EmbeddedGgufModel(
@@ -369,7 +366,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
         filename: filename,
         url: finalUrl,
         description: 'Local model added from disk.',
-        sizeBytes: File(path).lengthSync(),
+        sizeBytes: fileLengthSync(path),
       );
 
       await EmbeddedModelManager.instance.addCustomModel(model);
@@ -424,7 +421,10 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
 
     final bool cpuOnly = (_gpuLayersMap[model.filename] ?? 0) == 0;
-    if (!kIsWeb && Platform.isAndroid && cpuOnly && model.sizeBytes > _cpuSizeWarnBytes) {
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        cpuOnly &&
+        model.sizeBytes > _cpuSizeWarnBytes) {
       if (!context.mounted) return;
       final proceed = await showDialog<bool>(
         context: context,
@@ -462,7 +462,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
       if (kIsWeb) {
         fullPath = model.url;
       } else {
-        fullPath = File(model.url).existsSync()
+        fullPath = fileExists(model.url)
             ? model.url
             : await EmbeddedModelManager.instance.fullPathForFilename(
                 model.filename,
@@ -596,7 +596,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
             // Check if the GGUF file is in models/ folder, or if it points to a valid file on disk (direct path)
             final isDownloaded =
                 _downloadedFilenames.contains(model.filename) ||
-                (!kIsWeb && File(model.url).existsSync());
+                (!kIsWeb && fileExists(model.url));
             final isAppLoaded =
                 EmbeddedLlmAdapter.instance.isLoaded &&
                 (appLoadedPath?.endsWith(model.filename) ?? false);

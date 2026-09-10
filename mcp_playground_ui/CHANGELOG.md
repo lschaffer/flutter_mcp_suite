@@ -1,3 +1,12 @@
+## 0.3.3
+
+- Enabled WebAssembly (WASM) runtime support:
+  - Replaced direct `dart:io` and `path_provider` imports with conditional exports and platform-agnostic helpers.
+  - Added conditional stubs for `EmbeddedModelManager`, `LocalMCPClient`, and `FileSystemSkillStorageAdapter` for Web/WASM runtimes.
+  - Decoupled HTML preview in chat bubbles via conditional launcher.
+  - Removed `universal_io` dependency.
+  - Replaced platform checks with `defaultTargetPlatform`.
+
 ## 0.3.2
 
 - Upgraded AI and core dependencies:

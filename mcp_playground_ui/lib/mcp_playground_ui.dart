@@ -4,6 +4,8 @@ export 'playground_controller.dart';
 export 'src/local_mcp_client.dart';
 export 'src/mcp_localizations.dart';
 export 'src/utils/mime_utils.dart';
+export 'src/utils/platform_file/platform_file.dart';
+export 'src/utils/platform_directory/platform_directory.dart';
 export 'src/services/embedded_llm/embedded_model.dart';
 export 'src/services/embedded_llm/embedded_model_manager.dart';
 export 'src/services/embedded_llm/embedded_llm_adapter.dart';

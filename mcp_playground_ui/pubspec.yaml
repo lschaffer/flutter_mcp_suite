@@ -1,6 +1,6 @@
 name: mcp_playground_ui
 description: "Shared UI components, dialogs, drawers, controllers, and services for MCP Playground and GenUI Playground."
-version: 0.3.2
+version: 0.3.3
 homepage: https://github.com/lschaffer/mcp_playground
 repository: https://github.com/lschaffer/mcp_playground/tree/main/mcp_playground_ui
 
@@ -20,7 +20,6 @@ dependencies:
   flutter:
     sdk: flutter
   mcp_playground_dart: ^0.3.2
-  universal_io: ^2.3.1
   http: ^1.6.0
   uuid: ^4.6.0
   shared_preferences: ^2.5.5
@@ -29,7 +28,7 @@ dependencies:
   ollama_dart: ^2.6.1
   llamadart: ^0.8.23
   flutter_markdown_plus: ^1.0.12
-  file_picker: ">=11.0.3 <13.0.0"
+  file_picker: ^12.0.0
   googleai_dart: ^12.0.1
   url_launcher: ^6.3.2
   path: ^1.9.1

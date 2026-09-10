@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
@@ -348,7 +347,11 @@ class _SettingsPanelState extends State<SettingsPanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = McpPlaygroundLocalizations.of(context);
-    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final isDesktop =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
     return DefaultTabController(
       length: isDesktop ? 4 : 3,
       child: Scaffold(

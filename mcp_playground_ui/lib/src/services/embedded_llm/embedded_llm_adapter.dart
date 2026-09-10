@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:universal_io/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:llamadart/llamadart.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
@@ -362,7 +361,9 @@ class EmbeddedLlmAdapter {
   // ── Tool result truncation ───────────────────────────────────────────────────
 
   static bool get _shouldTruncate =>
-      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   String _extractToolResultText(List<MCPContent>? contents, String fallback) {
     if (contents == null || contents.isEmpty) return fallback;
