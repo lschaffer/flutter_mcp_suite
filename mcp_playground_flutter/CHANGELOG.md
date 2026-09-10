@@ -1,3 +1,8 @@
+## 0.3.4
+
+- Replaced `PlatformFile.lengthSync()` with `bytes.length` in attachment handling, resolving `UNDEFINED_METHOD` failures during dependency lower-bound analysis.
+- Upgraded `mcp_playground_ui` to `^0.3.4`.
+
 ## 0.3.3
 
 - Enabled WebAssembly (WASM) runtime support:

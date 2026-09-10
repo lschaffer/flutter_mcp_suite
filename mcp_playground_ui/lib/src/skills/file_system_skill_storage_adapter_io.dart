@@ -14,6 +14,7 @@ class FileSystemSkillStorageAdapter implements SkillStorageAdapter {
 
   String get _defsPath => '$rootPath${Platform.pathSeparator}skills-defs.json';
 
+  /// Saves a skill to the file system using [name], optional [description], and [zipBytes].
   @override
   Future<StoredSkillInfo> saveSkill({
     required String name,

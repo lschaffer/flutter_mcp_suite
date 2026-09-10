@@ -7,6 +7,7 @@ class FileSystemSkillStorageAdapter implements SkillStorageAdapter {
 
   const FileSystemSkillStorageAdapter({required this.rootPath});
 
+  /// Saves a skill using [name], optional [description], and [zipBytes].
   @override
   Future<StoredSkillInfo> saveSkill({
     required String name,

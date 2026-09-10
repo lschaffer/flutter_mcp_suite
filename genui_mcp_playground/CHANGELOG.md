@@ -1,3 +1,8 @@
+## 0.3.4
+
+- Replaced `PlatformFile.lengthSync()` with `bytes.length` in attachment handling, resolving `UNDEFINED_METHOD` failures during dependency lower-bound analysis.
+- Upgraded `mcp_playground_ui` to `^0.3.4`.
+
 ## 0.3.3
 
 - **WASM & Web Platform Support**: Eliminated direct imports of `dart:io` in favor of `defaultTargetPlatform`, and upgraded to `mcp_playground_ui: ^0.3.3` with conditional exports to ensure full WebAssembly (WASM) compatibility.

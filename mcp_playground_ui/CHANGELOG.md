@@ -1,3 +1,8 @@
+## 0.3.4
+
+- Tightened `file_picker` dependency constraint to `^12.0.0` and removed redundant null checks to ensure seamless `pub downgrade` analysis.
+- Fixed dartdoc parameter references in `SkillStorageAdapter` implementations.
+
 ## 0.3.3
 
 - Enabled WebAssembly (WASM) runtime support:

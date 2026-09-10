@@ -528,7 +528,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
           final bytes = await file.readAsBytes();
           final name = file.name;
           final mime = _mimeFromExtension(name);
-          final size = file.lengthSync() ?? bytes.length;
+          final size = bytes.length;
           _attachments.add(
             MessageAttachment(
               id: const Uuid().v4(),

@@ -15,6 +15,7 @@ class WebSkillStorageAdapter implements SkillStorageAdapter {
   static const String _defsKey = 'mcp_playground_skills_defs';
   static const String _zipPrefix = 'mcp_playground_skill_zip_';
 
+  /// Saves a skill to web storage using [name], optional [description], and [zipBytes].
   @override
   Future<StoredSkillInfo> saveSkill({
     required String name,

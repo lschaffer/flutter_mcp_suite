@@ -1,6 +1,6 @@
 name: mcp_playground_ui
 description: "Shared UI components, dialogs, drawers, controllers, and services for MCP Playground and GenUI Playground."
-version: 0.3.3
+version: 0.3.4
 homepage: https://github.com/lschaffer/mcp_playground
 repository: https://github.com/lschaffer/mcp_playground/tree/main/mcp_playground_ui
 
