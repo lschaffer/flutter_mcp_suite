@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +58,8 @@ class SerpApiTravelSearchTool extends McpLocalTool {
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final query = (arguments['query'] as String? ?? '').trim();
     final destination = (arguments['destination'] as String? ?? '').trim();
-    final accomType = (arguments['accommodationType'] as String? ?? 'hotel').toLowerCase();
+    final accomType = (arguments['accommodationType'] as String? ?? 'hotel')
+        .toLowerCase();
     final apiKey = EnvLoader.get('SERPAPI_KEY').isNotEmpty
         ? EnvLoader.get('SERPAPI_KEY')
         : EnvLoader.get('SERPAPI_API_KEY');
@@ -67,7 +67,10 @@ class SerpApiTravelSearchTool extends McpLocalTool {
     if (query.isEmpty) {
       return MCPToolResult(
         content: [
-          MCPContent(type: 'text', text: 'Error: Query parameter cannot be empty.'),
+          MCPContent(
+            type: 'text',
+            text: 'Error: Query parameter cannot be empty.',
+          ),
         ],
         isError: true,
       );
@@ -76,21 +79,30 @@ class SerpApiTravelSearchTool extends McpLocalTool {
     if (apiKey.isNotEmpty) {
       try {
         final results = <Map<String, dynamic>>[];
-        final targetSearch = destination.isNotEmpty ? '$accomType in $destination' : query;
+        final targetSearch = destination.isNotEmpty
+            ? '$accomType in $destination'
+            : query;
 
         // 1. Try SerpAPI Google Hotels Engine (best for real hotel photos & pricing)
-        if (accomType == 'hotel' || accomType == 'resort' || accomType == 'all') {
+        if (accomType == 'hotel' ||
+            accomType == 'resort' ||
+            accomType == 'all') {
           final hotelUri = Uri.https('serpapi.com', '/search.json', {
             'engine': 'google_hotels',
             'q': targetSearch,
             'api_key': apiKey,
-            if (arguments['startDate'] != null) 'check_in_date': arguments['startDate'].toString(),
-            if (arguments['endDate'] != null) 'check_out_date': arguments['endDate'].toString(),
+            if (arguments['startDate'] != null)
+              'check_in_date': arguments['startDate'].toString(),
+            if (arguments['endDate'] != null)
+              'check_out_date': arguments['endDate'].toString(),
           });
 
-          final hotelResp = await http.get(hotelUri).timeout(const Duration(seconds: 12));
+          final hotelResp = await http
+              .get(hotelUri)
+              .timeout(const Duration(seconds: 12));
           if (hotelResp.statusCode == 200) {
-            final hotelData = jsonDecode(hotelResp.body) as Map<String, dynamic>;
+            final hotelData =
+                jsonDecode(hotelResp.body) as Map<String, dynamic>;
             final properties = (hotelData['properties'] as List?) ?? [];
 
             for (var i = 0; i < properties.length && results.length < 6; i++) {
@@ -99,24 +111,45 @@ class SerpApiTravelSearchTool extends McpLocalTool {
                 final images = (prop['images'] as List?) ?? [];
                 String? photoUrl;
                 if (images.isNotEmpty && images.first is Map) {
-                  photoUrl = images.first['thumbnail'] as String? ?? images.first['original_image'] as String?;
+                  photoUrl =
+                      images.first['thumbnail'] as String? ??
+                      images.first['original_image'] as String?;
                 }
-                photoUrl ??= prop['thumbnail'] as String? ?? _defaultPhotoForType(accomType, i);
+                photoUrl ??=
+                    prop['thumbnail'] as String? ??
+                    _defaultPhotoForType(accomType, i);
 
                 final rate = prop['rate_per_night'];
-                final priceStr = rate is Map ? (rate['lowest']?.toString() ?? rate['extracted_lowest']?.toString() ?? '€140') : (rate?.toString() ?? '€140');
-                final amenities = (prop['amenities'] as List?)?.map((e) => e.toString()).take(4).toList() ?? ['Free Wi-Fi', 'Breakfast', 'Great Location'];
+                final priceStr = rate is Map
+                    ? (rate['lowest']?.toString() ??
+                          rate['extracted_lowest']?.toString() ??
+                          '€140')
+                    : (rate?.toString() ?? '€140');
+                final amenities =
+                    (prop['amenities'] as List?)
+                        ?.map((e) => e.toString())
+                        .take(4)
+                        .toList() ??
+                    ['Free Wi-Fi', 'Breakfast', 'Great Location'];
 
                 results.add({
                   'name': prop['name'] ?? 'Hotel',
                   'type': accomType,
                   'rating': (prop['overall_rating'] as num?)?.toDouble() ?? 4.7,
-                  'reviews': prop['reviews'] != null ? '${prop['reviews']} reviews' : 'Verified Stay',
-                  'price': priceStr.startsWith('€') || priceStr.startsWith('\$') ? '$priceStr/night' : '€$priceStr/night',
+                  'reviews': prop['reviews'] != null
+                      ? '${prop['reviews']} reviews'
+                      : 'Verified Stay',
+                  'price': priceStr.startsWith('€') || priceStr.startsWith('\$')
+                      ? '$priceStr/night'
+                      : '€$priceStr/night',
                   'address': prop['hotel_class'] ?? destination,
                   'thumbnail': photoUrl,
-                  'link': prop['link'] ?? 'https://www.google.com/travel/hotels',
-                  'snippet': prop['description'] ?? prop['deal'] ?? 'Highly rated accommodation option in $destination.',
+                  'link':
+                      prop['link'] ?? 'https://www.google.com/travel/hotels',
+                  'snippet':
+                      prop['description'] ??
+                      prop['deal'] ??
+                      'Highly rated accommodation option in $destination.',
                   'amenities': amenities,
                 });
               }
@@ -133,7 +166,9 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'type': 'search',
           });
 
-          final mapsResp = await http.get(mapsUri).timeout(const Duration(seconds: 12));
+          final mapsResp = await http
+              .get(mapsUri)
+              .timeout(const Duration(seconds: 12));
           if (mapsResp.statusCode == 200) {
             final mapsData = jsonDecode(mapsResp.body) as Map<String, dynamic>;
             final localPlaces = (mapsData['local_results'] as List?) ?? [];
@@ -141,17 +176,27 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             for (var i = 0; i < localPlaces.length && results.length < 6; i++) {
               final lp = localPlaces[i];
               if (lp is Map<String, dynamic>) {
-                final photoUrl = lp['thumbnail'] as String? ?? _defaultPhotoForType(accomType, i);
+                final photoUrl =
+                    lp['thumbnail'] as String? ??
+                    _defaultPhotoForType(accomType, i);
                 results.add({
                   'name': lp['title'] ?? 'Accommodation',
                   'type': accomType,
                   'rating': (lp['rating'] as num?)?.toDouble() ?? 4.6,
-                  'reviews': lp['reviews'] != null ? '${lp['reviews']} reviews' : 'Verified',
+                  'reviews': lp['reviews'] != null
+                      ? '${lp['reviews']} reviews'
+                      : 'Verified',
                   'price': lp['price'] ?? '€90 - €180/night',
                   'address': lp['address'] ?? destination,
                   'thumbnail': photoUrl,
-                  'link': lp['website'] ?? lp['link'] ?? 'https://www.google.com/maps',
-                  'snippet': lp['description'] ?? lp['type'] ?? 'Top rated $accomType in $destination.',
+                  'link':
+                      lp['website'] ??
+                      lp['link'] ??
+                      'https://www.google.com/maps',
+                  'snippet':
+                      lp['description'] ??
+                      lp['type'] ??
+                      'Top rated $accomType in $destination.',
                   'amenities': ['WiFi', 'Central', 'Verified Stay'],
                 });
               }
@@ -168,7 +213,9 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'num': '8',
           });
 
-          final response = await http.get(uri).timeout(const Duration(seconds: 12));
+          final response = await http
+              .get(uri)
+              .timeout(const Duration(seconds: 12));
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body) as Map<String, dynamic>;
             final places = (data['places_results'] as List?) ?? [];
@@ -178,11 +225,15 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             for (var i = 0; i < places.length && results.length < 6; i++) {
               final p = places[i];
               if (p is Map<String, dynamic>) {
-                String? thumb = p['thumbnail'] as String? ?? p['image'] as String?;
-                if ((thumb == null || thumb.isEmpty) && i < inlineImages.length) {
+                String? thumb =
+                    p['thumbnail'] as String? ?? p['image'] as String?;
+                if ((thumb == null || thumb.isEmpty) &&
+                    i < inlineImages.length) {
                   final inline = inlineImages[i];
                   if (inline is Map) {
-                    thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+                    thumb =
+                        inline['thumbnail'] as String? ??
+                        inline['original'] as String?;
                   }
                 }
                 thumb ??= _defaultPhotoForType(accomType, i);
@@ -195,8 +246,14 @@ class SerpApiTravelSearchTool extends McpLocalTool {
                   'price': p['price'] ?? '€120 - €220/night',
                   'address': p['address'] ?? destination,
                   'thumbnail': thumb,
-                  'link': p['links']?['website'] ?? p['link'] ?? 'https://www.google.com/search?q=${Uri.encodeComponent(p['title'] ?? '')}',
-                  'snippet': p['description'] ?? p['snippet'] ?? 'Highly rated accommodation option.',
+                  'link':
+                      p['links']?['website'] ??
+                      p['link'] ??
+                      'https://www.google.com/search?q=${Uri.encodeComponent(p['title'] ?? '')}',
+                  'snippet':
+                      p['description'] ??
+                      p['snippet'] ??
+                      'Highly rated accommodation option.',
                   'amenities': ['WiFi', 'Verified Stay', 'Central'],
                 });
               }
@@ -206,10 +263,13 @@ class SerpApiTravelSearchTool extends McpLocalTool {
               final org = organic[i];
               if (org is Map<String, dynamic>) {
                 String? thumb = org['thumbnail'] as String?;
-                if ((thumb == null || thumb.isEmpty) && i < inlineImages.length) {
+                if ((thumb == null || thumb.isEmpty) &&
+                    i < inlineImages.length) {
                   final inline = inlineImages[i];
                   if (inline is Map) {
-                    thumb = inline['thumbnail'] as String? ?? inline['original'] as String?;
+                    thumb =
+                        inline['thumbnail'] as String? ??
+                        inline['original'] as String?;
                   }
                 }
                 thumb ??= _defaultPhotoForType(accomType, i);
@@ -220,7 +280,9 @@ class SerpApiTravelSearchTool extends McpLocalTool {
                   'rating': (org['rating'] as num?)?.toDouble() ?? 4.6,
                   'reviews': '${org['reviews'] ?? 250} reviews',
                   'price': '€100 - €250/night',
-                  'address': destination.isNotEmpty ? destination : 'Local Area',
+                  'address': destination.isNotEmpty
+                      ? destination
+                      : 'Local Area',
                   'thumbnail': thumb,
                   'link': org['link'] ?? 'https://www.google.com',
                   'snippet': org['snippet'] ?? '',
@@ -250,7 +312,9 @@ class SerpApiTravelSearchTool extends McpLocalTool {
           );
         }
       } catch (e) {
-        debugPrint('[SerpApiTravelSearchTool] SerpAPI query failed ($e). Using curated fallback data.');
+        debugPrint(
+          '[SerpApiTravelSearchTool] SerpAPI query failed ($e). Using curated fallback data.',
+        );
       }
     }
 
@@ -263,7 +327,9 @@ class SerpApiTravelSearchTool extends McpLocalTool {
           text: jsonEncode({
             'status': 'success',
             'source': 'Curated Travel Knowledgebase',
-            'destination': destination.isNotEmpty ? destination : 'Selected Destination',
+            'destination': destination.isNotEmpty
+                ? destination
+                : 'Selected Destination',
             'accommodationType': accomType,
             'count': mockResults.length,
             'results': mockResults,
@@ -317,7 +383,10 @@ class SerpApiTravelSearchTool extends McpLocalTool {
     return pool[index % pool.length];
   }
 
-  List<Map<String, dynamic>> _generateCuratedAccommodations(String destination, String type) {
+  List<Map<String, dynamic>> _generateCuratedAccommodations(
+    String destination,
+    String type,
+  ) {
     final city = destination.isNotEmpty ? destination : 'Kyoto, Japan';
     switch (type) {
       case 'camping':
@@ -329,10 +398,18 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '412 reviews',
             'price': '\$85/night',
             'address': 'Scenic Ridge Valley, near $city',
-            'thumbnail': 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['Campfire Pits', 'Stargazing Domes', 'Hot Showers', 'Pet Friendly'],
-            'link': 'https://www.google.com/search?q=glamping+camping+near+$city',
-            'snippet': 'Luxury safari tents and open campsites overlooking panoramic mountain valleys.',
+            'thumbnail':
+                'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Campfire Pits',
+              'Stargazing Domes',
+              'Hot Showers',
+              'Pet Friendly',
+            ],
+            'link':
+                'https://www.google.com/search?q=glamping+camping+near+$city',
+            'snippet':
+                'Luxury safari tents and open campsites overlooking panoramic mountain valleys.',
           },
           {
             'name': 'Eco-Wilderness Forest Pods',
@@ -341,10 +418,17 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '289 reviews',
             'price': '\$110/night',
             'address': 'Pine Creek Reserve, $city Area',
-            'thumbnail': 'https://images.unsplash.com/photo-1510312305653-8ed496efae75?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['Solar Powered', 'Sauna Access', 'Hiking Trails', 'Kitchen Shelter'],
+            'thumbnail':
+                'https://images.unsplash.com/photo-1510312305653-8ed496efae75?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Solar Powered',
+              'Sauna Access',
+              'Hiking Trails',
+              'Kitchen Shelter',
+            ],
             'link': 'https://www.google.com/search?q=eco+forest+camping+$city',
-            'snippet': 'Secluded geodesic domes with wood-fired stoves and crystal clear night sky views.',
+            'snippet':
+                'Secluded geodesic domes with wood-fired stoves and crystal clear night sky views.',
           },
         ];
       case 'apartment':
@@ -356,10 +440,17 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '620 reviews',
             'price': '\$135/night',
             'address': 'Historic Old Town District, $city',
-            'thumbnail': 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['High-Speed WiFi', 'Full Chef Kitchen', 'Washer/Dryer', 'Balcony View'],
+            'thumbnail':
+                'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'High-Speed WiFi',
+              'Full Chef Kitchen',
+              'Washer/Dryer',
+              'Balcony View',
+            ],
             'link': 'https://www.airbnb.com',
-            'snippet': 'Spacious designer apartment walking distance from top attractions and local cafés.',
+            'snippet':
+                'Spacious designer apartment walking distance from top attractions and local cafés.',
           },
           {
             'name': 'Artisan Terrace Penthouse',
@@ -368,10 +459,17 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '345 reviews',
             'price': '\$175/night',
             'address': 'Riverside Quarter, $city',
-            'thumbnail': 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['Rooftop Terrace', 'Smart TV', 'Air Conditioning', 'Elevator'],
+            'thumbnail':
+                'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Rooftop Terrace',
+              'Smart TV',
+              'Air Conditioning',
+              'Elevator',
+            ],
             'link': 'https://www.airbnb.com',
-            'snippet': 'Bright penthouse with private botanical terrace overlooking the historical skyline.',
+            'snippet':
+                'Bright penthouse with private botanical terrace overlooking the historical skyline.',
           },
         ];
       case 'resort':
@@ -383,10 +481,17 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '1,140 reviews',
             'price': '\$295/night',
             'address': 'Coastal Palms Bay, $city',
-            'thumbnail': 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['Infinity Pool', 'Thermal Spa', 'Complimentary Breakfast', 'Private Beach'],
+            'thumbnail':
+                'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Infinity Pool',
+              'Thermal Spa',
+              'Complimentary Breakfast',
+              'Private Beach',
+            ],
             'link': 'https://www.booking.com',
-            'snippet': 'Five-star coastal sanctuary offering personalized wellness therapies and oceanfront suites.',
+            'snippet':
+                'Five-star coastal sanctuary offering personalized wellness therapies and oceanfront suites.',
           },
         ];
       case 'hotel':
@@ -399,10 +504,17 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '890 reviews',
             'price': '\$165/night',
             'address': 'Central Avenue, $city',
-            'thumbnail': 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['Free Gourmet Breakfast', 'Rooftop Bar', 'Fitness Club', 'Concierge Service'],
+            'thumbnail':
+                'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Free Gourmet Breakfast',
+              'Rooftop Bar',
+              'Fitness Club',
+              'Concierge Service',
+            ],
             'link': 'https://www.booking.com',
-            'snippet': 'Elegantly restored boutique hotel combining heritage architecture with modern luxury.',
+            'snippet':
+                'Elegantly restored boutique hotel combining heritage architecture with modern luxury.',
           },
           {
             'name': 'The Metropolitan Vista Hotel',
@@ -411,10 +523,17 @@ class SerpApiTravelSearchTool extends McpLocalTool {
             'reviews': '730 reviews',
             'price': '\$145/night',
             'address': 'Downtown Promenade, $city',
-            'thumbnail': 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=600&auto=format&fit=crop&q=80',
-            'amenities': ['Indoor Heated Pool', 'EV Charging', '24/7 Room Service', 'Business Lounge'],
+            'thumbnail':
+                'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=600&auto=format&fit=crop&q=80',
+            'amenities': [
+              'Indoor Heated Pool',
+              'EV Charging',
+              '24/7 Room Service',
+              'Business Lounge',
+            ],
             'link': 'https://www.booking.com',
-            'snippet': 'Contemporary luxury suites with skyline vistas, exquisite dining, and express transit access.',
+            'snippet':
+                'Contemporary luxury suites with skyline vistas, exquisite dining, and express transit access.',
           },
         ];
     }
@@ -426,13 +545,15 @@ class SerpApiTravelSearchTool extends McpLocalTool {
 // ═══════════════════════════════════════════════════════════════
 
 final travelSearchFormSchema = S.object(
-  description: 'Interactive travel planning form to select destination, dates, accommodation type and budget.',
+  description:
+      'Interactive travel planning form to select destination, dates, accommodation type and budget.',
   properties: {
     'title': S.string(description: 'Form header title.'),
     'subtitle': S.string(description: 'Form subtitle.'),
     'defaultDestination': S.string(description: 'Pre-filled destination name.'),
     'defaultAccommodationType': S.string(
-      description: 'Default accommodation type: hotel, apartment, camping, resort, or hostel.',
+      description:
+          'Default accommodation type: hotel, apartment, camping, resort, or hostel.',
     ),
   },
 );
@@ -444,7 +565,8 @@ final travelSearchFormItem = CatalogItem(
 );
 
 final accommodationGridSchema = S.object(
-  description: 'Rich accommodation cards with photos, ratings, amenities, prices, and booking links.',
+  description:
+      'Rich accommodation cards with photos, ratings, amenities, prices, and booking links.',
   properties: {
     'title': S.string(description: 'Header title.'),
     'destination': S.string(description: 'Target city or region.'),
@@ -476,7 +598,8 @@ final accommodationGridItem = CatalogItem(
 );
 
 final travelItineraryCardSchema = S.object(
-  description: 'Day-by-day travel timeline with activity schedule and JPG export.',
+  description:
+      'Day-by-day travel timeline with activity schedule and JPG export.',
   properties: {
     'title': S.string(description: 'Itinerary title.'),
     'destination': S.string(description: 'Destination name.'),
@@ -515,7 +638,8 @@ class _TravelSearchFormWidget extends StatefulWidget {
   const _TravelSearchFormWidget({required this.itemContext});
 
   @override
-  State<_TravelSearchFormWidget> createState() => _TravelSearchFormWidgetState();
+  State<_TravelSearchFormWidget> createState() =>
+      _TravelSearchFormWidgetState();
 }
 
 class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
@@ -537,10 +661,14 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
   @override
   void initState() {
     super.initState();
-    final data = Map<String, Object?>.from((widget.itemContext.data as Map?) ?? {});
-    final defaultDest = data['defaultDestination']?.toString() ?? 'Kyoto, Japan';
+    final data = Map<String, Object?>.from(
+      (widget.itemContext.data as Map?) ?? {},
+    );
+    final defaultDest =
+        data['defaultDestination']?.toString() ?? 'Kyoto, Japan';
     _destinationCtrl = TextEditingController(text: defaultDest);
-    _accommodationType = data['defaultAccommodationType']?.toString() ?? 'hotel';
+    _accommodationType =
+        data['defaultAccommodationType']?.toString() ?? 'hotel';
   }
 
   @override
@@ -568,8 +696,10 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
     final dest = _destinationCtrl.text.trim();
     if (dest.isEmpty) return;
 
-    final startStr = '${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}';
-    final endStr = '${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}';
+    final startStr =
+        '${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}';
+    final endStr =
+        '${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}';
 
     final query = 'best $_accommodationType in $dest from $startStr to $endStr';
 
@@ -591,7 +721,9 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from((widget.itemContext.data as Map?) ?? {});
+    final data = Map<String, Object?>.from(
+      (widget.itemContext.data as Map?) ?? {},
+    );
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -631,11 +763,18 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
                     children: [
                       Text(
                         data['title']?.toString() ?? 'Trip & Stay Finder',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       Text(
-                        data['subtitle']?.toString() ?? 'Pick dates, destination & accommodation style',
-                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                        data['subtitle']?.toString() ??
+                            'Pick dates, destination & accommodation style',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -654,7 +793,9 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
                 hintText: 'City, region or country (e.g. Kyoto, Japan)',
                 prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
                 isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -679,16 +820,24 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
                     children: [
                       const Text(
                         'Travel Dates',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       InkWell(
                         onTap: _pickDateRange,
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            border: Border.all(color: isDark ? Colors.white24 : Colors.black26),
+                            border: Border.all(
+                              color: isDark ? Colors.white24 : Colors.black26,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
@@ -751,10 +900,15 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 icon: const Icon(Icons.search, size: 18),
-                label: const Text('Search Stays & Generate Itinerary', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'Search Stays & Generate Itinerary',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -768,7 +922,13 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
     final theme = Theme.of(context);
     return FilterChip(
       selected: isSelected,
-      label: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
       onSelected: (_) => setState(() => _accommodationType = value),
       selectedColor: theme.colorScheme.primaryContainer,
       checkmarkColor: theme.colorScheme.primary,
@@ -780,7 +940,13 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
     final theme = Theme.of(context);
     return FilterChip(
       selected: isSelected,
-      label: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
       onSelected: (_) => setState(() => _budget = value),
       selectedColor: theme.colorScheme.primaryContainer,
       checkmarkColor: theme.colorScheme.primary,
@@ -818,19 +984,32 @@ class _AccommodationGridWidget extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.hotel_rounded, color: theme.colorScheme.primary, size: 22),
+                Icon(
+                  Icons.hotel_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 22,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     destination.isNotEmpty ? '$title • $destination' : title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             for (final item in items) ...[
-              if (item is Map) _buildStayCard(context, Map<String, dynamic>.from(item), theme, isDark),
+              if (item is Map)
+                _buildStayCard(
+                  context,
+                  Map<String, dynamic>.from(item),
+                  theme,
+                  isDark,
+                ),
               const SizedBox(height: 12),
             ],
           ],
@@ -845,19 +1024,25 @@ class _AccommodationGridWidget extends StatelessWidget {
     ThemeData theme,
     bool isDark,
   ) {
-    final name = item['name'] as String? ?? item['title'] as String? ?? 'Accommodation';
+    final name =
+        item['name'] as String? ?? item['title'] as String? ?? 'Accommodation';
     final price = item['price'] as String? ?? '\$120/night';
     final rating = (item['rating'] as num?)?.toDouble() ?? 4.8;
     final reviews = item['reviews']?.toString() ?? 'Verified Stay';
     final address = item['address'] as String? ?? '';
-    final snippet = item['snippet'] as String? ?? item['description'] as String? ?? '';
-    final photo = item['thumbnail'] as String? ?? item['photo'] as String? ?? '';
+    final snippet =
+        item['snippet'] as String? ?? item['description'] as String? ?? '';
+    final photo =
+        item['thumbnail'] as String? ?? item['photo'] as String? ?? '';
     final link = item['link'] as String? ?? '';
-    final amenities = (item['amenities'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final amenities =
+        (item['amenities'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.02),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
       ),
@@ -884,11 +1069,17 @@ class _AccommodationGridWidget extends StatelessWidget {
                     Expanded(
                       child: Text(
                         name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(6),
@@ -909,19 +1100,39 @@ class _AccommodationGridWidget extends StatelessWidget {
                   children: [
                     const Icon(Icons.star, size: 14, color: Colors.amber),
                     const SizedBox(width: 4),
-                    Text('$rating', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(
+                      '$rating',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(width: 4),
-                    Text('($reviews)', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                    Text(
+                      '($reviews)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     if (address.isNotEmpty) ...[
                       const SizedBox(width: 8),
-                      Text('•', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                      Text(
+                        '•',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           address,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],
@@ -929,7 +1140,12 @@ class _AccommodationGridWidget extends StatelessWidget {
                 ),
                 if (snippet.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Text(snippet, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                  Text(
+                    snippet,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ],
                 if (amenities.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -939,9 +1155,14 @@ class _AccommodationGridWidget extends StatelessWidget {
                     children: [
                       for (final a in amenities)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.black.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(a, style: const TextStyle(fontSize: 10)),
@@ -961,7 +1182,10 @@ class _AccommodationGridWidget extends StatelessWidget {
                         }
                       },
                       icon: const Icon(Icons.open_in_new, size: 14),
-                      label: const Text('View Details & Book', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'View Details & Book',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ),
                 ],
@@ -981,21 +1205,27 @@ class _TravelItineraryCardWidget extends StatefulWidget {
   const _TravelItineraryCardWidget({required this.itemContext});
 
   @override
-  State<_TravelItineraryCardWidget> createState() => _TravelItineraryCardWidgetState();
+  State<_TravelItineraryCardWidget> createState() =>
+      _TravelItineraryCardWidgetState();
 }
 
-class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> {
+class _TravelItineraryCardWidgetState
+    extends State<_TravelItineraryCardWidget> {
   final GlobalKey _repaintKey = GlobalKey();
   bool _isExporting = false;
 
   Future<void> _exportJpg() async {
     setState(() => _isExporting = true);
     try {
-      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _repaintKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) return;
 
       final uiImage = await boundary.toImage(pixelRatio: 2.5);
-      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final byteData = await uiImage.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
       if (byteData == null) return;
 
       final imgObj = img.Image.fromBytes(
@@ -1006,31 +1236,33 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
       );
 
       final jpgBytes = img.encodeJpg(imgObj, quality: 92);
-      final data = Map<String, Object?>.from((widget.itemContext.data as Map?) ?? {});
-      final dest = (data['destination']?.toString() ?? 'Travel_Plan').replaceAll(RegExp(r'\W+'), '_');
+      final data = Map<String, Object?>.from(
+        (widget.itemContext.data as Map?) ?? {},
+      );
+      final dest = (data['destination']?.toString() ?? 'Travel_Plan')
+          .replaceAll(RegExp(r'\W+'), '_');
       final fileName = 'Itinerary_$dest.jpg';
 
-      final result = await FilePicker.saveFile(
+      final savedUri = await FilePicker.saveFile(
         dialogTitle: 'Export Travel Itinerary as JPG',
         fileName: fileName,
+        bytes: jpgBytes,
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg'],
       );
 
-      if (result != null) {
-        final file = File(result.endsWith('.jpg') ? result : '$result.jpg');
-        await file.writeAsBytes(jpgBytes);
+      if (savedUri != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Itinerary exported to ${file.path}')),
+            SnackBar(content: Text('Itinerary exported to ${savedUri.path}')),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isExporting = false);
@@ -1039,7 +1271,9 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from((widget.itemContext.data as Map?) ?? {});
+    final data = Map<String, Object?>.from(
+      (widget.itemContext.data as Map?) ?? {},
+    );
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final title = data['title']?.toString() ?? 'Trip Itinerary';
@@ -1063,12 +1297,21 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
                   Expanded(
                     child: Row(
                       children: [
-                        Icon(Icons.map_rounded, color: theme.colorScheme.primary, size: 22),
+                        Icon(
+                          Icons.map_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 22,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            destination.isNotEmpty ? '$title • $destination' : title,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            destination.isNotEmpty
+                                ? '$title • $destination'
+                                : title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                       ],
@@ -1077,16 +1320,32 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
                   ElevatedButton.icon(
                     onPressed: _isExporting ? null : _exportJpg,
                     icon: _isExporting
-                        ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Icon(Icons.camera_alt_outlined, size: 14),
-                    label: const Text('Export JPG', style: TextStyle(fontSize: 11)),
-                    style: ElevatedButton.styleFrom(visualDensity: VisualDensity.compact),
+                    label: const Text(
+                      'Export JPG',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               for (var i = 0; i < days.length; i++) ...[
-                if (days[i] is Map) _buildDaySection(context, Map<String, dynamic>.from(days[i] as Map), i + 1, theme, isDark),
+                if (days[i] is Map)
+                  _buildDaySection(
+                    context,
+                    Map<String, dynamic>.from(days[i] as Map),
+                    i + 1,
+                    theme,
+                    isDark,
+                  ),
                 if (i < days.length - 1) const Divider(height: 24),
               ],
             ],
@@ -1131,7 +1390,10 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
             Expanded(
               child: Text(
                 themeTitle.isNotEmpty ? '$dayTitle: $themeTitle' : dayTitle,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
@@ -1152,12 +1414,18 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
                       children: [
                         Text(
                           '${act['time'] ?? 'Activity'}: ${act['title'] ?? ''}',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
                         ),
                         if (act['description'] != null)
                           Text(
                             act['description'].toString(),
-                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                       ],
                     ),
@@ -1177,11 +1445,13 @@ class _TravelItineraryCardWidgetState extends State<_TravelItineraryCardWidget> 
 
 Catalog buildTravelGenuiCatalog() {
   final base = BasicCatalogItems.asNoAssetCatalog();
-  return base.copyWith(newItems: [
-    travelSearchFormItem,
-    accommodationGridItem,
-    travelItineraryCardItem,
-  ]);
+  return base.copyWith(
+    newItems: [
+      travelSearchFormItem,
+      accommodationGridItem,
+      travelItineraryCardItem,
+    ],
+  );
 }
 
 const String travelGenuiSystemPrompt = '''
@@ -1274,18 +1544,19 @@ class GenuiTravelScreen extends StatelessWidget {
       provider: provider != LlmProvider.none ? provider : LlmProvider.mistral,
       apiKey: EnvLoader.get('LLM_API_KEY'),
       model: EnvLoader.get('LLM_MODEL', defaultValue: 'mistral-medium-latest'),
-      baseUrl: EnvLoader.get('LLM_URL', defaultValue: 'https://api.mistral.ai/v1'),
+      baseUrl: EnvLoader.get(
+        'LLM_URL',
+        defaultValue: 'https://api.mistral.ai/v1',
+      ),
     );
 
     return Scaffold(
       body: GenuiMcpPlayground(
-        initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
-        customLocalTools: [
-          SerpApiTravelSearchTool(),
-        ],
-        initialEnabledTools: const [
-          'search_travel_destinations',
-        ],
+        initialLlmConfig: initialLlm.provider != LlmProvider.none
+            ? initialLlm
+            : null,
+        customLocalTools: [SerpApiTravelSearchTool()],
+        initialEnabledTools: const ['search_travel_destinations'],
         initialSystemPrompt: travelGenuiSystemPrompt,
         genuiCatalog: buildTravelGenuiCatalog(),
         showAgentInspector: true,

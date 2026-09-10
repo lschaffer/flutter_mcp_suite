@@ -1,0 +1,20 @@
+name: mcp_api_tester_skill
+description: Pure Dart agent skill for live API health probing, schema validation, and diagnostic reporting.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  http: ^1.6.0
+  path: ^1.9.1
+
+dependency_overrides:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+
+dev_dependencies:
+  lints: ^6.0.0

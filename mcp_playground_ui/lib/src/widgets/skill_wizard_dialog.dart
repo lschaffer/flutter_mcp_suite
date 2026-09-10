@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -184,20 +183,15 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
           ? '${_nameCtrl.text.trim().toLowerCase().replaceAll(' ', '_')}.md'
           : 'skill.md';
 
-      final path = await FilePicker.saveFile(
+      final savedUri = await FilePicker.saveFile(
         dialogTitle: 'Export Skill Markdown',
         fileName: defaultName,
         bytes: Uint8List.fromList(utf8.encode(content)),
       );
 
-      if (path != null && !kIsWeb) {
-        final file = File(path);
-        await file.writeAsString(content);
-      }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Skill exported successfully${path != null ? ': $path' : ''}')),
+          SnackBar(content: Text('Skill exported successfully${savedUri != null ? ': ${savedUri.path}' : ''}')),
         );
       }
     } catch (e) {
@@ -211,21 +205,16 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
 
   Future<void> _importSkillFile() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['md', 'markdown', 'txt'],
-        withData: true,
       );
 
-      if (result == null || result.files.isEmpty) return;
+      if (files.isEmpty) return;
 
-      final file = result.files.first;
-      String content = '';
-      if (file.bytes != null) {
-        content = utf8.decode(file.bytes!);
-      } else if (file.path != null) {
-        content = await File(file.path!).readAsString();
-      }
+      final file = files.first;
+      final bytes = await file.readAsBytes();
+      final content = utf8.decode(bytes);
 
       if (content.isEmpty) return;
 

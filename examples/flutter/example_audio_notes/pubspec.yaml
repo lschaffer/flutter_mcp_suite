@@ -1,0 +1,36 @@
+name: example_audio_notes
+description: "Flutter MCP Playground example for meeting transcription summaries, action items extraction, and structured task checklists."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mcp_playground_flutter:
+    path: ../../../mcp_playground_flutter
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+
+dependency_overrides:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  mcp_playground_flutter:
+    path: ../../../mcp_playground_flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../../.env

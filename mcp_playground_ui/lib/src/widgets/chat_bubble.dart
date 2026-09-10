@@ -455,24 +455,19 @@ class ChatBubble extends StatelessWidget {
     String? mimeType,
   ) async {
     try {
-      final isMobile = !kIsWeb && (io.Platform.isAndroid || io.Platform.isIOS);
       final extension = mimeType != null && mimeType.contains('/')
           ? mimeType.split('/').last
           : 'png';
       final fileName = 'generated_image.$extension';
 
-      final resultPath = await FilePicker.saveFile(
+      final savedUri = await FilePicker.saveFile(
         fileName: fileName,
         type: FileType.custom,
         allowedExtensions: [extension],
-        bytes: isMobile ? bytes : null,
+        bytes: bytes,
       );
 
-      if (resultPath != null) {
-        if (!kIsWeb && !isMobile) {
-          final file = io.File(resultPath);
-          await file.writeAsBytes(bytes);
-        }
+      if (savedUri != null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Image saved successfully.')),
@@ -494,23 +489,18 @@ class ChatBubble extends StatelessWidget {
     String fileName,
   ) async {
     try {
-      final isMobile = !kIsWeb && (io.Platform.isAndroid || io.Platform.isIOS);
       final extension = fileName.contains('.')
           ? fileName.split('.').last
           : 'bin';
 
-      final resultPath = await FilePicker.saveFile(
+      final savedUri = await FilePicker.saveFile(
         fileName: fileName,
         type: FileType.custom,
         allowedExtensions: [extension],
-        bytes: isMobile ? bytes : null,
+        bytes: bytes,
       );
 
-      if (resultPath != null) {
-        if (!kIsWeb && !isMobile) {
-          final file = io.File(resultPath);
-          await file.writeAsBytes(bytes);
-        }
+      if (savedUri != null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('File saved successfully: $fileName')),

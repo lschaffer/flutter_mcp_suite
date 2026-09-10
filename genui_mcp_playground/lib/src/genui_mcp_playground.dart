@@ -520,30 +520,26 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
 
   Future<void> _pickAttachments() async {
     try {
-      final result = await FilePicker.pickFiles(
-        allowMultiple: true,
-        withData: true,
-      );
+      final files = await FilePicker.pickFiles();
 
-      if (result != null && result.files.isNotEmpty) {
-        setState(() {
-          for (final file in result.files) {
-            if (file.bytes != null) {
-              final name = file.name;
-              final mime = _mimeFromExtension(name);
-              _attachments.add(
-                MessageAttachment(
-                  id: const Uuid().v4(),
-                  name: name,
-                  path: file.path ?? '',
-                  bytes: file.bytes,
-                  mimeType: mime,
-                  size: file.size,
-                ),
-              );
-            }
-          }
-        });
+      if (files.isNotEmpty) {
+        for (final file in files) {
+          final bytes = await file.readAsBytes();
+          final name = file.name;
+          final mime = _mimeFromExtension(name);
+          final size = file.lengthSync() ?? bytes.length;
+          _attachments.add(
+            MessageAttachment(
+              id: const Uuid().v4(),
+              name: name,
+              path: file.path ?? '',
+              bytes: bytes,
+              mimeType: mime,
+              size: size,
+            ),
+          );
+        }
+        setState(() {});
       }
     } catch (e) {
       debugPrint('Error picking files: $e');

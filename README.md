@@ -25,13 +25,22 @@ We provide several runnable example applications across Flutter, GenUI, and head
 ### 🎨 GenUI (Generative UI) Examples
 * **[Travel & Accommodation Planner](genui_mcp_playground/example)**: Primary showcase — interactive travel and stay planner with SerpAPI live search, date range pickers, accommodation style chips (hotels, apartments, glamping), rich photo cards, day-by-day itineraries, and JPG export.
 * **[Dynamic Weather Generator](examples/genui/example_genui_weather)**: Interactive weather generator demonstrating model-generated input forms, live `fl_chart` visualizations, JPG export, and native Open-Meteo tool integrations.
+* **[Smart Home & Climate Studio](examples/genui/example_genui_smarthome)**: Interactive climate controls, device toggle switches, and energy consumption bar charts.
+* **[Financial Portfolio & Budget Planner](examples/genui/example_genui_finance)**: Interactive expense pie charts (`fl_chart`), savings sliders, and compound interest projection curves.
+* **[Data Visualizer & Query Studio](examples/genui/example_genui_data_studio)**: Executive dashboard generator with KPI metric cards, data tables, and dynamic trend charts.
 * **[Filesystem Explorer](examples/genui/example_genui_filesystem)**: Interactive GenUI filesystem explorer showcasing folder tree navigation and file content inspection surfaces.
 
 ### 📱 Flutter (Classic UI) Examples
 * **[Primary Showcase App](mcp_playground_flutter/example)**: A comprehensive Flutter application demonstrating the `McpPlayground` UI widget with custom SSH, Open-Meteo weather, and fl_chart tool integrations.
+* **[Device & Network Diagnostics Copilot](examples/flutter/example_device_diagnostics)**: Telemetry monitor with custom chat cards for battery, memory, CPU load, and network latency pings.
+* **[Meeting Notes & Action Items Assistant](examples/flutter/example_audio_notes)**: Transcript processor with interactive action item checklist cards and markdown export.
+* **[GitHub Issue Triage & PR Review Copilot](examples/flutter/example_github_triage)**: GitHub issue triage assistant with auto-labeling and inline PR code reviews.
 * **[Embedded LLM Showcase](examples/flutter/example_embedded)**: A Flutter application pre-configured to run with a local on-device embedded LLM (`llamadart`) with zero external network dependencies.
 
 ### 💻 Dart (Headless) Examples
+* **[Git Staged Diff Reviewer & PR Generator](examples/dart/git_review_skill)**: Automated git inspection workflow analyzing staged diffs with `dart analyze` and exporting `PR_REVIEW.md`.
+* **[API Endpoint Health & Schema Prober](examples/dart/api_tester_skill)**: REST health-checking agent benchmarking endpoint latency and producing `API_DIAGNOSTICS.md`.
+* **[SQLite Database Analyst & Executive Reporter](examples/dart/sqlite_analyst_skill)**: Database exploration agent introspecting schemas, executing SQL queries, and exporting `DATABASE_REPORT.md`.
 * **[Skill Importer Example](examples/dart/skill_example)**: Demonstrates importing an agentskills.io-compatible [`skill.md`](examples/dart/skill_example/skill.md) with multi-turn prompts, executing a web search + HTML chart generation workflow via `McpAgentEngine`.
 * **[Local Filesystem Inspector](examples/dart/local_filesystem_example)**: A headless agent configured to install and run the official `@modelcontextprotocol/server-filesystem` Node.js server via NPX to inspect and sort local files.
   

@@ -12,13 +12,13 @@ dependencies:
     sdk: flutter
   genui_mcp_playground:
     path: ../../../genui_mcp_playground
-  mcp_playground_dart: ^0.2.3
-  mcp_playground_ui: ^0.1.1
+  mcp_playground_dart: ^0.3.2
+  mcp_playground_ui: ^0.3.2
   http: ^1.6.0
   fl_chart: ^1.2.0
   genui: ^0.10.2
   image: ^4.8.0
-  file_picker: ^11.0.3
+  file_picker: ^12.2.0
 
 dependency_overrides:
   mcp_playground_dart:

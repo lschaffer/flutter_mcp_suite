@@ -1,3 +1,14 @@
+## 0.3.2
+
+- Upgraded dependencies:
+  - `mcp_playground_dart` to `^0.3.2`
+  - `mcp_playground_ui` to `^0.3.2`
+  - `json_schema_builder` to `^0.1.7`
+- **New Dynamic GenUI Examples**:
+  - **Smart Home & Climate Studio** (`examples/genui/example_genui_smarthome`): Interactive generative UI with thermostat temperature controls, device toggle switches, and live `fl_chart` energy consumption bar charts.
+  - **Financial Portfolio & Budget Planner** (`examples/genui/example_genui_finance`): Budgeting companion rendering expense category pie charts (`fl_chart`), interactive spending sliders, and compound interest projection curves.
+  - **Data Visualizer & Query Studio** (`examples/genui/example_genui_data_studio`): Executive dashboard generator featuring KPI metric cards with trend indicators, horizontal scrollable data tables, and dynamic time-series charts.
+
 ## 0.3.1
 
 - Declared supported platforms explicitly in `pubspec.yaml` (Android, iOS, Linux, macOS, Web, Windows).

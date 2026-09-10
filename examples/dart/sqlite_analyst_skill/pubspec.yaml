@@ -1,0 +1,19 @@
+name: mcp_sqlite_analyst_skill
+description: Pure Dart agent skill that inspects database schemas, runs analytical SQL queries, and generates data reports.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  path: ^1.9.1
+
+dependency_overrides:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+
+dev_dependencies:
+  lints: ^6.0.0

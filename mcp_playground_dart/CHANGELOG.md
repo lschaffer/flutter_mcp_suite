@@ -1,3 +1,17 @@
+## 0.3.2
+
+- Upgraded AI SDK dependencies:
+  - `anthropic_sdk_dart` to `^8.0.0`
+  - `googleai_dart` to `^12.0.1`
+  - `openai_dart` to `^8.1.0`
+  - `ollama_dart` to `^2.6.1`
+  - `yaml` to `^3.1.4`
+  - `test` to `^1.32.0`
+- **New Pure Dart Examples & Skills**:
+  - **Git Staged Diff Reviewer & PR Generator** (`examples/dart/git_review_skill`): Automated git inspection workflow that reads staged diffs, runs static analysis, and produces structured pull request markdown reviews (`PR_REVIEW.md`).
+  - **API Endpoint Health & Schema Prober** (`examples/dart/api_tester_skill`): REST health-checking agent benchmarking endpoint latency, validating JSON schema payloads, and generating diagnostic audit reports (`API_DIAGNOSTICS.md`).
+  - **SQLite Database Analyst & Executive Reporter** (`examples/dart/sqlite_analyst_skill`): Autonomous database exploration agent that introspects relational schemas, executes aggregation queries, and exports business intelligence summaries (`DATABASE_REPORT.md`).
+
 ## 0.3.1
 
 - Fixed `repository` URL in `pubspec.yaml` to point to GitHub `main` branch.

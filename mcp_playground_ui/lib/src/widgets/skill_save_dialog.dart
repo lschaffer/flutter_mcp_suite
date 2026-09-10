@@ -542,16 +542,15 @@ class _SkillLoadDialogState extends State<SkillLoadDialog> {
 
   Future<void> _importFromFile() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'md'],
-        withData: true,
       );
-      if (result == null || result.files.isEmpty) return;
+      if (files.isEmpty) return;
 
-      final file = result.files.first;
-      final bytes = file.bytes;
-      if (bytes == null) return;
+      final file = files.first;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
 
       SkillManifest manifest;
       if (file.extension?.toLowerCase() == 'md') {

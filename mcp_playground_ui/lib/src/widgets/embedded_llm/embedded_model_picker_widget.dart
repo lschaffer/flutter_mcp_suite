@@ -330,12 +330,12 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
   Future<void> _openAddFromDisk() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['gguf'],
       );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.first;
+      if (files.isEmpty) return;
+      final file = files.first;
       final path = file.path;
       if (path == null) return;
 
@@ -369,7 +369,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
         filename: filename,
         url: finalUrl,
         description: 'Local model added from disk.',
-        sizeBytes: file.size,
+        sizeBytes: File(path).lengthSync(),
       );
 
       await EmbeddedModelManager.instance.addCustomModel(model);

@@ -1,3 +1,15 @@
+## 0.3.2
+
+- Upgraded AI and core dependencies:
+  - `mcp_playground_dart` to `^0.3.2`
+  - `anthropic_sdk_dart` to `^8.0.0`
+  - `googleai_dart` to `^12.0.1`
+  - `openai_dart` to `^8.1.0`
+  - `ollama_dart` to `^2.6.1`
+  - `llamadart` to `^0.8.23`
+  - `archive` to `^4.2.0`
+  - `flutter_widget_from_html` to `^0.17.4`
+
 ## 0.3.1
 
 - Declared supported platforms explicitly in `pubspec.yaml` (Android, iOS, Linux, macOS, Web, Windows).

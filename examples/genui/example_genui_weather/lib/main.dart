@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -377,17 +376,16 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
       );
       final defaultFileName = '${sanitizedTitle}_chart.jpg';
 
-      final savePath = await FilePicker.saveFile(
+      final savedUri = await FilePicker.saveFile(
         dialogTitle: 'Export Chart Picture (JPG)',
         fileName: defaultFileName,
+        bytes: jpgBytes,
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png'],
       );
 
-      if (savePath != null) {
-        final file = File(savePath);
-        await file.writeAsBytes(jpgBytes);
-
+      if (savedUri != null) {
+        final filePath = savedUri.path;
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -395,7 +393,7 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
                 children: [
                   const Icon(Icons.check_circle, color: Colors.white, size: 20),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('Chart exported to JPG: $savePath')),
+                  Expanded(child: Text('Chart exported to JPG: $filePath')),
                 ],
               ),
               backgroundColor: const Color(0xFF107C41),

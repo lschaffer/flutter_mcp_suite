@@ -1,3 +1,20 @@
+## 0.3.2
+
+- Upgraded AI SDK dependencies and shared components:
+  - `mcp_playground_dart` to `^0.3.2`
+  - `mcp_playground_ui` to `^0.3.2`
+  - `anthropic_sdk_dart` to `^8.0.0`
+  - `googleai_dart` to `^12.0.1`
+  - `openai_dart` to `^8.1.0`
+  - `ollama_dart` to `^2.6.1`
+  - `llamadart` to `^0.8.23`
+  - `archive` to `^4.2.0`
+  - `flutter_widget_from_html` to `^0.17.4`
+- **New Interactive Flutter Examples**:
+  - **Device & Network Diagnostics Copilot** (`examples/flutter/example_device_diagnostics`): Hardware telemetry monitor with custom chat bubbles rendering battery, memory, CPU load, and network latency ping cards.
+  - **Meeting Notes & Action Items Assistant** (`examples/flutter/example_audio_notes`): Meeting transcript triage tool rendering interactive action item checklist cards with priority chips, assignees, and markdown export.
+  - **GitHub Issue Triage & PR Review Copilot** (`examples/flutter/example_github_triage`): Repository maintenance agent that fetches GitHub issues, auto-suggests categorization labels, and drafts inline PR code reviews.
+
 ## 0.3.1
 
 - Added `repository` URL in `pubspec.yaml` pointing to GitHub `main` branch.

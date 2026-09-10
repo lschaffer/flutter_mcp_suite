@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -86,17 +85,13 @@ class _SkillsManagerDialogState extends State<SkillsManagerDialog> {
       final fileName = '${skill.name.toLowerCase().replaceAll(' ', '_')}.md';
       final bytes = Uint8List.fromList(utf8.encode(skill.skillDef));
 
-      final path = await FilePicker.saveFile(
+      final savedUri = await FilePicker.saveFile(
         dialogTitle: 'Export Skill Markdown',
         fileName: fileName,
         bytes: bytes,
       );
 
-      if (path != null && !kIsWeb) {
-        await File(path).writeAsString(skill.skillDef);
-      }
-
-      if (mounted) {
+      if (mounted && savedUri != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Exported "${skill.name}" successfully')),
         );
@@ -112,21 +107,16 @@ class _SkillsManagerDialogState extends State<SkillsManagerDialog> {
 
   Future<void> _importSkill() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['md', 'markdown', 'txt'],
-        withData: true,
       );
 
-      if (result == null || result.files.isEmpty) return;
+      if (files.isEmpty) return;
 
-      final file = result.files.first;
-      String content = '';
-      if (file.bytes != null) {
-        content = utf8.decode(file.bytes!);
-      } else if (file.path != null) {
-        content = await File(file.path!).readAsString();
-      }
+      final file = files.first;
+      final bytes = await file.readAsBytes();
+      final content = utf8.decode(bytes);
 
       if (content.isEmpty) return;
 

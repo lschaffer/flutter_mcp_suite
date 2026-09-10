@@ -1,0 +1,37 @@
+name: example_genui_data_studio
+description: "GenUI Data Visualizer and Query Studio with interactive tables, KPI metric grids, and dynamic trend charts."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  genui_mcp_playground:
+    path: ../../../genui_mcp_playground
+  mcp_playground_dart: ^0.3.2
+  mcp_playground_ui: ^0.3.2
+  genui: ^0.10.2
+  json_schema_builder: ^0.1.7
+  fl_chart: ^1.2.0
+
+dependency_overrides:
+  mcp_playground_dart:
+    path: ../../../mcp_playground_dart
+  mcp_playground_ui:
+    path: ../../../mcp_playground_ui
+  genui_mcp_playground:
+    path: ../../../genui_mcp_playground
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../../.env
