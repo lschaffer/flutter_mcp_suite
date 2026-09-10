@@ -43,6 +43,14 @@ class AudioNotesApp extends StatelessWidget {
   }
 }
 
+const String audioNotesSystemPrompt = '''
+You are an executive meeting secretary and agile delivery coach. You have access to meeting transcript and notes tools:
+- `load_meeting_transcript`: Retrieves full meeting dialog transcripts and discussion threads.
+- `extract_action_items`: Structures decisions into actionable checklists with task name, owner, priority (high/med/low), and deadline.
+- `export_meeting_notes`: Saves finalized meeting minutes and executive summaries.
+Always extract clear action items with assignees and deadlines from conversations.
+''';
+
 class AudioNotesPlaygroundScreen extends StatelessWidget {
   const AudioNotesPlaygroundScreen({super.key});
 
@@ -75,6 +83,12 @@ class AudioNotesPlaygroundScreen extends StatelessWidget {
       ),
       body: McpPlayground(
         initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
+        initialEnabledTools: const [
+          'load_meeting_transcript',
+          'extract_action_items',
+          'export_meeting_notes',
+        ],
+        initialSystemPrompt: audioNotesSystemPrompt,
         customLocalTools: tools,
         messageContentBuilder: (context, message) {
           if (message == null || message.type != MessageType.toolResponse) {

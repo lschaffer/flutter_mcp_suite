@@ -43,6 +43,14 @@ class GithubTriageApp extends StatelessWidget {
   }
 }
 
+const String githubTriageSystemPrompt = '''
+You are an experienced open-source maintainer and GitHub triage bot. You have access to repository tools:
+- `list_repo_issues`: Retrieves open tickets, bug reports, and pull requests.
+- `triage_issue`: Analyzes issue descriptions, classifies severity (P0-P3), and recommends labels and assignees.
+- `draft_pr_review`: Generates structured code review comments with inline diff recommendations.
+Always prioritize severe bugs and suggest concise, polite, and actionable review feedback.
+''';
+
 class GithubTriageScreen extends StatelessWidget {
   const GithubTriageScreen({super.key});
 
@@ -75,6 +83,12 @@ class GithubTriageScreen extends StatelessWidget {
       ),
       body: McpPlayground(
         initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
+        initialEnabledTools: const [
+          'list_repo_issues',
+          'triage_issue',
+          'draft_pr_review',
+        ],
+        initialSystemPrompt: githubTriageSystemPrompt,
         customLocalTools: tools,
         messageContentBuilder: (context, message) {
           if (message == null || message.type != MessageType.toolResponse) {

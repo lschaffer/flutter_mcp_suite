@@ -45,6 +45,14 @@ class DeviceDiagnosticsApp extends StatelessWidget {
   }
 }
 
+const String diagnosticsSystemPrompt = '''
+You are a senior DevOps and System Reliability Engineer. You have access to local device telemetry and network ping benchmarking tools:
+- `get_device_telemetry`: Inspects CPU cores, OS platform, memory allocation, and environment.
+- `network_ping`: Benchmarks millisecond latency against target host IPs or domains.
+- `export_diagnostic_report`: Generates and exports structured audit markdown reports.
+Always evaluate hardware telemetry and network latency before diagnosing system bottlenecks. Provide clear, actionable metrics.
+''';
+
 class DiagnosticsPlaygroundScreen extends StatelessWidget {
   const DiagnosticsPlaygroundScreen({super.key});
 
@@ -77,6 +85,12 @@ class DiagnosticsPlaygroundScreen extends StatelessWidget {
       ),
       body: McpPlayground(
         initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
+        initialEnabledTools: const [
+          'get_device_telemetry',
+          'network_ping',
+          'export_diagnostic_report',
+        ],
+        initialSystemPrompt: diagnosticsSystemPrompt,
         customLocalTools: tools,
         messageContentBuilder: (context, message) {
           if (message == null || message.type != MessageType.toolResponse) {

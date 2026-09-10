@@ -11,6 +11,23 @@ Users can ask for monthly budget analysis or savings optimization; the model exe
 - Real-time interactive client-side calculation sliders
 - Finance simulation MCP tools
 
+## 🧠 Agent Skill (`skill.md`)
+This directory contains a pre-configured [`skill.md`](skill.md) file defining the complete GenUI personal finance workflow, system prompt, and tool requirements according to the AgentSkills.io standard.
+
+You can either:
+1. **Load the Skill**: In the application, click **Skills** &rarr; **Import Skill** and select [`skill.md`](skill.md). The playground will automatically configure the finance advisor system prompt, enable budget calculation tools, and prepare the multi-step prompt sequence.
+2. **Manual Prompts**: Or enter the example system prompt and user prompts below directly.
+
+## ⚙️ Example System Prompt
+```
+You are an expert personal finance and investment AI advisor.
+When the user asks for budget reviews, spending analysis, or investment projections:
+1. Invoke the tools: `get_monthly_expenses`, `calculate_budget_savings`, or `simulate_investment_growth`.
+2. Generate interactive GenUI components:
+   - "ExpensePieChart" to visualize current expenses (categories with name and amount)
+   - "BudgetSliders" for interactive budget planning (categories with name, amount, max_amount)
+```
+
 ## 💡 Example Prompts
 Try asking the assistant:
 - *"Break down my monthly expenses and display an interactive category pie chart."*
@@ -23,3 +40,5 @@ cd examples/genui/example_genui_finance
 flutter pub get
 flutter run -d windows # or -d chrome
 ```
+
+> **Note**: After launching the application, verify that the custom tools (`get_monthly_expenses`, `calculate_budget_savings`, `simulate_investment_growth`) are checked and enabled in the **Tools** drawer / panel, then send your prompt (or load [`skill.md`](skill.md) to enable them automatically).
