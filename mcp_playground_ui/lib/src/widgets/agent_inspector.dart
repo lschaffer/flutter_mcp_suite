@@ -884,34 +884,72 @@ class _AgentInspectorState extends State<AgentInspector> {
                                     icon = Icons.smart_toy;
                                     iconColor = Colors.blue;
                                   }
-                                  return ListTile(
-                                    dense: true,
-                                    leading: Icon(
-                                      icon,
-                                      size: 16,
-                                      color: iconColor,
-                                    ),
-                                    title: Text(
-                                      entry.text,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    subtitle: Text(
-                                      _formatTimestamp(entry.timestamp),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
+                                  return Material(
+                                    type: MaterialType.transparency,
+                                    child: ListTile(
+                                      dense: true,
+                                      leading: Icon(
+                                        icon,
+                                        size: 16,
+                                        color: iconColor,
                                       ),
-                                    ),
-                                    trailing: entry.details != null
-                                        ? IconButton(
-                                            icon: const Icon(
-                                              Icons.open_in_full,
-                                              size: 14,
-                                            ),
-                                            tooltip: 'Expand log details',
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            onPressed: () {
+                                      title: Text(
+                                        entry.text,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      subtitle: Text(
+                                        _formatTimestamp(entry.timestamp),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      trailing: entry.details != null
+                                          ? IconButton(
+                                              icon: const Icon(
+                                                Icons.open_in_full,
+                                                size: 14,
+                                              ),
+                                              tooltip: 'Expand log details',
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onPressed: () {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (c) => AlertDialog(
+                                                    title: Text(
+                                                      entry.type == 'system'
+                                                          ? 'System Prompt'
+                                                          : 'Log Details',
+                                                    ),
+                                                    content:
+                                                        SingleChildScrollView(
+                                                          child: SelectableText(
+                                                            entry.details!,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontFamily:
+                                                                      'monospace',
+                                                                  fontSize: 12,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(c),
+                                                        child: const Text(
+                                                          'Close',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            )
+                                          : null,
+                                      onTap: entry.details != null
+                                          ? () {
                                               showDialog(
                                                 context: context,
                                                 builder: (c) => AlertDialog(
@@ -920,62 +958,27 @@ class _AgentInspectorState extends State<AgentInspector> {
                                                         ? 'System Prompt'
                                                         : 'Log Details',
                                                   ),
-                                                  content:
-                                                      SingleChildScrollView(
-                                                        child: SelectableText(
-                                                          entry.details!,
-                                                          style:
-                                                              const TextStyle(
-                                                                fontFamily:
-                                                                    'monospace',
-                                                                fontSize: 12,
-                                                              ),
-                                                        ),
+                                                  content: SingleChildScrollView(
+                                                    child: SelectableText(
+                                                      entry.details!,
+                                                      style: const TextStyle(
+                                                        fontFamily: 'monospace',
+                                                        fontSize: 12,
                                                       ),
+                                                    ),
+                                                  ),
                                                   actions: [
                                                     TextButton(
                                                       onPressed: () =>
                                                           Navigator.pop(c),
-                                                      child: const Text(
-                                                        'Close',
-                                                      ),
+                                                      child: const Text('Close'),
                                                     ),
                                                   ],
                                                 ),
                                               );
-                                            },
-                                          )
-                                        : null,
-                                    onTap: entry.details != null
-                                        ? () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (c) => AlertDialog(
-                                                title: Text(
-                                                  entry.type == 'system'
-                                                      ? 'System Prompt'
-                                                      : 'Log Details',
-                                                ),
-                                                content: SingleChildScrollView(
-                                                  child: SelectableText(
-                                                    entry.details!,
-                                                    style: const TextStyle(
-                                                      fontFamily: 'monospace',
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(c),
-                                                    child: const Text('Close'),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }
-                                        : null,
+                                            }
+                                          : null,
+                                    ),
                                   );
                                 },
                               ),

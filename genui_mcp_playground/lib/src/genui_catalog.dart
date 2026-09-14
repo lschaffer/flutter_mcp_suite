@@ -136,10 +136,11 @@ final CatalogItem genuiChatMessageItem = CatalogItem(
 /// Column, Row, Button, TextField, ChoicePicker, ...) plus the default
 /// [genuiChatMessageItem]. When [catalogJson] or [catalogItems] is provided,
 /// the corresponding items are merged in (replacing any item with the same
-/// name).
+/// name). When [clientFunctions] is provided, they are registered into the catalog.
 Catalog buildGenuiCatalog({
   String? catalogJson,
   List<GenuiCatalogItemDefinition>? catalogItems,
+  List<ClientFunction>? clientFunctions,
 }) {
   final base = BasicCatalogItems.asNoAssetCatalog();
 
@@ -165,7 +166,10 @@ Catalog buildGenuiCatalog({
     }
   }
 
-  return base.copyWith(newItems: custom);
+  return base.copyWith(
+    newItems: custom,
+    newFunctions: clientFunctions,
+  );
 }
 
 CatalogItem _catalogItemFromDefinition(GenuiCatalogItemDefinition definition) {

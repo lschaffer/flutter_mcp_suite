@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:genui_mcp_playground/genui_mcp_playground.dart';
@@ -45,25 +44,30 @@ class GenuiFinanceApp extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 1. Finance MCP Tools
+// 1. Finance GenUI Client-Side Functions
+// Reference: https://flutter.dev/blog/a2ui-client-side-functions
 // ═══════════════════════════════════════════════════════════════
 
-class GetMonthlyExpensesTool extends McpLocalTool {
-  @override
-  String get name => 'get_monthly_expenses';
+/// Deterministically fetches the monthly breakdown of spending and income.
+class GetMonthlyExpensesFunction extends SynchronousClientFunction {
+  const GetMonthlyExpensesFunction();
 
   @override
-  String get description => 'Get monthly breakdown of expenses by category (Housing, Food, Transit, Leisure).';
+  String get name => 'getMonthlyExpenses';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  String get description =>
+      'Returns a deterministic breakdown of monthly expenses by category (Housing, Groceries, Transit, Leisure, Utilities) and total monthly income.';
 
   @override
-  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final expenses = {
+  ClientFunctionReturnType get returnType => ClientFunctionReturnType.object;
+
+  @override
+  Schema get argumentSchema => S.object(properties: {});
+
+  @override
+  Object? executeSync(JsonMap args, ExecutionContext _) {
+    return {
       'income': 5400.0,
       'total_expenses': 3650.0,
       'categories': [
@@ -74,72 +78,77 @@ class GetMonthlyExpensesTool extends McpLocalTool {
         {'name': 'Utilities & Health', 'amount': 250.0, 'color': '#EC4899'},
       ],
     };
-    return MCPToolResult(
-      content: [MCPContent(type: 'text', text: jsonEncode(expenses))],
-    );
   }
 }
 
-class CalculateBudgetSavingsTool extends McpLocalTool {
-  @override
-  String get name => 'calculate_budget_savings';
+/// Deterministically calculates monthly and annual savings and savings rate.
+class CalculateBudgetSavingsFunction extends SynchronousClientFunction {
+  const CalculateBudgetSavingsFunction();
 
   @override
-  String get description => 'Calculate projected annual savings based on monthly income and expense adjustments.';
+  String get name => 'calculateBudgetSavings';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'monthly_income': {'type': 'number'},
-          'monthly_expenses': {'type': 'number'},
+  String get description =>
+      'Calculates projected annual and monthly savings and savings rate based on monthly income and expense adjustments.';
+
+  @override
+  ClientFunctionReturnType get returnType => ClientFunctionReturnType.object;
+
+  @override
+  Schema get argumentSchema => S.object(
+        properties: {
+          'monthly_income': S.number(description: 'Gross monthly income'),
+          'monthly_expenses': S.number(description: 'Total monthly expenses'),
         },
-        'required': ['monthly_income', 'monthly_expenses'],
-      };
+        required: ['monthly_income', 'monthly_expenses'],
+      );
 
   @override
-  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final income = (arguments['monthly_income'] as num).toDouble();
-    final expenses = (arguments['monthly_expenses'] as num).toDouble();
+  Object? executeSync(JsonMap args, ExecutionContext _) {
+    final income = (args['monthly_income'] as num?)?.toDouble() ?? 0.0;
+    final expenses = (args['monthly_expenses'] as num?)?.toDouble() ?? 0.0;
     final monthlySavings = (income - expenses).clamp(0.0, double.infinity);
     final annualSavings = monthlySavings * 12;
+    final savingsRate = income > 0 ? (monthlySavings / income) * 100 : 0.0;
 
-    return MCPToolResult(
-      content: [
-        MCPContent(
-          type: 'text',
-          text: jsonEncode({
-            'monthly_savings': monthlySavings,
-            'annual_savings': annualSavings,
-            'savings_rate_percent': ((monthlySavings / income) * 100).toStringAsFixed(1),
-          }),
-        ),
-      ],
-    );
+    return {
+      'monthly_savings': monthlySavings,
+      'annual_savings': annualSavings,
+      'savings_rate_percent': savingsRate.toStringAsFixed(1),
+    };
   }
 }
 
-class SimulateInvestmentGrowthTool extends McpLocalTool {
-  @override
-  String get name => 'simulate_investment_growth';
+/// Deterministically computes compound investment projections.
+class SimulateInvestmentGrowthFunction extends SynchronousClientFunction {
+  const SimulateInvestmentGrowthFunction();
 
   @override
-  String get description => 'Simulate compound interest returns over 1, 3, 5, and 10 years.';
+  String get name => 'simulateInvestmentGrowth';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'monthly_contribution': {'type': 'number'},
-          'annual_interest_rate': {'type': 'number', 'description': 'e.g. 0.08 for 8%'},
+  String get description =>
+      'Simulates deterministic compound interest returns over 1, 3, 5, and 10 years for regular monthly contributions.';
+
+  @override
+  ClientFunctionReturnType get returnType => ClientFunctionReturnType.object;
+
+  @override
+  Schema get argumentSchema => S.object(
+        properties: {
+          'monthly_contribution': S.number(description: 'Monthly contribution amount'),
+          'annual_interest_rate': S.number(
+            description: 'Annual interest rate as a decimal (e.g. 0.075 for 7.5%)',
+          ),
         },
-        'required': ['monthly_contribution'],
-      };
+        required: ['monthly_contribution'],
+      );
 
   @override
-  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final pmt = (arguments['monthly_contribution'] as num).toDouble();
-    final rate = (arguments['annual_interest_rate'] as num?)?.toDouble() ?? 0.07;
+  Object? executeSync(JsonMap args, ExecutionContext _) {
+    final pmt = (args['monthly_contribution'] as num?)?.toDouble() ?? 0.0;
+    final rate = (args['annual_interest_rate'] as num?)?.toDouble() ?? 0.07;
     final r = rate / 12;
 
     double fv(int years) {
@@ -151,39 +160,165 @@ class SimulateInvestmentGrowthTool extends McpLocalTool {
       return total;
     }
 
-    return MCPToolResult(
-      content: [
-        MCPContent(
-          type: 'text',
-          text: jsonEncode({
-            '1_year': fv(1).round(),
-            '3_years': fv(3).round(),
-            '5_years': fv(5).round(),
-            '10_years': fv(10).round(),
-          }),
-        ),
-      ],
-    );
+    return {
+      '1_year': fv(1).round(),
+      '3_years': fv(3).round(),
+      '5_years': fv(5).round(),
+      '10_years': fv(10).round(),
+    };
   }
 }
+
+const financeClientFunctions = <ClientFunction>[
+  GetMonthlyExpensesFunction(),
+  CalculateBudgetSavingsFunction(),
+  SimulateInvestmentGrowthFunction(),
+];
 
 // ═══════════════════════════════════════════════════════════════
 // 2. Custom GenUI Catalog Items
 // ═══════════════════════════════════════════════════════════════
 
+final ExecutionContext _fallbackContext =
+    DataContext(InMemoryDataModel(), DataPath('/'));
+
+dynamic _resolveCall(dynamic raw, [ExecutionContext? context]) {
+  if (raw == null) return null;
+  if (raw is Map) {
+    if (raw.containsKey('call')) {
+      final funcName = raw['call']?.toString() ?? '';
+      final rawArgs = raw['args'];
+      final args = rawArgs is Map ? Map<String, dynamic>.from(rawArgs) : <String, dynamic>{};
+      for (final func in financeClientFunctions) {
+        if (func.name.toLowerCase() == funcName.toLowerCase().replaceAll('_', '')) {
+          if (func is SynchronousClientFunction) {
+            try {
+              return func.executeSync(args, context ?? _fallbackContext);
+            } catch (_) {}
+          }
+        }
+      }
+    }
+    final newMap = <String, dynamic>{};
+    for (final entry in raw.entries) {
+      newMap[entry.key.toString()] = _resolveCall(entry.value, context);
+    }
+    return newMap;
+  }
+  if (raw is List) {
+    return raw.map((item) => _resolveCall(item, context)).toList();
+  }
+  return raw;
+}
+
+
+List<Map<String, dynamic>> _extractCategories(dynamic raw) {
+  if (raw == null) return const [];
+  raw = _resolveCall(raw);
+
+  if (raw is List) {
+    final result = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (item is Map) {
+        final m = Map<String, dynamic>.from(item);
+        final name = m['name']?.toString() ?? m['category']?.toString() ?? '';
+        final amount = (m['amount'] ?? m['value'] ?? m['cost'] as num?)?.toDouble() ?? 0.0;
+        final maxAmount = (m['max_amount'] ?? m['maxAmount'] ?? m['max'] as num?)?.toDouble();
+        final itemMap = <String, dynamic>{
+          'name': name,
+          'amount': amount,
+        };
+        if (m.containsKey('color')) itemMap['color'] = m['color'];
+        if (maxAmount != null) itemMap['max_amount'] = maxAmount;
+        result.add(itemMap);
+      }
+    }
+    return result;
+  }
+
+  if (raw is Map) {
+    final map = Map<String, dynamic>.from(raw);
+    if (map.containsKey('categories')) {
+      return _extractCategories(map['categories']);
+    }
+
+    final result = <Map<String, dynamic>>[];
+    for (final entry in map.entries) {
+      if (entry.key == 'total_expenses' || entry.key == 'totalExpenses' || entry.key == 'income') {
+        continue;
+      }
+      if (entry.value is num) {
+        result.add({
+          'name': entry.key,
+          'amount': (entry.value as num).toDouble(),
+        });
+      } else if (entry.value is Map) {
+        final valMap = Map<String, dynamic>.from(entry.value as Map);
+        final itemMap = <String, dynamic>{
+          'name': valMap['name']?.toString() ?? entry.key,
+          'amount': (valMap['amount'] as num?)?.toDouble() ?? 0.0,
+        };
+        if (valMap.containsKey('color')) itemMap['color'] = valMap['color'];
+        if (valMap['max_amount'] != null) {
+          itemMap['max_amount'] = (valMap['max_amount'] as num).toDouble();
+        }
+        result.add(itemMap);
+      }
+    }
+    return result;
+  }
+
+  return const [];
+}
+
+double _extractTotalExpenses(dynamic rawData, List<Map<String, dynamic>> categories) {
+  rawData = _resolveCall(rawData);
+  if (rawData is Map) {
+    final map = Map<String, dynamic>.from(rawData);
+    final rawTotal = map['total_expenses'] ?? map['totalExpenses'] ?? map['total'];
+    if (rawTotal is num) return rawTotal.toDouble();
+    if (rawTotal is String) {
+      final parsed = double.tryParse(rawTotal.replaceAll(RegExp(r'[^\d.]'), ''));
+      if (parsed != null) return parsed;
+    }
+    if (map['categories'] is Map) {
+      final nested = Map<String, dynamic>.from(map['categories'] as Map);
+      final nestedTotal = nested['total_expenses'] ?? nested['totalExpenses'];
+      if (nestedTotal is num) return nestedTotal.toDouble();
+    }
+  }
+
+  return categories.fold<double>(
+    0.0,
+    (sum, cat) => sum + ((cat['amount'] as num?)?.toDouble() ?? 0.0),
+  );
+}
+
+double _extractIncome(dynamic rawData) {
+  rawData = _resolveCall(rawData);
+  if (rawData is Map) {
+    final map = Map<String, dynamic>.from(rawData);
+    final raw = map['monthly_income'] ?? map['monthlyIncome'] ?? map['income'];
+    if (raw is num) return raw.toDouble();
+    if (raw is String) {
+      final parsed = double.tryParse(raw.replaceAll(RegExp(r'[^\d.]'), ''));
+      if (parsed != null) return parsed;
+    }
+    if (map['categories'] is Map) {
+      final nested = Map<String, dynamic>.from(map['categories'] as Map);
+      final nestedIncome = nested['income'] ?? nested['monthly_income'];
+      if (nestedIncome is num) return nestedIncome.toDouble();
+    }
+  }
+  return 5400.0;
+}
+
 // --- A. Expense Pie Chart Widget ---
 final expensePieSchema = S.object(
   description: 'Interactive pie chart showing category breakdown of expenses.',
   properties: {
-    'total_expenses': S.number(),
-    'categories': S.list(
-      items: S.object(
-        properties: {
-          'name': S.string(),
-          'amount': S.number(),
-        },
-      ),
-    ),
+    'total_expenses': S.number(description: 'Total monthly expenses'),
+    'categories': S.any(description: 'List of categories with name and amount, or map of category names to amounts'),
   },
   required: ['categories'],
 );
@@ -208,11 +343,19 @@ class _ExpensePieWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
-    final list = (data['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final total = (data['total_expenses'] as num?)?.toDouble() ?? 0.0;
-    final theme = Theme.of(context);
+    final rawData = _resolveCall(itemContext.data, itemContext.dataContext);
+    var list = _extractCategories(
+      rawData is Map ? (rawData['categories'] ?? rawData) : rawData,
+    );
+    var total = _extractTotalExpenses(rawData, list);
 
+    if (list.isEmpty) {
+      final defaultExpenses = const GetMonthlyExpensesFunction().executeSync(const {}, _fallbackContext) as Map<String, dynamic>;
+      list = _extractCategories(defaultExpenses['categories']);
+      total = (defaultExpenses['total_expenses'] as num).toDouble();
+    }
+
+    final theme = Theme.of(context);
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -238,7 +381,7 @@ class _ExpensePieWidget extends StatelessWidget {
                   sections: [
                     for (var i = 0; i < list.length; i++)
                       PieChartSectionData(
-                        value: (list[i]['amount'] as num?)?.toDouble() ?? 1.0,
+                        value: ((list[i]['amount'] as num?)?.toDouble() ?? 1.0).clamp(0.01, double.infinity),
                         title: '\$${(list[i]['amount'] as num?)?.toInt() ?? 0}',
                         color: _colors[i % _colors.length],
                         radius: 50,
@@ -275,18 +418,10 @@ class _ExpensePieWidget extends StatelessWidget {
 final budgetSliderSchema = S.object(
   description: 'Interactive budget adjustment sliders with live savings calculation.',
   properties: {
-    'monthly_income': S.number(),
-    'categories': S.list(
-      items: S.object(
-        properties: {
-          'name': S.string(),
-          'amount': S.number(),
-          'max_amount': S.number(),
-        },
-      ),
-    ),
+    'monthly_income': S.number(description: 'Gross monthly income'),
+    'categories': S.any(description: 'List or map of budget categories with spending amounts'),
   },
-  required: ['monthly_income', 'categories'],
+  required: ['categories'],
 );
 
 final budgetSliderItem = CatalogItem(
@@ -310,19 +445,45 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
   @override
   void initState() {
     super.initState();
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
-    _income = (data['monthly_income'] as num?)?.toDouble() ?? 5400.0;
-    final list = (data['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    _extractData();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BudgetSlidersWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.itemContext.data != widget.itemContext.data) {
+      _extractData();
+    }
+  }
+
+  void _extractData() {
+    final rawData = _resolveCall(widget.itemContext.data, widget.itemContext.dataContext);
+    _income = _extractIncome(rawData);
+    var list = _extractCategories(
+      rawData is Map ? (rawData['categories'] ?? rawData) : rawData,
+    );
+    if (list.isEmpty) {
+      final defaultExpenses = const GetMonthlyExpensesFunction().executeSync(const {}, _fallbackContext) as Map<String, dynamic>;
+      list = _extractCategories(defaultExpenses['categories']);
+    }
     for (final c in list) {
       final name = c['name']?.toString() ?? '';
-      _currentAmounts[name] = (c['amount'] as num?)?.toDouble() ?? 300.0;
+      if (name.isNotEmpty && !_currentAmounts.containsKey(name)) {
+        _currentAmounts[name] = (c['amount'] as num?)?.toDouble() ?? 300.0;
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
-    final list = (data['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final rawData = _resolveCall(widget.itemContext.data, widget.itemContext.dataContext);
+    var list = _extractCategories(
+      rawData is Map ? (rawData['categories'] ?? rawData) : rawData,
+    );
+    if (list.isEmpty) {
+      final defaultExpenses = const GetMonthlyExpensesFunction().executeSync(const {}, _fallbackContext) as Map<String, dynamic>;
+      list = _extractCategories(defaultExpenses['categories']);
+    }
     final theme = Theme.of(context);
 
     final totalExpenses = _currentAmounts.values.fold(0.0, (a, b) => a + b);
@@ -368,7 +529,8 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
   Widget _buildSliderRow(Map<String, dynamic> cat) {
     final name = cat['name']?.toString() ?? 'Category';
     final max = (cat['max_amount'] as num?)?.toDouble() ?? 2000.0;
-    final val = _currentAmounts[name] ?? 300.0;
+    final val = _currentAmounts[name] ?? ((cat['amount'] as num?)?.toDouble() ?? 300.0);
+    final effectiveMax = max > 0 ? max : (val > 0 ? val * 2 : 1000.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,10 +543,10 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
           ],
         ),
         Slider(
-          value: val.clamp(0.0, max),
+          value: val.clamp(0.0, effectiveMax),
           min: 0.0,
-          max: max,
-          divisions: (max / 50).round().clamp(5, 100),
+          max: effectiveMax,
+          divisions: (effectiveMax / 50).round().clamp(5, 100),
           onChanged: (newVal) {
             setState(() => _currentAmounts[name] = newVal);
           },
@@ -401,12 +563,16 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
 const String financeSystemPrompt = '''
 You are an expert personal finance and investment AI advisor.
 When the user asks for budget reviews, spending analysis, or investment projections:
-1. Invoke the tools: `get_monthly_expenses`, `calculate_budget_savings`, or `simulate_investment_growth`.
-2. Generate interactive GenUI components:
-   - "ExpensePieChart" to visualize current expenses:
-     {"total_expenses": 3650.0, "categories": [{"name": "Housing", "amount": 1800.0}, {"name": "Groceries", "amount": 850.0}]}
-   - "BudgetSliders" for interactive budget planning:
-     {"monthly_income": 5400.0, "categories": [{"name": "Groceries", "amount": 850.0, "max_amount": 1500.0}]}
+1. Available Client-Side Functions:
+   - `getMonthlyExpenses()`: Returns monthly income (\$5,400) and current categories: Housing (\$1,800), Groceries & Dining (\$850), Transportation (\$400), Leisure & Subs (\$350), Utilities & Health (\$250) totaling \$3,650.
+   - `calculateBudgetSavings(monthly_income, monthly_expenses)`: Computes deterministic monthly and annual savings and savings rate.
+   - `simulateInvestmentGrowth(monthly_contribution, annual_interest_rate)`: Computes multi-year compound interest projections.
+2. Generating interactive GenUI components:
+   - "ExpensePieChart": When the user asks to break down expenses or show a pie chart, ALWAYS emit the "ExpensePieChart" component with populated categories:
+     {"total_expenses": 3650.0, "categories": [{"name": "Housing", "amount": 1800.0}, {"name": "Groceries & Dining", "amount": 850.0}, {"name": "Transportation", "amount": 400.0}, {"name": "Leisure & Subs", "amount": 350.0}, {"name": "Utilities & Health", "amount": 250.0}]}
+   - "BudgetSliders": When the user asks to adjust budget or plan savings, emit the "BudgetSliders" component:
+     {"monthly_income": 5400.0, "categories": [{"name": "Housing", "amount": 1800.0, "max_amount": 2500.0}, {"name": "Groceries & Dining", "amount": 850.0, "max_amount": 1500.0}, {"name": "Transportation", "amount": 400.0, "max_amount": 800.0}, {"name": "Leisure & Subs", "amount": 350.0, "max_amount": 700.0}, {"name": "Utilities & Health", "amount": 250.0, "max_amount": 500.0}]}
+3. Do NOT emit raw placeholder text, and do NOT loop. If calling `getMonthlyExpenses()`, use its results immediately to render the requested component.
 ''';
 
 class FinanceScreen extends StatelessWidget {
@@ -416,6 +582,7 @@ class FinanceScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
       newItems: [expensePieItem, budgetSliderItem],
+      newFunctions: financeClientFunctions,
     );
 
     // Load initial LLM configuration if configured in .env
@@ -439,18 +606,9 @@ class FinanceScreen extends StatelessWidget {
       ),
       body: GenuiMcpPlayground(
         initialLlmConfig: initialLlm.provider != LlmProvider.none ? initialLlm : null,
-        customLocalTools: [
-          GetMonthlyExpensesTool(),
-          CalculateBudgetSavingsTool(),
-          SimulateInvestmentGrowthTool(),
-        ],
-        initialEnabledTools: const [
-          'get_monthly_expenses',
-          'calculate_budget_savings',
-          'simulate_investment_growth',
-        ],
         initialSystemPrompt: financeSystemPrompt,
         genuiCatalog: catalog,
+        clientFunctions: financeClientFunctions,
         showAgentInspector: true,
       ),
     );

@@ -6,7 +6,17 @@ export 'package:genui/genui.dart'
         CatalogItem,
         CatalogItemContext,
         CatalogWidgetBuilder,
-        BasicCatalogItems;
+        BasicCatalogItems,
+        ClientFunction,
+        SynchronousClientFunction,
+        ClientFunctionReturnType,
+        ExecutionContext,
+        DataContext,
+        DataPath,
+        DataModel,
+        InMemoryDataModel,
+        BasicFunctions,
+        JsonMap;
 export 'package:json_schema_builder/json_schema_builder.dart' show Schema, S;
 export 'package:mcp_playground_dart/mcp_playground_dart.dart'
     hide

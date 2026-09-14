@@ -1,3 +1,10 @@
+## 0.3.5
+
+- **GenUI Client-Side Functions Support**:
+  - Exported `ClientFunction`, `SynchronousClientFunction`, `ClientFunctionReturnType`, `ExecutionContext`, and `BasicFunctions` from `genui` package.
+  - Added optional `clientFunctions` parameter to `GenuiMcpPlayground`, `McpGenuiChatController`, and `buildGenuiCatalog`, allowing client-side functions to be registered directly into the GenUI catalog.
+  - Automatically incorporates client-side functions into the GenUI Catalog schema for prompt generation and synchronous client-side execution.
+
 ## 0.3.4
 
 - Replaced `PlatformFile.lengthSync()` with `bytes.length` in attachment handling, resolving `UNDEFINED_METHOD` failures during dependency lower-bound analysis.

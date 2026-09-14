@@ -69,6 +69,7 @@ The primary widget providing a full-featured generative UI and agent playground.
 | `genuiCatalog` | `Catalog?` | `null` | Custom GenUI `Catalog` instance. |
 | `genuiCatalogItems` | `List<GenuiCatalogItemDefinition>?` | `null` | List of JSON schema item definitions to build the catalog dynamically. |
 | `genuiCatalogJson` | `String?` | `null` | Raw JSON string containing schema catalog definitions. |
+| `clientFunctions` | `List<ClientFunction>?` | `null` | List of GenUI client-side functions (`ClientFunction` / `SynchronousClientFunction`) registered in the catalog. |
 | `initialSystemPrompt` | `String?` | `null` | Optional initial system prompt. |
 | `initialEnabledTools` | `List<String>?` | `null` | Tool names pre-selected on startup. |
 | `showAgentInspector` | `bool` | `true` | Show/hide the side-by-side Agent Inspector panel. |

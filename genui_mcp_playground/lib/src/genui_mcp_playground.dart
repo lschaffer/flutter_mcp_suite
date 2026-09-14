@@ -51,6 +51,9 @@ class GenuiMcpPlayground extends StatefulWidget {
   /// Optional catalog JSON string.
   final String? genuiCatalogJson;
 
+  /// Optional list of GenUI client-side functions to register into the catalog.
+  final List<ClientFunction>? clientFunctions;
+
   /// Whether to show the Agent Inspector side panel and toggle button. Defaults to true.
   final bool showAgentInspector;
 
@@ -74,6 +77,7 @@ class GenuiMcpPlayground extends StatefulWidget {
     this.genuiCatalogItems,
     this.genuiCatalog,
     this.genuiCatalogJson,
+    this.clientFunctions,
     this.showAgentInspector = true,
     this.initialSystemPrompt,
     this.initialEnabledTools,
@@ -479,6 +483,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
         catalog: widget.genuiCatalog,
         catalogJson: widget.genuiCatalogJson,
         catalogItems: widget.genuiCatalogItems,
+        clientFunctions: widget.clientFunctions,
         playgroundController: _controller,
       );
       _genuiController!.addListener(_onStateChange);
@@ -812,25 +817,28 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
                   itemCount: enabledTools.length,
                   itemBuilder: (context, index) {
                     final tool = enabledTools[index];
-                    return ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.build, size: 16),
-                      title: Text(
-                        tool.name,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                    return Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.build, size: 16),
+                        title: Text(
+                          tool.name,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
+                        subtitle: tool.description != null &&
+                                tool.description!.isNotEmpty
+                            ? Text(
+                                tool.description!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
                       ),
-                      subtitle: tool.description != null &&
-                              tool.description!.isNotEmpty
-                          ? Text(
-                              tool.description!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
                     );
                   },
                 ),
@@ -1039,22 +1047,28 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
                 ],
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.play_arrow),
-              title: Text(l10n.get('playground')),
-              onTap: () {
-                Navigator.pop(context);
-                _resetPlayground();
-              },
-            ),
-            if (!widget.disableConfigDialog)
-              ListTile(
-                leading: const Icon(Icons.settings),
-                title: Text(l10n.get('playgroundSettings')),
+            Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                leading: const Icon(Icons.play_arrow),
+                title: Text(l10n.get('playground')),
                 onTap: () {
                   Navigator.pop(context);
-                  _showSettingsDialog();
+                  _resetPlayground();
                 },
+              ),
+            ),
+            if (!widget.disableConfigDialog)
+              Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: Text(l10n.get('playgroundSettings')),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSettingsDialog();
+                  },
+                ),
               ),
           ],
         ),

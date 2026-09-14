@@ -69,16 +69,21 @@ class McpGenuiChatController extends ChangeNotifier {
     Catalog? catalog,
     List<GenuiCatalogItemDefinition>? catalogItems,
     String? catalogJson,
+    List<ClientFunction>? clientFunctions,
     this._systemPrompt,
     this.maxToolIterations = 10,
     this._playgroundController,
   }) : _tools = List.unmodifiable(tools),
        _catalog =
-           catalog ??
-           buildGenuiCatalog(
-             catalogJson: catalogJson,
-             catalogItems: catalogItems,
-           ) {
+           catalog != null
+               ? (clientFunctions != null
+                   ? catalog.copyWith(newFunctions: clientFunctions)
+                   : catalog)
+               : buildGenuiCatalog(
+                 catalogJson: catalogJson,
+                 catalogItems: catalogItems,
+                 clientFunctions: clientFunctions,
+               ) {
     _transport = A2uiTransportAdapter(onSend: _handleSend);
     _surfaceController = SurfaceController(catalogs: [_catalog]);
     _conversation = Conversation(
@@ -293,7 +298,16 @@ class McpGenuiChatController extends ChangeNotifier {
     try {
       for (var iteration = 0; iteration < maxToolIterations; iteration++) {
         mp.LLMResponse? finalResponse;
-        final mcpTools = _tools.map((t) => t.toMCPTool()).toList();
+        final mcpTools = <mp.MCPTool>[
+          ..._tools.map((t) => t.toMCPTool()),
+          for (final func in _catalog.functions)
+            mp.MCPTool(
+              name: func.name,
+              description: func.description,
+              inputSchema:
+                  Map<String, dynamic>.from(func.argumentSchema.value),
+            ),
+        ];
         final iterationBuffer = StringBuffer();
         final iterationEntryId = _newId();
 
@@ -409,6 +423,49 @@ class McpGenuiChatController extends ChangeNotifier {
         }
       }
     }
+
+    for (final func in _catalog.functions) {
+      final matchesName = func.name == call.name ||
+          func.name.toLowerCase() ==
+              call.name.toLowerCase().replaceAll('_', '');
+      if (matchesName) {
+        try {
+          final dataModel = _surfaceController.activeSurfaceIds.isNotEmpty
+              ? _surfaceController
+                  .contextFor(_surfaceController.activeSurfaceIds.first)
+                  .dataModel
+              : InMemoryDataModel();
+          final context = DataContext(
+            dataModel,
+            DataPath('/'),
+            functions: _catalog.functions,
+          );
+
+          final Object? result;
+          if (func is SynchronousClientFunction) {
+            result = func.executeSync(call.arguments, context);
+          } else {
+            result = await func.execute(call.arguments, context).first;
+          }
+
+          return mp.MCPToolResult(
+            content: [
+              mp.MCPContent(
+                type: 'text',
+                text: result is String ? result : jsonEncode(result),
+              ),
+            ],
+          );
+        } catch (error) {
+          return mp.MCPToolResult(
+            content: [
+              mp.MCPContent(type: 'text', text: 'Function error: $error'),
+            ],
+            isError: true,
+          );
+        }
+      }
+    }
     return mp.MCPToolResult(
       content: [
         mp.MCPContent(type: 'text', text: 'Unknown tool: ${call.name}'),
@@ -434,11 +491,21 @@ class McpGenuiChatController extends ChangeNotifier {
       buffer.writeln('\n\n### Active Skill (${activeSkill.name}):');
       buffer.writeln(activeSkill.skillDef.trim());
     }
-    if (_tools.isNotEmpty && !_llmConfig.useNativeToolCall) {
+    final allTools = <mp.MCPTool>[
+      ..._tools.map((t) => t.toMCPTool()),
+      for (final func in _catalog.functions)
+        mp.MCPTool(
+          name: func.name,
+          description: func.description,
+          inputSchema:
+              Map<String, dynamic>.from(func.argumentSchema.value),
+        ),
+    ];
+    if (allTools.isNotEmpty && !_llmConfig.useNativeToolCall) {
       buffer.writeln('\n\nAvailable Tools:');
-      for (final tool in _tools) {
+      for (final tool in allTools) {
         buffer.writeln('- Tool Name: ${tool.name}');
-        if (tool.description.isNotEmpty) {
+        if (tool.description != null && tool.description!.isNotEmpty) {
           buffer.writeln('  Description: ${tool.description}');
         }
         buffer.writeln('  Input Schema: ${jsonEncode(tool.inputSchema)}');

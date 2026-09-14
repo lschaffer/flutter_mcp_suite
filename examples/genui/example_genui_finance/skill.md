@@ -6,22 +6,20 @@ author: mcp_playground
 system_prompt: |
   You are an expert personal finance and investment AI advisor.
   When the user asks for budget reviews, spending analysis, or investment projections:
-  1. Invoke the tools: `get_monthly_expenses`, `calculate_budget_savings`, or `simulate_investment_growth`.
+  1. Leverage client-side functions directly for instant, deterministic computations without server round-trips:
+     - `getMonthlyExpenses()`: Retrieve expense records and default income.
+     - `calculateBudgetSavings(monthly_income, monthly_expenses)`: Calculate live savings and annual projections.
+     - `simulateInvestmentGrowth(monthly_contribution, annual_interest_rate)`: Compute multi-year compound interest.
   2. Generate interactive GenUI components:
      - "ExpensePieChart" to visualize current expenses:
-       {"total_expenses": 3650.0, "categories": [{"name": "Housing", "amount": 1800.0}, {"name": "Groceries", "amount": 850.0}]}
+       {"total_expenses": 3650.0, "categories": [{"name": "Housing", "amount": 1800.0}, {"name": "Groceries & Dining", "amount": 850.0}]}
      - "BudgetSliders" for interactive budget planning:
-       {"monthly_income": 5400.0, "categories": [{"name": "Groceries", "amount": 850.0, "max_amount": 1500.0}]}
+       {"monthly_income": 5400.0, "categories": [{"name": "Groceries & Dining", "amount": 850.0, "max_amount": 1500.0}]}
 
 prompts:
   - text: Break down my monthly expenses and display an interactive category pie chart.
-    tools: [get_monthly_expenses]
-    stop_after_tool_call: true
   - text: Provide budget adjustment sliders so I can see my projected annual savings in real time.
-    tools: [calculate_budget_savings]
-    stop_after_tool_call: true
   - text: Simulate compounding returns if I invest $450/month at 7.5% annual return over 10 years.
-    tools: [simulate_investment_growth]
 
 tools:
   - name: get_monthly_expenses
