@@ -129,17 +129,20 @@ class SimulateInvestmentGrowthFunction extends SynchronousClientFunction {
 
   @override
   String get description =>
-      'Simulates deterministic compound interest returns over 1, 3, 5, and 10 years for regular monthly contributions.';
+      'Simulates deterministic compound interest returns over 1, 3, 5, and 10 years for regular monthly contributions. Can also return a single year projection if "years" is provided.';
 
   @override
-  ClientFunctionReturnType get returnType => ClientFunctionReturnType.object;
+  ClientFunctionReturnType get returnType => ClientFunctionReturnType.any;
 
   @override
   Schema get argumentSchema => S.object(
         properties: {
           'monthly_contribution': S.number(description: 'Monthly contribution amount'),
           'annual_interest_rate': S.number(
-            description: 'Annual interest rate as a decimal (e.g. 0.075 for 7.5%)',
+            description: 'Annual interest rate (e.g. 0.075 for 7.5%)',
+          ),
+          'years': S.number(
+            description: 'Optional number of years to project (e.g. 1, 3, 5, 10)',
           ),
         },
         required: ['monthly_contribution'],
@@ -147,8 +150,29 @@ class SimulateInvestmentGrowthFunction extends SynchronousClientFunction {
 
   @override
   Object? executeSync(JsonMap args, ExecutionContext _) {
-    final pmt = (args['monthly_contribution'] as num?)?.toDouble() ?? 0.0;
-    final rate = (args['annual_interest_rate'] as num?)?.toDouble() ?? 0.07;
+    final rawPmt = args['monthly_contribution'] ??
+        args['monthlyContribution'] ??
+        args['contribution'] ??
+        args['amount'];
+    final pmt = (rawPmt is num ? rawPmt.toDouble() : null) ??
+        (double.tryParse(rawPmt?.toString() ?? '') ?? 450.0);
+
+    final rawRate = args['annual_interest_rate'] ??
+        args['annualInterestRate'] ??
+        args['annual_return'] ??
+        args['interest_rate'] ??
+        args['rate'];
+    double rate = 0.075;
+    if (rawRate is num) {
+      rate = rawRate.toDouble();
+      if (rate > 1.0) rate = rate / 100.0;
+    } else if (rawRate is String) {
+      final parsed = double.tryParse(rawRate.replaceAll('%', '').trim());
+      if (parsed != null) {
+        rate = parsed > 1.0 ? parsed / 100.0 : parsed;
+      }
+    }
+
     final r = rate / 12;
 
     double fv(int years) {
@@ -160,11 +184,38 @@ class SimulateInvestmentGrowthFunction extends SynchronousClientFunction {
       return total;
     }
 
+    String fmt(num val) {
+      final str = val.round().toString();
+      return '\$${str.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+    }
+
+    final reqYears = (args['years'] as num?)?.toInt();
+    if (reqYears != null) {
+      return fmt(fv(reqYears));
+    }
+
+    final fv1 = fv(1).round();
+    final fv3 = fv(3).round();
+    final fv5 = fv(5).round();
+    final fv10 = fv(10).round();
+
     return {
-      '1_year': fv(1).round(),
-      '3_years': fv(3).round(),
-      '5_years': fv(5).round(),
-      '10_years': fv(10).round(),
+      'monthly_contribution': pmt,
+      'annual_interest_rate': rate,
+      '1_year': fv1,
+      '3_years': fv3,
+      '5_years': fv5,
+      '10_years': fv10,
+      '1_year_formatted': fmt(fv1),
+      '3_years_formatted': fmt(fv3),
+      '5_years_formatted': fmt(fv5),
+      '10_years_formatted': fmt(fv10),
+      'projections': [
+        {'years': 1, 'amount': fv1, 'formatted': fmt(fv1)},
+        {'years': 3, 'amount': fv3, 'formatted': fmt(fv3)},
+        {'years': 5, 'amount': fv5, 'formatted': fmt(fv5)},
+        {'years': 10, 'amount': fv10, 'formatted': fmt(fv10)},
+      ],
     };
   }
 }
@@ -556,6 +607,160 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
   }
 }
 
+// --- C. Investment Growth Card Widget ---
+final investmentGrowthSchema = S.object(
+  description: 'Compound interest investment growth projection card with multi-year milestones.',
+  properties: {
+    'monthly_contribution': S.number(description: 'Monthly investment amount'),
+    'annual_interest_rate': S.number(description: 'Annual interest rate (e.g. 0.075 for 7.5%)'),
+    'projections': S.any(description: 'Yearly projected balances or simulation call'),
+  },
+  required: ['monthly_contribution'],
+);
+
+final investmentGrowthItem = CatalogItem(
+  name: 'InvestmentGrowthCard',
+  dataSchema: investmentGrowthSchema,
+  widgetBuilder: (itemContext) => _InvestmentGrowthWidget(itemContext: itemContext),
+);
+
+class _InvestmentGrowthWidget extends StatelessWidget {
+  final CatalogItemContext itemContext;
+  const _InvestmentGrowthWidget({required this.itemContext});
+
+  @override
+  Widget build(BuildContext context) {
+    final rawData = _resolveCall(itemContext.data, itemContext.dataContext);
+    final map = rawData is Map ? Map<String, dynamic>.from(rawData) : <String, dynamic>{};
+
+    final pmt = (map['monthly_contribution'] ?? map['monthlyContribution'] ?? map['amount'] as num?)?.toDouble() ?? 450.0;
+    final rawRate = map['annual_interest_rate'] ?? map['annual_return'] ?? map['rate'] ?? 0.075;
+    double rate = 0.075;
+    if (rawRate is num) {
+      rate = rawRate.toDouble();
+      if (rate > 1.0) rate = rate / 100.0;
+    }
+
+    final sim = const SimulateInvestmentGrowthFunction().executeSync({
+      'monthly_contribution': pmt,
+      'annual_interest_rate': rate,
+    }, _fallbackContext) as Map<String, dynamic>;
+
+    final theme = Theme.of(context);
+    final projections = (sim['projections'] as List).cast<Map<String, dynamic>>();
+
+    final total10YearDeposits = pmt * 12 * 10;
+    final total10YearGrowth = (sim['10_years'] as num).toDouble();
+    final interestEarned = (total10YearGrowth - total10YearDeposits).clamp(0.0, double.infinity);
+
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Investment Growth Simulation', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Monthly: \$${pmt.toStringAsFixed(0)} | Return: ${(rate * 100).toStringAsFixed(1)}%/yr',
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    sim['10_years_formatted']?.toString() ?? '\$80,036',
+                    style: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            Text('Projected Growth Milestones:', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            for (final p in projections) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          p['years'] == 10 ? Icons.stars : Icons.trending_up,
+                          size: 16,
+                          color: p['years'] == 10 ? Colors.amber : Colors.blueAccent,
+                        ),
+                        const SizedBox(width: 8),
+                        Text('${p['years']} Year${p['years'] == 1 ? '' : 's'}:', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    Text(
+                      p['formatted']?.toString() ?? '',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: p['years'] == 10 ? 15 : 13,
+                        color: p['years'] == 10 ? Colors.greenAccent : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: ((p['amount'] as num).toDouble() / (total10YearGrowth > 0 ? total10YearGrowth : 1.0)).clamp(0.0, 1.0),
+                  minHeight: 6,
+                  backgroundColor: Colors.white10,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    p['years'] == 10 ? Colors.greenAccent : (p['years'] == 5 ? Colors.blueAccent : Colors.tealAccent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '10-Yr Deposits: \$${total10YearDeposits.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  Text(
+                    'Compound Interest: +\$${interestEarned.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.greenAccent, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 3. Screen Setup
 // ═══════════════════════════════════════════════════════════════
@@ -566,13 +771,15 @@ When the user asks for budget reviews, spending analysis, or investment projecti
 1. Available Client-Side Functions:
    - `getMonthlyExpenses()`: Returns monthly income (\$5,400) and current categories: Housing (\$1,800), Groceries & Dining (\$850), Transportation (\$400), Leisure & Subs (\$350), Utilities & Health (\$250) totaling \$3,650.
    - `calculateBudgetSavings(monthly_income, monthly_expenses)`: Computes deterministic monthly and annual savings and savings rate.
-   - `simulateInvestmentGrowth(monthly_contribution, annual_interest_rate)`: Computes multi-year compound interest projections.
+   - `simulateInvestmentGrowth(monthly_contribution, annual_interest_rate, [years])`: Computes compound interest projections over 1, 3, 5, and 10 years.
 2. Generating interactive GenUI components:
    - "ExpensePieChart": When the user asks to break down expenses or show a pie chart, ALWAYS emit the "ExpensePieChart" component with populated categories:
      {"total_expenses": 3650.0, "categories": [{"name": "Housing", "amount": 1800.0}, {"name": "Groceries & Dining", "amount": 850.0}, {"name": "Transportation", "amount": 400.0}, {"name": "Leisure & Subs", "amount": 350.0}, {"name": "Utilities & Health", "amount": 250.0}]}
    - "BudgetSliders": When the user asks to adjust budget or plan savings, emit the "BudgetSliders" component:
      {"monthly_income": 5400.0, "categories": [{"name": "Housing", "amount": 1800.0, "max_amount": 2500.0}, {"name": "Groceries & Dining", "amount": 850.0, "max_amount": 1500.0}, {"name": "Transportation", "amount": 400.0, "max_amount": 800.0}, {"name": "Leisure & Subs", "amount": 350.0, "max_amount": 700.0}, {"name": "Utilities & Health", "amount": 250.0, "max_amount": 500.0}]}
-3. Do NOT emit raw placeholder text, and do NOT loop. If calling `getMonthlyExpenses()`, use its results immediately to render the requested component.
+   - "InvestmentGrowthCard": When the user asks to simulate compounding returns or investment growth, ALWAYS emit the "InvestmentGrowthCard" component:
+     {"monthly_contribution": 450.0, "annual_interest_rate": 0.075}
+3. Always emit dedicated GenUI components ("ExpensePieChart", "BudgetSliders", "InvestmentGrowthCard") instead of generic text cards. Never leave projection values blank.
 ''';
 
 class FinanceScreen extends StatelessWidget {
@@ -581,7 +788,7 @@ class FinanceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [expensePieItem, budgetSliderItem],
+      newItems: [expensePieItem, budgetSliderItem, investmentGrowthItem],
       newFunctions: financeClientFunctions,
     );
 

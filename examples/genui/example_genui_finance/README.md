@@ -10,6 +10,7 @@ Instead of making slow round-trips to an external MCP server or LLM tool-calling
 The model orchestrates and generates rich interactive GenUI components:
 - **ExpensePieChart**: Visual breakdown of spending by category using `fl_chart`.
 - **BudgetSliders**: Interactive sliders allowing the user to tweak category spending in real-time, calculating instant projected annual savings.
+- **InvestmentGrowthCard**: Multi-year compound interest milestone projections with visual indicators, progress bars, and total interest earned.
 
 ## Features
 - Dynamic financial widget generation using GenUI (`A2UI`)
