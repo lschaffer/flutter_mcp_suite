@@ -16,7 +16,7 @@ dependencies:
   mcp_playground_ui: ^0.3.2
   http: ^1.6.0
   fl_chart: ^1.2.0
-  genui: ^0.10.2
+  genui: ^0.10.3
   image: ^4.8.0
   file_picker: ^12.2.0
 

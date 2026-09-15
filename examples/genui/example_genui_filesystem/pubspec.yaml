@@ -17,7 +17,7 @@ dependencies:
     path: ../../../mcp_playground_ui
   mcp_playground_dart:
     path: ../../../mcp_playground_dart
-  genui: ^0.10.2
+  genui: ^0.10.3
   json_schema_builder: ^0.1.7
   path: ^1.9.1
   path_provider: ^2.1.6
