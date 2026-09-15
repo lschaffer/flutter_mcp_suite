@@ -35,6 +35,9 @@ Watch the dynamic GenUI Playground in action rendering interactive surfaces:
 ### ⛅ GenUI Weather Generator
 ![GenUI MCP Weather Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
 
+### 📈 GenUI Finance & Budget Planner
+![GenUI MCP Finance Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_finance_example.gif)
+
 ---
 
 ## 🚀 Installation
