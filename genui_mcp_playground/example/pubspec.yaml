@@ -18,7 +18,7 @@ dependencies:
     path: shared_tools
   http: ^1.6.0
   fl_chart: ^1.2.0
-  genui: ^0.10.2
+  genui: ^0.10.3
   json_schema_builder: ^0.1.7
   image: ^4.8.0
   file_picker: ^12.2.0
