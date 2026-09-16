@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../playground_controller.dart';
 import '../models/skill_def.dart';
 import 'skill_wizard_dialog.dart';

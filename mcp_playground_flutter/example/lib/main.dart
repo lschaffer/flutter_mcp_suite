@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
 import 'env_loader.dart';

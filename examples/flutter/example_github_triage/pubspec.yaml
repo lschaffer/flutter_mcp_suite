@@ -16,7 +16,7 @@ dependencies:
     path: ../../../mcp_playground_ui
   mcp_playground_dart:
     path: ../../../mcp_playground_dart
-
+  material_ui: ^1.3.0
 dependency_overrides:
   mcp_playground_dart:
     path: ../../../mcp_playground_dart

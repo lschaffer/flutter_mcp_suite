@@ -22,7 +22,7 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.6
   http: ^1.6.0
-
+  material_ui: ^1.3.0
 dependency_overrides:
   mcp_playground_dart:
     path: ../../../mcp_playground_dart

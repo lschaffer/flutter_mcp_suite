@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
 import 'env_loader.dart';
 

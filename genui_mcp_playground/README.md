@@ -46,8 +46,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  genui_mcp_playground: ^0.3.1
-  genui: ^0.10.2
+  genui_mcp_playground: ^0.4.0
+  genui: ^0.10.3
 ```
 
 Then import:

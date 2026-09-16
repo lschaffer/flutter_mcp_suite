@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
 import '../../playground_controller.dart';

@@ -1,3 +1,11 @@
+## 0.4.0
+
+- **BREAKING CHANGE - Decoupled Material UI**:
+  - Migrated from legacy `package:flutter/material.dart` to standalone `package:material_ui/material_ui.dart` using the official Flutter migration tool (`dart fix --apply --code=migrate_design_widgets`).
+  - Added dependency on `material_ui: ^1.3.0`.
+  - Upgraded `mcp_playground_ui` to `^0.4.0`.
+  - Re-exports `material_ui` through `mcp_playground_ui` for streamlined imports.
+
 ## 0.3.4
 
 - Replaced `PlatformFile.lengthSync()` with `bytes.length` in attachment handling, resolving `UNDEFINED_METHOD` failures during dependency lower-bound analysis.

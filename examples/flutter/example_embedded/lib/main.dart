@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
 import 'package:mcp_playground_shared_tools/shared_tools.dart';

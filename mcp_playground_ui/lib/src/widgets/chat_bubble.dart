@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import '../utils/html_preview/html_preview.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import '../utils/markdown_style_sheet.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart';
 import '../../playground_controller.dart';
@@ -1250,7 +1251,7 @@ class ChatBubble extends StatelessWidget {
     if (match == null) {
       return MarkdownBody(
         data: content,
-        styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+        styleSheet: markdownStyleSheetFromMaterialUiTheme(theme).copyWith(
           p: TextStyle(color: theme.colorScheme.onSurface),
           code: const TextStyle(fontFamily: 'monospace', fontSize: 13),
         ),
@@ -1286,7 +1287,7 @@ class ChatBubble extends StatelessWidget {
         if (beforeText.trim().isNotEmpty)
           MarkdownBody(
             data: beforeText,
-            styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+            styleSheet: markdownStyleSheetFromMaterialUiTheme(theme).copyWith(
               p: TextStyle(color: theme.colorScheme.onSurface),
               code: const TextStyle(fontFamily: 'monospace', fontSize: 13),
             ),

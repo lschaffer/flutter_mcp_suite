@@ -38,7 +38,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  mcp_playground_flutter: ^0.3.0
+  mcp_playground_flutter: ^0.4.0
 ```
 
 Then import:

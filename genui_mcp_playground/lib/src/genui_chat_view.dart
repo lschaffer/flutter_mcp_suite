@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:genui/genui.dart';
 
 import 'genui_chat_controller.dart';
