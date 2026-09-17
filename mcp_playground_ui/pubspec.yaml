@@ -42,6 +42,6 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
-dependency_overrides:
-  mcp_playground_dart:
-    path: ../mcp_playground_dart
+#dependency_overrides:
+#  mcp_playground_dart:
+#    path: ../mcp_playground_dart
