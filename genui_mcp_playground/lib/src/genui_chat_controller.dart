@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:genui/genui.dart';
 import 'package:mcp_playground_dart/mcp_playground_dart.dart' as mp;
 import 'package:mcp_playground_ui/mcp_playground_ui.dart';
