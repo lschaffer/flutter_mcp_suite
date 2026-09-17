@@ -29,7 +29,7 @@ dependencies:
   ollama_dart: ^2.6.1
   llamadart: ^0.8.23
   flutter_markdown_plus: ^1.0.12
-  file_picker: ^12.0.0
+  file_picker: ^13.0.0
   googleai_dart: ^12.0.1
   url_launcher: ^6.3.2
   path: ^1.9.1

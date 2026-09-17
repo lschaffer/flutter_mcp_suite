@@ -5,6 +5,7 @@
   - Added dependency on `material_ui: ^1.3.0`.
   - Upgraded `mcp_playground_ui` to `^0.4.0`.
   - Re-exports `material_ui` through `mcp_playground_ui` for streamlined imports.
+- Upgraded `file_picker` to `^13.0.0`.
 
 ## 0.3.4
 

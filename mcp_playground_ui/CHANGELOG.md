@@ -4,6 +4,8 @@
   - Migrated from legacy `package:flutter/material.dart` to standalone `package:material_ui/material_ui.dart` using the official Flutter migration tool (`dart fix --apply --code=migrate_design_widgets`).
   - Added dependency on `material_ui: ^1.3.0`.
   - Re-exported `package:material_ui/material_ui.dart` in `mcp_playground_ui.dart` for backwards and downstream compatibility.
+- Upgraded `file_picker` to `^13.0.0`.
+- Fixed markdown style sheet text colors in dark mode to guarantee legible `onSurface` contrast for headings and body text.
 
 ## 0.3.4
 
