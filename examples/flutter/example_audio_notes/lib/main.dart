@@ -101,6 +101,9 @@ class AudioNotesPlaygroundScreen extends StatelessWidget {
             if (message.toolName == 'extract_action_items') {
               return _buildActionItemsCard(context, data);
             }
+            if (message.toolName == 'export_meeting_notes') {
+              return _buildMeetingNotesCard(context, data);
+            }
           } catch (_) {}
           return null;
         },
@@ -146,7 +149,10 @@ class AudioNotesPlaygroundScreen extends StatelessWidget {
                         children: [
                           Text(
                             item['task']?.toString() ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Row(
@@ -158,7 +164,9 @@ class AudioNotesPlaygroundScreen extends StatelessWidget {
                                 const SizedBox(width: 6),
                                 Text(
                                   'Due: ${item['due_date']}',
-                                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
                             ],
@@ -169,6 +177,61 @@ class AudioNotesPlaygroundScreen extends StatelessWidget {
                   ],
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMeetingNotesCard(BuildContext context, Map<String, dynamic> data) {
+    final theme = Theme.of(context);
+    final markdown = data['markdown']?.toString() ?? '';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.description_outlined, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Exported Meeting Minutes',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.3),
+                ),
+              ),
+              child: SelectableText(
+                markdown,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: theme.colorScheme.onSurface,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
           ],
         ),
       ),

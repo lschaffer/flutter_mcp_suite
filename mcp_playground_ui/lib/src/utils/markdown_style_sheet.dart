@@ -7,14 +7,18 @@ MarkdownStyleSheet markdownStyleSheetFromMaterialUiTheme(
   Color? bodyColor,
 }) {
   final ColorScheme colorScheme = theme.colorScheme;
+  final Color textColor = bodyColor ?? colorScheme.onSurface;
   final TextTheme textTheme = theme.textTheme.apply(
-    bodyColor: bodyColor ?? colorScheme.onSurface,
+    bodyColor: textColor,
+    displayColor: textColor,
   );
 
   final Color? cardThemeColor = theme.cardTheme.color;
   final Color cardColor = cardThemeColor ?? colorScheme.surface;
 
-  final TextStyle body = textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+  final TextStyle body = (textTheme.bodyMedium ?? const TextStyle(fontSize: 14)).copyWith(
+    color: textColor,
+  );
   final double bodyFontSize = body.fontSize ?? 14;
 
   return MarkdownStyleSheet(
@@ -26,21 +30,21 @@ MarkdownStyleSheet markdownStyleSheetFromMaterialUiTheme(
       fontFamily: 'monospace',
       fontSize: bodyFontSize * 0.85,
     ),
-    h1: textTheme.headlineSmall,
+    h1: textTheme.headlineSmall?.copyWith(color: textColor),
     h1Padding: EdgeInsets.zero,
-    h2: textTheme.titleLarge,
+    h2: textTheme.titleLarge?.copyWith(color: textColor),
     h2Padding: EdgeInsets.zero,
-    h3: textTheme.titleMedium,
+    h3: textTheme.titleMedium?.copyWith(color: textColor),
     h3Padding: EdgeInsets.zero,
-    h4: textTheme.bodyLarge,
+    h4: textTheme.bodyLarge?.copyWith(color: textColor),
     h4Padding: EdgeInsets.zero,
-    h5: textTheme.bodyLarge,
+    h5: textTheme.bodyLarge?.copyWith(color: textColor),
     h5Padding: EdgeInsets.zero,
-    h6: textTheme.bodyLarge,
+    h6: textTheme.bodyLarge?.copyWith(color: textColor),
     h6Padding: EdgeInsets.zero,
-    em: const TextStyle(fontStyle: FontStyle.italic),
-    strong: const TextStyle(fontWeight: FontWeight.bold),
-    del: const TextStyle(decoration: TextDecoration.lineThrough),
+    em: body.copyWith(fontStyle: FontStyle.italic),
+    strong: body.copyWith(fontWeight: FontWeight.bold),
+    del: body.copyWith(decoration: TextDecoration.lineThrough),
     blockquote: body,
     img: body,
     checkbox: body.copyWith(color: colorScheme.primary),
