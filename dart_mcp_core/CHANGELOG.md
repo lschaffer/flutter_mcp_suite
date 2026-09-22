@@ -1,3 +1,7 @@
+## 1.0.2
+
+- Updated package documentation and branding references to `flutter_mcp_suite`.
+
 ## 1.0.1
 
 - Expanded LLM SDK dependency version constraints to support `anthropic_sdk_dart` 9.x, `googleai_dart` 13.x, `openai_dart` 9.x, and `ollama_dart` 3.x.

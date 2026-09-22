@@ -1,8 +1,8 @@
-# genui_mcp_playground
+# flutter_genui_mcp
 
-An interactive, dynamic **GenUI & Agentic MCP Playground** for Flutter.
+An interactive, dynamic **GenUI & Agentic MCP Widget** for Flutter.
 
-`genui_mcp_playground` brings together Google's **GenUI** (`A2UI`) generative UI protocol, the **Model Context Protocol (MCP)**, and native Dart tools. It enables LLMs to emit structured UI components and render rich, interactive Flutter widgets directly in the conversation flow, while retaining full agentic tool-calling capabilities and live state inspection.
+`flutter_genui_mcp` brings together Google's **GenUI** (`A2UI`) generative UI protocol, the **Model Context Protocol (MCP)**, and native Dart tools. It enables LLMs to emit structured UI components and render rich, interactive Flutter widgets directly in the conversation flow, while retaining full agentic tool-calling capabilities and live state inspection.
 
 ---
 
@@ -19,24 +19,24 @@ An interactive, dynamic **GenUI & Agentic MCP Playground** for Flutter.
 ---
 
 > [!TIP]
-> **Recommended LLMs**: Rendering dynamic GenUI surfaces requires strict structured JSON output compliant with the GenUI (`A2UI`) protocol. A **medium-to-large sized model** (e.g., Gemini 3.6 Flash / Pro, GPT-4o / latest OpenAI models, Mistral Medium / Large, Llama 3.3 70B+, Gemma 27B, Claude 3.5 / 3.7 Sonnet) is recommended for reliable generative UI generation. Small embedded/on-device SLMs (e.g. 1B–3B parameter models) might not be adequate for complex GenUI catalog schemas.
+> **Recommended LLMs**: Rendering dynamic GenUI surfaces requires strict structured JSON output compliant with the GenUI (`A2UI`) protocol. A **medium-to-large sized model** (e.g., Gemini 2.5 Flash / Pro, GPT-4o / latest OpenAI models, Mistral Medium / Large, Llama 3.3 70B+, Gemma 27B, Claude 3.5 / 3.7 Sonnet) is recommended for reliable generative UI generation. Small embedded/on-device SLMs (e.g. 1B–3B parameter models) might not be adequate for complex GenUI catalog schemas.
 > 
-> If your primary use case requires small embedded or offline on-device models (e.g. GGUF via `llamadart`), consider using the lighter standard variant [`mcp_playground_flutter`](https://pub.dev/packages/mcp_playground_flutter).
+> If your primary use case requires small embedded or offline on-device models (e.g. GGUF via `llamadart`) with standard chat and attachment rendering, consider using [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp).
 
 ---
 
 ## 🎥 Demo
 
-Watch the dynamic GenUI Playground in action rendering interactive surfaces:
+Watch dynamic GenUI in action rendering interactive surfaces:
 
 ### 🏖️ GenUI Travel & Stay Planner
-![GenUI MCP Travel Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_mcp_travel_example.gif)
+![GenUI MCP Travel Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_mcp_travel_example.gif)
 
 ### ⛅ GenUI Weather Generator
-![GenUI MCP Weather Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+![GenUI MCP Weather Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_weather_example.gif)
 
 ### 📈 GenUI Finance & Budget Planner
-![GenUI MCP Finance Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_finance_example.gif)
+![GenUI MCP Finance Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_finance_example.gif)
 
 ---
 
@@ -46,7 +46,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_genui_mcp: ^0.4.0
+  flutter_genui_mcp: ^1.0.2
   genui: ^0.10.3
 ```
 
@@ -60,9 +60,9 @@ import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 
 ## 📦 Widget API
 
-### `GenuiMcpPlayground`
+### `FlutterGenUiMcp` (or `GenuiMcpPlayground`)
 
-The primary widget providing a full-featured generative UI and agent playground.
+The primary widget providing a full-featured generative UI and agent interface.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -86,7 +86,7 @@ The primary widget providing a full-featured generative UI and agent playground.
 ### 1. Basic Setup with Weather Forecast Catalog
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 
 class MyGenuiApp extends StatelessWidget {
@@ -95,7 +95,7 @@ class MyGenuiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GenuiMcpPlayground(
+      body: FlutterGenUiMcp(
         initialLlmConfig: const LlmConfig(
           provider: LlmProvider.openai,
           model: 'gpt-4o',
@@ -134,6 +134,6 @@ GenuiChatView(
 ## 📂 Example Projects
 
 Explore the runnable showcases in this repository:
-- **[`genui_mcp_playground/example`](example)** – Primary showcase: **Travel & Accommodation Planner** with SerpAPI Google search, date pickers, stay grids (hotels, apartments, camping), day-by-day itineraries, and JPG export.
+- **[`flutter_genui_mcp/example`](example)** – Primary showcase: **Travel & Accommodation Planner** with SerpAPI Google search, date pickers, stay grids (hotels, apartments, camping), day-by-day itineraries, and JPG export.
 - **[`examples/genui/example_genui_weather`](../examples/genui/example_genui_weather)** – Dynamic weather generator with interactive form selectors, `fl_chart` visualizations, and JPG export.
 - **[`examples/genui/example_genui_filesystem`](../examples/genui/example_genui_filesystem)** – Interactive filesystem explorer with folder tree navigation and file viewer surfaces.

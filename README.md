@@ -23,7 +23,7 @@ Welcome to the **Flutter MCP Suite** monorepo! This project is modularized into 
 We provide several runnable example applications across Flutter, GenUI, and headless Dart:
 
 ### 🎨 GenUI (Generative UI) Examples
-* **[Travel & Accommodation Planner](genui_mcp_playground/example)**: Primary showcase — interactive travel and stay planner with SerpAPI live search, date range pickers, accommodation style chips (hotels, apartments, glamping), rich photo cards, day-by-day itineraries, and JPG export.
+* **[Travel & Accommodation Planner](flutter_genui_mcp/example)**: Primary showcase — interactive travel and stay planner with SerpAPI live search, date range pickers, accommodation style chips (hotels, apartments, glamping), rich photo cards, day-by-day itineraries, and JPG export.
 * **[Dynamic Weather Generator](examples/genui/example_genui_weather)**: Interactive weather generator demonstrating model-generated input forms, live `fl_chart` visualizations, JPG export, and native Open-Meteo tool integrations.
 * **[Smart Home & Climate Studio](examples/genui/example_genui_smarthome)**: Interactive climate controls, device toggle switches, and energy consumption bar charts.
 * **[Financial Portfolio & Budget Planner](examples/genui/example_genui_finance)**: Interactive expense pie charts (`fl_chart`), savings sliders, and compound interest projection curves.
@@ -31,7 +31,7 @@ We provide several runnable example applications across Flutter, GenUI, and head
 * **[Filesystem Explorer](examples/genui/example_genui_filesystem)**: Interactive GenUI filesystem explorer showcasing folder tree navigation and file content inspection surfaces.
 
 ### 📱 Flutter (Classic UI) Examples
-* **[Primary Showcase App](mcp_playground_flutter/example)**: A comprehensive Flutter application demonstrating the `McpPlayground` UI widget with custom SSH, Open-Meteo weather, and fl_chart tool integrations.
+* **[Primary Showcase App](flutter_ui_mcp/example)**: A comprehensive Flutter application demonstrating the `McpPlayground` UI widget with custom SSH, Open-Meteo weather, and fl_chart tool integrations.
 * **[Device & Network Diagnostics Copilot](examples/flutter/example_device_diagnostics)**: Telemetry monitor with custom chat cards for battery, memory, CPU load, and network latency pings.
 * **[Meeting Notes & Action Items Assistant](examples/flutter/example_audio_notes)**: Transcript processor with interactive action item checklist cards and markdown export.
 * **[GitHub Issue Triage & PR Review Copilot](examples/flutter/example_github_triage)**: GitHub issue triage assistant with auto-labeling and inline PR code reviews.

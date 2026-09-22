@@ -1,3 +1,8 @@
+## 1.0.2
+
+- Updated package documentation and README with correct naming, classes, and GitHub links.
+- Depends on `dart_mcp_core: ^1.0.2` and `flutter_ui_mcp_core: ^1.0.2`.
+
 ## 1.0.1
 
 - Upgraded dependencies: `material_ui` to `^1.4.0` and `file_picker` to `^13.1.0`.

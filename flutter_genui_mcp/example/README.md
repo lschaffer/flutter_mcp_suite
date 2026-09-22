@@ -1,6 +1,6 @@
 # GenUI Travel & Accommodation Planner Showcase
 
-The primary example application for **`genui_mcp_playground`**, demonstrating interactive generative UI powered by the `genui` (`A2UI`) protocol, local Dart MCP tools, and web search integration via SerpAPI.
+The primary example application for **`flutter_genui_mcp`**, demonstrating interactive generative UI powered by the `genui` (`A2UI`) protocol, local Dart MCP tools, and web search integration via SerpAPI.
 
 ---
 

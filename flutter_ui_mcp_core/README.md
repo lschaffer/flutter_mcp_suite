@@ -1,6 +1,6 @@
-# mcp_playground_ui
+# flutter_ui_mcp_core
 
-Shared UI components, dialogs, drawers, controllers, and services for **MCP Playground** (`mcp_playground_flutter`) and **GenUI Playground** (`genui_mcp_playground`).
+Shared UI components, dialogs, drawers, controllers, and services for **Flutter MCP Suite** packages: [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp) and [`flutter_genui_mcp`](https://pub.dev/packages/flutter_genui_mcp).
 
 ---
 
@@ -13,15 +13,15 @@ Shared UI components, dialogs, drawers, controllers, and services for **MCP Play
 - **MCP Server & Tool Management** – `McpServerRegistryTab`, `EditMcpDialog`, `RemoteMcpDialog`, `RegisteredToolsDialog`, `ServerToolsDialog`.
 - **On-Device Embedded LLMs** – `EmbeddedModelManager`, `EmbeddedModelPickerWidget`, `HfDiscoverDialog`, `AddGgufDialog`.
 - **Inspector Panel** – `AgentInspector` side pane for real-time observability of tool executions, raw JSON payloads, and system prompts.
-- **Localization** – Full English & German strings via `McpPlaygroundLocalizations` (`McpLocalizations`).
+- **Localization** – Full English & German strings via `McpLocalizations`.
 
 ---
 
 ## 🎥 Demo
 
-Watch the AI Agent Playground in action executing tasks with local tools and embedded models:
+Watch shared components in action executing tasks with local tools and embedded models:
 
-![GenUI MCP Demo](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/screenshots/video/genui_weather_example.gif)
+![Flutter UI MCP Core Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_weather_example.gif)
 
 ---
 
@@ -31,6 +31,12 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp_core: ^0.3.0
-  dart_mcp_core: ^0.3.0
+  flutter_ui_mcp_core: ^1.0.2
+  dart_mcp_core: ^1.0.2
 ```
+
+---
+
+## 📂 Example
+
+See the standalone runnable example at [`example/lib/main.dart`](example/lib/main.dart) which showcases configuring LLMs, managing MCP servers, and inspecting tool execution.

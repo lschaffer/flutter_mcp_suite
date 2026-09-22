@@ -1,6 +1,6 @@
 # MCP Playground Example Showcase
 
-This directory contains a complete showcase application demonstrating how to integrate the [`mcp_playground_flutter`](https://pub.dev/packages/mcp_playground_flutter) widget into a Flutter project.
+This directory contains a complete showcase application demonstrating how to integrate the [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp) widget into a Flutter project.
 
 It initializes the playground widget with custom local Dart-native tools (Weather, SSH/SFTP, and Chart Generator) and registers local MCP subprocesses (`Git` and `Filesystem`) automatically.
 

@@ -1,3 +1,8 @@
+## 1.0.2
+
+- Updated README and documentation to reference `flutter_mcp_suite` ecosystem.
+- Depends on `dart_mcp_core: ^1.0.2`.
+
 ## 1.0.1
 
 - Upgraded dependencies: `material_ui` to `^1.4.0`, `file_picker` to `^13.1.0`, `archive` to `^4.3.0`, `llamadart` to `^0.8.24`.
