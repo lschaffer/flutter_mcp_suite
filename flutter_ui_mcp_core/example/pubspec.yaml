@@ -1,0 +1,29 @@
+name: flutter_ui_mcp_core_example
+description: Demonstrates how to use components from flutter_ui_mcp_core.
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  material_ui: ^1.4.0
+  flutter_ui_mcp_core:
+    path: ../
+  dart_mcp_core:
+    path: ../../dart_mcp_core
+
+dependency_overrides:
+  dart_mcp_core:
+    path: ../../dart_mcp_core
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

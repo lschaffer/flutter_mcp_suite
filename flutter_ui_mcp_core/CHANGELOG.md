@@ -1,3 +1,9 @@
+## 1.0.1
+
+- Upgraded dependencies: `material_ui` to `^1.4.0`, `file_picker` to `^13.1.0`, `archive` to `^4.3.0`, `llamadart` to `^0.8.24`.
+- Expanded version constraints for `anthropic_sdk_dart`, `googleai_dart`, `openai_dart`, and `ollama_dart`.
+- Added standalone showcase example package in `example/`.
+
 ## 1.0.0
 
 - **Initial stable production release** under the `flutter_mcp_suite` ecosystem.

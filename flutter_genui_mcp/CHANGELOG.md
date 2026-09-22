@@ -1,3 +1,8 @@
+## 1.0.1
+
+- Upgraded dependencies: `material_ui` to `^1.4.0` and `file_picker` to `^13.1.0`.
+- Depends on `dart_mcp_core: ^1.0.1` and `flutter_ui_mcp_core: ^1.0.1`.
+
 ## 1.0.0
 
 - **Initial stable production release** under the `flutter_mcp_suite` ecosystem.
