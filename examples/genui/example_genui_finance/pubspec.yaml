@@ -10,21 +10,21 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  genui_mcp_playground:
-    path: ../../../genui_mcp_playground
-  mcp_playground_dart: ^0.3.2
-  mcp_playground_ui: ^0.4.0
+  flutter_genui_mcp:
+    path: ../../../flutter_genui_mcp
+  dart_mcp_core: ^0.3.2
+  flutter_ui_mcp_core: ^0.4.0
   genui: ^0.10.3
   json_schema_builder: ^0.1.7
   fl_chart: ^1.2.0
   material_ui: ^1.3.0
 dependency_overrides:
-  mcp_playground_dart:
-    path: ../../../mcp_playground_dart
-  mcp_playground_ui:
-    path: ../../../mcp_playground_ui
-  genui_mcp_playground:
-    path: ../../../genui_mcp_playground
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
+  flutter_ui_mcp_core:
+    path: ../../../flutter_ui_mcp_core
+  flutter_genui_mcp:
+    path: ../../../flutter_genui_mcp
 
 dev_dependencies:
   flutter_test:

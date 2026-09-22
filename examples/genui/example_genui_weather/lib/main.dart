@@ -7,7 +7,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:genui/genui.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
-import 'package:genui_mcp_playground/genui_mcp_playground.dart';
+import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 
 import 'env_loader.dart';
 

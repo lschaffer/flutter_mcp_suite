@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:genui_mcp_playground/genui_mcp_playground.dart';
+import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 
 class EnvLoader {
   static final Map<String, String> _env = {};

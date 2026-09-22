@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+import 'package:flutter_ui_mcp/flutter_ui_mcp.dart';
 import 'package:mcp_playground_shared_tools/shared_tools.dart';
 
 void main() async {

@@ -1,0 +1,43 @@
+name: genui_mcp_playground_example
+description: "Example application for genui_mcp_playground showing dynamic GenUI widgets, catalog items, and MCP tools."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_genui_mcp:
+    path: ../
+  dart_mcp_core: ^0.3.2
+  flutter_ui_mcp_core: ^0.4.0
+  mcp_playground_shared_tools:
+    path: shared_tools
+  http: ^1.6.0
+  fl_chart: ^1.2.0
+  genui: ^0.10.3
+  json_schema_builder: ^0.1.7
+  image: ^4.8.0
+  file_picker: ^13.0.0
+  url_launcher: ^6.3.1
+  material_ui: ^1.3.0
+dependency_overrides:
+  dart_mcp_core:
+    path: ../../dart_mcp_core
+  flutter_ui_mcp_core:
+    path: ../../flutter_ui_mcp_core
+  flutter_genui_mcp:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../.env

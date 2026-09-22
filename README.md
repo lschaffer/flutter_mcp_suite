@@ -1,20 +1,20 @@
-# MCP Playground Monorepo
+# Flutter MCP Suite Monorepo
 
 > [!NOTE]
 > This project was created and is actively maintained mostly using agentic coding tools. The core monorepo and its packages were built with **Google Antigravity IDE** (primarily powered by **Gemini 3.6 Flash**), and specific components (such as some examples) were developed using the **ZooCode** plugin with **DeepSeek-V4 Flash/Pro**. It stands as a real-world demonstration of building production-ready Dart packages and interactive Flutter libraries using agentic workflows.
 
-Welcome to the **MCP Playground** monorepo! This project is modularized into dedicated packages spanning headless pure-Dart execution, shared UI widgets, classic AI agent playground interfaces, and dynamic generative UI rendering via Google GenUI (`A2UI`).
+Welcome to the **Flutter MCP Suite** monorepo! This project is modularized into dedicated packages spanning headless pure-Dart execution, shared UI widgets, classic AI agent chat interfaces, and dynamic generative UI rendering via Google GenUI (`A2UI`).
 
 ---
 
 ## 📦 Packages
 
 | Package | Description | Directory |
-|---------|-------------|-----------|
-| **[`mcp_playground_dart`](mcp_playground_dart)** | Pure Dart core engine. Handles agent orchestration, LLM service adapters, MCP client transport (HTTP/SSE/stdio subprocesses), and loop execution — **no Flutter dependencies**. | [`/mcp_playground_dart`](mcp_playground_dart) |
-| **[`mcp_playground_ui`](mcp_playground_ui)** | Shared Flutter UI library containing reusable controllers, LLM forms, MCP server manager tabs, settings drawers, embedded model discoverers, and the side-by-side **Agent Inspector** panel. | [`/mcp_playground_ui`](mcp_playground_ui) |
-| **[`mcp_playground_flutter`](mcp_playground_flutter)** | Classic AI Agent Playground for Flutter. Drop-in interactive chat widget with markdown rendering, tool call execution, attachment support, and live inspector debugging. | [`/mcp_playground_flutter`](mcp_playground_flutter) |
-| **[`genui_mcp_playground`](genui_mcp_playground)** | Standalone dynamic GenUI (`A2UI`) Playground. Enables LLMs to emit structured UI components and render rich, interactive Flutter widgets directly in the conversation flow. | [`/genui_mcp_playground`](genui_mcp_playground) |
+|---|---|---|
+| **[`dart_mcp_core`](dart_mcp_core)** | Pure Dart core engine. Handles agent orchestration, LLM service adapters, MCP client transport (HTTP/SSE/stdio subprocesses), and loop execution — **no Flutter dependencies**. | [`/dart_mcp_core`](dart_mcp_core) |
+| **[`flutter_ui_mcp_core`](flutter_ui_mcp_core)** | Shared Flutter UI library containing reusable controllers, LLM forms, MCP server manager tabs, settings drawers, embedded model discoverers, and the side-by-side **Agent Inspector** panel. | [`/flutter_ui_mcp_core`](flutter_ui_mcp_core) |
+| **[`flutter_ui_mcp`](flutter_ui_mcp)** | Classic AI Agent widget for Flutter. Drop-in interactive chat widget with markdown rendering, tool call execution, attachment support, and live inspector debugging. | [`/flutter_ui_mcp`](flutter_ui_mcp) |
+| **[`flutter_genui_mcp`](flutter_genui_mcp)** | Standalone dynamic GenUI (`A2UI`) widget. Enables LLMs to emit structured UI components and render rich, interactive Flutter widgets directly in the conversation flow. | [`/flutter_genui_mcp`](flutter_genui_mcp) |
 
 ---
 

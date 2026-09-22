@@ -1,0 +1,12 @@
+name: mcp_playground_shared_dart_tools
+description: Pure-Dart MCP tool implementations (weather, chart, SSH) shared across examples.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
+  http: ^1.6.0

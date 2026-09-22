@@ -7,8 +7,8 @@ environment:
   sdk: ^3.12.0
 
 dependencies:
-  mcp_playground_dart:
-    path: ../../../mcp_playground_dart
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
   yaml: ^3.1.4
 
 dev_dependencies:

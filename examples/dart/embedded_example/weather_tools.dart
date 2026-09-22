@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 
 // Helper function to decode WMO codes
 String _wmoCodeToDesc(int code) {

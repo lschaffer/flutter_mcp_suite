@@ -1,4 +1,4 @@
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'package:universal_io/io.dart';
 
 final Map<String, String> _env = {};

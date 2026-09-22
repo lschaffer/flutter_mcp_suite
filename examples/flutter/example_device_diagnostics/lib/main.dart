@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:mcp_playground_flutter/mcp_playground_flutter.dart';
+import 'package:flutter_ui_mcp/flutter_ui_mcp.dart';
 import 'env_loader.dart';
 
 void main() async {

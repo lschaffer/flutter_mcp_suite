@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:async';
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'skill_tools.dart';
 
 /// Loads environment variables from a .env file.

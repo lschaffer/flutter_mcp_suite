@@ -6,6 +6,6 @@ environment:
   sdk: ^3.12.0
 
 dependencies:
-  mcp_playground_dart:
-    path: ../../../mcp_playground_dart
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
   universal_io: ^2.3.1

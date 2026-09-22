@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:genui/genui.dart';
-import 'package:genui_mcp_playground/genui_mcp_playground.dart';
+import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 import 'package:path/path.dart' as p;
 import 'env_loader.dart';
 

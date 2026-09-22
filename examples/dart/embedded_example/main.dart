@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:yaml/yaml.dart';
 import 'package:path/path.dart' as p;
 import 'package:llamadart/llamadart.dart';
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'weather_tools.dart';
 
 // Resolves the default model storage directory: users/$user/.models

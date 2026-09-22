@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 
 /// Tool to probe HTTP endpoints with stopwatch latency tracking.
 class HttpProbeTool extends McpLocalTool {

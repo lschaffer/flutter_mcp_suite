@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'skill_tools.dart';
 
 Future<Map<String, String>> _loadEnv() async {

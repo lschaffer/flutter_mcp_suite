@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:mcp_playground_dart/mcp_playground_dart.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'package:yaml/yaml.dart';
 
 // ═══════════════════════════════════════════════════════════════
