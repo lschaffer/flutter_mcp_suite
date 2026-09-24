@@ -249,7 +249,7 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
                   maxLines: widget.maxLines,
                   decoration: InputDecoration(
                     hintText: index == 0
-                        ? (widget.hintText ?? 'Message AI Playground...')
+                        ? (widget.hintText ?? 'Message AI...')
                         : 'Continue...  use \${tool_result} to inject prior step output',
                     border: const OutlineInputBorder(),
                   ),
@@ -341,7 +341,7 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
                   maxLines: widget.maxLines,
                   decoration: InputDecoration(
                     hintText: index == 0
-                        ? (widget.hintText ?? 'Message AI Playground...')
+                        ? (widget.hintText ?? 'Message AI...')
                         : 'Continue...  use \${tool_result} to inject prior step output',
                     border: const OutlineInputBorder(),
                   ),

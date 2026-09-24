@@ -1,6 +1,6 @@
 name: dart_mcp_core
 description: "Production-ready pure Dart core for Model Context Protocol (MCP). Agent execution engine, LLM adapters, MCP client transports, and tool orchestration — no Flutter dependency."
-version: 1.0.2
+version: 1.1.0
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/dart_mcp_core
 

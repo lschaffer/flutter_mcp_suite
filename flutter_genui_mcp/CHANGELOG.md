@@ -1,3 +1,10 @@
+## 1.1.0
+
+- Modernized UI text across GenUI playground and setup screens ("Chat", "AI Agent Studio", clear action headers).
+- Improved structured user action parsing and natural-language prompt formatting in `McpGenuiChatController`.
+- Added dynamic GenUI Model Size & Capability Matrix in documentation.
+- Upgraded dependencies: `dart_mcp_core: ^1.1.0` and `flutter_ui_mcp_core: ^1.1.0`.
+
 ## 1.0.2
 
 - Updated package documentation and README with correct naming, classes, and GitHub links.

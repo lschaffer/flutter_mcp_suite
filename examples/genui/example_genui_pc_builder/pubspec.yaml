@@ -1,0 +1,37 @@
+name: example_genui_pc_builder
+description: "Standalone GenUI Custom PC Rig Builder & Hardware Store example with interactive catalogs, compatibility pickers, and checkout."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_genui_mcp:
+    path: ../../../flutter_genui_mcp
+  dart_mcp_core: ^1.0.2
+  flutter_ui_mcp_core: ^1.0.2
+  genui: ^0.10.3
+  json_schema_builder: ^0.1.7
+  material_ui: ^1.3.0
+
+dependency_overrides:
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
+  flutter_ui_mcp_core:
+    path: ../../../flutter_ui_mcp_core
+  flutter_genui_mcp:
+    path: ../../../flutter_genui_mcp
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../../.env

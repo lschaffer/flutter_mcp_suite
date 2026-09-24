@@ -24,6 +24,7 @@ We provide several runnable example applications across Flutter, GenUI, and head
 
 ### 🎨 GenUI (Generative UI) Examples
 * **[Travel & Accommodation Planner](flutter_genui_mcp/example)**: Primary showcase — interactive travel and stay planner with SerpAPI live search, date range pickers, accommodation style chips (hotels, apartments, glamping), rich photo cards, day-by-day itineraries, and JPG export.
+* **[Custom PC Rig Builder & Hardware Store](examples/genui/example_genui_pc_builder)**: Interactive hardware store configurator with socket platform selectors (AMD AM5 vs Intel LGA1700), dynamic product catalog grids with photos and specs, cart invoicing, and order checkout.
 * **[Dynamic Weather Generator](examples/genui/example_genui_weather)**: Interactive weather generator demonstrating model-generated input forms, live `fl_chart` visualizations, JPG export, and native Open-Meteo tool integrations.
 * **[Smart Home & Climate Studio](examples/genui/example_genui_smarthome)**: Interactive climate controls, device toggle switches, and energy consumption bar charts.
 * **[Financial Portfolio & Budget Planner](examples/genui/example_genui_finance)**: Interactive expense pie charts (`fl_chart`), savings sliders, and compound interest projection curves.
@@ -60,6 +61,7 @@ Quick prompts to copy-paste and test the interactive tools and widgets in the ne
 
 | Example Application | Category | Try Asking / Prompting |
 | :--- | :--- | :--- |
+| **[PC Rig Builder & Store](examples/genui/example_genui_pc_builder)** | GenUI | `"Help me pick components for an AMD AM5 gaming build with a $1900 target budget."`<br>`"Show all available graphics cards with pictures and specs."`<br>`"Assemble the build and show my order summary checkout cart."` |
 | **[Smart Home Studio](examples/genui/example_genui_smarthome)** | GenUI | `"Check current home climate status and show an interactive thermostat for the Living Room."`<br>`"Show all lights and switches with interactive toggles so I can adjust them."`<br>`"Analyze daily energy consumption and render a room-by-room bar chart."` |
 | **[Finance & Budget Planner](examples/genui/example_genui_finance)** | GenUI | `"Break down my monthly expenses and display an interactive category pie chart."`<br>`"Give me budget adjustment sliders to calculate projected annual savings."`<br>`"Simulate compound growth if I invest $500/month at 8% annual return over 10 years."` |
 | **[Data Visualizer Studio](examples/genui/example_genui_data_studio)** | GenUI | `"Load our quarterly sales dataset and show executive KPI cards for MRR, Churn, and ARPU."`<br>`"Display top enterprise accounts in an interactive data table."`<br>`"Plot monthly revenue growth over the past 12 months as a smooth curve chart."` |

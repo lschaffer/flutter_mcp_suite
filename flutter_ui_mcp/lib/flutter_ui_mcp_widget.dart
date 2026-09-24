@@ -1611,7 +1611,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
               onPressed: _startPlayground,
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text(
-                'Start Playground',
+                'Start Agent',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -1893,7 +1893,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Playground Active',
+                'Agent Active',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -2261,8 +2261,8 @@ class _McpPlaygroundState extends State<McpPlayground> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.play_arrow),
-              title: Text(l10n.get('playground')),
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: Text(l10n.get('newChat')),
               onTap: () {
                 Navigator.pop(context);
                 _resetPlayground();

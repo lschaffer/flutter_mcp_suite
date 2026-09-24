@@ -25,3 +25,6 @@ export 'src/utils/change_notifier.dart';
 export 'src/skills/skill_storage_adapter.dart';
 export 'src/skills/skill_exporter.dart';
 export 'src/skills/skill_importer.dart';
+
+// Coding Tools
+export 'src/tools/coding_tools.dart';

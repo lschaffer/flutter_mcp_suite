@@ -99,7 +99,7 @@ ${_selectedTools.map((t) => '- `$t`').join('\n')}
     if (!llm.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please configure an LLM first in Playground Settings.'),
+          content: Text('Please configure an LLM first in Agent Settings.'),
         ),
       );
       return;

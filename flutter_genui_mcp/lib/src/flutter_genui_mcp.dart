@@ -1049,8 +1049,8 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
             Material(
               type: MaterialType.transparency,
               child: ListTile(
-                leading: const Icon(Icons.play_arrow),
-                title: Text(l10n.get('playground')),
+                leading: const Icon(Icons.chat_bubble_outline),
+                title: Text(l10n.get('newChat')),
                 onTap: () {
                   Navigator.pop(context);
                   _resetPlayground();
@@ -1580,7 +1580,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
             child: FilledButton.icon(
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text(
-                'Start GenUI Agent Playground',
+                'Start GenUI Agent',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               onPressed: _startPlayground,
@@ -1935,7 +1935,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
               ),
               const SizedBox(height: 16),
               Text(
-                'GenUI Playground Ready',
+                'GenUI Agent Ready',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

@@ -176,6 +176,14 @@ typedef AssistantResultCallback = void Function(String prompt, String response);
 typedef ErrorCallback = void Function(Object error);
 typedef FinalResultCallback = void Function(String response);
 
+/// Callback invoked before executing a tool to request user approval.
+/// Returns true if approved, false if rejected.
+typedef ToolApprovalCallback = Future<bool> Function({
+  required String toolName,
+  required Map<String, dynamic> parameters,
+  required ToolRiskLevel riskLevel,
+});
+
 // ═══════════════════════════════════════════════════════════════
 // Main Agent Engine
 // ═══════════════════════════════════════════════════════════════
@@ -386,6 +394,7 @@ class McpAgentEngine {
     ErrorCallback? onError,
     FinalResultCallback? onFinalResult,
     MultiMCPManager? mcpManager,
+    ToolApprovalCallback? onToolApproval,
   }) async {
     return await _executeAgent(
       agentKey,
@@ -395,6 +404,7 @@ class McpAgentEngine {
       onError: onError,
       onFinalResult: onFinalResult,
       externalMcpManager: mcpManager,
+      onToolApproval: onToolApproval,
     );
   }
 
@@ -408,6 +418,7 @@ class McpAgentEngine {
     ErrorCallback? onError,
     FinalResultCallback? onFinalResult,
     MultiMCPManager? mcpManager,
+    ToolApprovalCallback? onToolApproval,
   }) {
     final runController = StreamController<AgentEvent>.broadcast();
     unawaited(
@@ -420,6 +431,7 @@ class McpAgentEngine {
             onFinalResult: onFinalResult,
             externalMcpManager: mcpManager,
             runController: runController,
+            onToolApproval: onToolApproval,
           )
           .then((_) {
             runController.close();
@@ -443,6 +455,7 @@ class McpAgentEngine {
     FinalResultCallback? onFinalResult,
     MultiMCPManager? externalMcpManager,
     StreamController<AgentEvent>? runController,
+    ToolApprovalCallback? onToolApproval,
   }) async {
     void emit(AgentEvent event) {
       _eventController.add(event);
@@ -865,12 +878,48 @@ class McpAgentEngine {
             emit(AgentLogEvent(logMessage));
             onLog?.call(logMessage);
 
-            // Execute tool
-            MCPToolResult result;
+            // Determine risk level
             final localMatch = agent.dartTools
                 .where((t) => t.name == call.name)
                 .toList();
+            final riskLevel = localMatch.isNotEmpty
+                ? localMatch.first.riskLevel
+                : ToolRiskLevel.network;
 
+            // Human-in-the-loop approval check
+            if (onToolApproval != null) {
+              final approved = await onToolApproval(
+                toolName: call.name,
+                parameters: call.arguments,
+                riskLevel: riskLevel,
+              );
+              if (!approved) {
+                final rejectMsg =
+                    'Tool execution of "${call.name}" was REJECTED by user.';
+                emit(AgentLogEvent(rejectMsg));
+                onLog?.call(rejectMsg);
+
+                final resMsg = ChatMessage(
+                  id: call.id,
+                  content: rejectMsg,
+                  role: ChatRole.tool,
+                  type: MessageType.toolResponse,
+                  toolName: call.name,
+                  toolResult: MCPToolResult(
+                    isError: true,
+                    content: [MCPContent(type: 'text', text: rejectMsg)],
+                  ),
+                  timestamp: DateTime.now(),
+                );
+                messages.add(resMsg);
+                stepNewMsgs.add(resMsg);
+                continueLoop = true;
+                continue;
+              }
+            }
+
+            // Execute tool
+            MCPToolResult result;
             if (localMatch.isNotEmpty) {
               result = await localMatch.first.execute(call.arguments);
             } else {

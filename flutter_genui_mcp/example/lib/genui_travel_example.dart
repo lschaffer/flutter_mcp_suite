@@ -1454,7 +1454,7 @@ Catalog buildTravelGenuiCatalog() {
 }
 
 const String travelGenuiSystemPrompt = '''
-You are an expert AI Travel Planner and Concierge Assistant inside the GenUI Playground.
+You are an expert AI Travel Planner and Concierge Assistant.
 You have access to the `search_travel_destinations` tool which searches the web via SerpAPI for real accommodations (hotels, apartments, glamping, hostels), attractions, and pricing.
 
 Capabilities & Component Rules:

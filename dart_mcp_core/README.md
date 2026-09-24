@@ -28,6 +28,19 @@ Ideal for building pure Dart CLI applications, background workers, backend servi
 
 ---
 
+## 🧠 Model Size & Embedded Compatibility Matrix
+
+`dart_mcp_core` provides headless orchestration across local and cloud LLMs:
+
+| Model Tier | Representative Models | Tool Calling Support | Suitable Headless Workflows |
+|:---|:---|:---:|:---|
+| **Compact SLMs (2B – 3.8B)** | **Gemma 2 2B**, **Ministral 3B**, **Qwen 2.5 3B / 3.8B** | 🟢 Native Tools & Simple JSON | Offline Dart CLI scripts (`embedded_example`), single-step tool execution, local file parsing, and quick summaries. |
+| **Mid-Size SLMs (7B – 9B)** | **Qwen 2.5 7B**, **Ministral 8B**, **Mistral 7B**, **Llama 3.1 8B**, **Gemma 2 9B** | 🟢 Multi-Step Tool Chaining | Subprocess MCP servers (e.g. `@modelcontextprotocol/server-filesystem`), SQLite queries (`sqlite_analyst_skill`), and REST API probing (`api_tester_skill`). |
+| **Workhorse Models (14B – 24B)** | **Qwen 2.5 14B**, **Mistral Small 24B** | 🟢 Complex Reasoning | Full multi-turn automated code reviews (`git_review_skill`), complex schema introspections, and high reliability. |
+| **Frontier Cloud Models (32B – 70B+)** | **Gemini 2.5 Flash / Pro**, **GPT-4o**, **Claude 3.7 Sonnet**, **Qwen 2.5 32B+** | 🟢 Complex Agent Loops | Deep multi-agent sub-prompt workflows with unlimited tool iterations. |
+
+---
+
 ## 🚀 Getting Started
 
 Add the package to your `pubspec.yaml`:

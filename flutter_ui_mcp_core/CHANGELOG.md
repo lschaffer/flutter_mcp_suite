@@ -1,3 +1,10 @@
+## 1.1.0
+
+- Modernized UI text across widgets: updated defaults to "Chat", "AI Agent Studio", and clean action labels.
+- Added support for sub-prompt and workflow prompt templates with improved styling.
+- Model Size & Capability Matrix added to documentation.
+- Upgraded dependency on `dart_mcp_core: ^1.1.0`.
+
 ## 1.0.2
 
 - Updated README and documentation to reference `flutter_mcp_suite` ecosystem.

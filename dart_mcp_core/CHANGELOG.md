@@ -1,3 +1,13 @@
+## 1.1.0
+
+- **New Native Coding Tools & Engine Helpers**:
+  - Added `FsFindTool` (`fs_find`) for discovering files and directories across workspaces with `.gitignore` awareness.
+  - Added `FsReadFileTool` (`fs_read_file`) for line-numbered and paginated file inspection.
+  - Added `FsWriteFileTool` (`fs_write_file`) for creating and overwriting files with automatic directory resolution.
+  - Added `FsReplaceTextTool` (`fs_replace_text`) for surgical, unique search-and-replace edits.
+  - Added `TerminalExecTool` (`terminal_exec`) for cross-platform workspace command execution (e.g. `dotnet build`, `dart test`, `git status`).
+  - Added `CodingTools.createAll()` factory helper to bundle coding tools for CLI, Desktop, and Server environments.
+
 ## 1.0.2
 
 - Updated package documentation and branding references to `flutter_mcp_suite`.

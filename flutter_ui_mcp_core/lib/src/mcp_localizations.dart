@@ -8,9 +8,12 @@ class McpPlaygroundLocalizations {
   static const _localizedValues = {
     'en': {
       'ok': 'OK',
-      'playground': 'Playground',
-      'playgroundSettings': 'Playground Settings',
-      'agentPlayground': 'AI Agent Playground',
+      'playground': 'Chat',
+      'chat': 'Chat',
+      'newChat': 'New Chat',
+      'playgroundSettings': 'Agent Settings',
+      'agentSettings': 'Agent Settings',
+      'agentPlayground': 'AI Agent Studio',
       'pleaseConfigureLlm': 'Please configure the LLM settings first.',
       'skillLlmNotConfigured':
           'The LLM configured in this skill ({provider} / {model}) is not available. Using the default LLM instead.',
@@ -100,9 +103,12 @@ class McpPlaygroundLocalizations {
     },
     'de': {
       'ok': 'OK',
-      'playground': 'Spielplatz',
-      'playgroundSettings': 'Spielplatz-Einstellungen',
-      'agentPlayground': 'KI-Agenten-Spielplatz',
+      'playground': 'Chat',
+      'chat': 'Chat',
+      'newChat': 'Neuer Chat',
+      'playgroundSettings': 'Agent-Einstellungen',
+      'agentSettings': 'Agent-Einstellungen',
+      'agentPlayground': 'KI-Agenten-Studio',
       'pleaseConfigureLlm':
           'Bitte konfigurieren Sie zuerst die LLM-Einstellungen.',
       'skillLlmNotConfigured':

@@ -465,6 +465,68 @@ class McpGenuiChatController extends ChangeNotifier {
         }
       }
     }
+
+    // Handle GenUI / A2UI operations if the model invokes them as tools
+    const a2uiOpMap = {
+      'createsurface': 'createSurface',
+      'updatecomponents': 'updateComponents',
+      'updatedatamodel': 'updateDataModel',
+      'deletesurface': 'deleteSurface',
+      'beginrendering': 'beginRendering',
+      'finishrendering': 'finishRendering',
+    };
+    final normalizedOp =
+        a2uiOpMap[call.name.toLowerCase().replaceAll('_', '')];
+    if (normalizedOp != null) {
+      try {
+        Map<String, dynamic> a2uiPayload;
+        if (call.arguments.containsKey('version') &&
+            call.arguments.containsKey(normalizedOp)) {
+          // LLM passed full A2UI message as arguments: {"version": "v0.9", "createSurface": {...}}
+          a2uiPayload = Map<String, dynamic>.from(call.arguments);
+        } else if (call.arguments.containsKey(normalizedOp)) {
+          // LLM passed {"createSurface": {...}}
+          a2uiPayload = {
+            'version': 'v0.9',
+            ...call.arguments,
+          };
+        } else {
+          // LLM passed direct parameters: {"surfaceId": "...", "catalogId": "..."}
+          final argsCopy = Map<String, dynamic>.from(call.arguments);
+          argsCopy.remove('version');
+          a2uiPayload = {
+            'version': 'v0.9',
+            normalizedOp: argsCopy,
+          };
+        }
+        final a2uiJson = jsonEncode(a2uiPayload);
+        _transport.addChunk('\n$a2uiJson\n');
+        _syncSurfaces();
+        return mp.MCPToolResult(
+          content: [
+            mp.MCPContent(
+              type: 'text',
+              text: jsonEncode({
+                'status': 'success',
+                'operation': normalizedOp,
+                'message': 'Surface operation executed successfully',
+              }),
+            ),
+          ],
+        );
+      } catch (error) {
+        return mp.MCPToolResult(
+          content: [
+            mp.MCPContent(
+              type: 'text',
+              text: 'GenUI operation error: $error',
+            ),
+          ],
+          isError: true,
+        );
+      }
+    }
+
     return mp.MCPToolResult(
       content: [
         mp.MCPContent(type: 'text', text: 'Unknown tool: ${call.name}'),
@@ -571,11 +633,28 @@ class McpGenuiChatController extends ChangeNotifier {
 
     final action = _extractUserAction(message);
     if (action != null) {
-      final paramsStr = jsonEncode(action.context);
-      buffer.writeln(
-        'The user submitted the UI form for action "${action.name}" with arguments: $paramsStr.\n'
-        'Call the tool "${action.name}" now with these arguments to fetch the result.',
-      );
+      final context = action.context;
+      final explicitMsg = context['message']?.toString() ??
+          context['prompt']?.toString() ??
+          context['query']?.toString();
+
+      final cleanParams = Map<String, dynamic>.from(context)
+        ..remove('message')
+        ..remove('prompt')
+        ..remove('query')
+        ..remove('userSummary')
+        ..remove('summary');
+
+      if (cleanParams.isNotEmpty) {
+        buffer.writeln(
+          'UI Action "${action.name}" submitted with context: ${jsonEncode(cleanParams)}',
+        );
+      }
+      if (explicitMsg != null && explicitMsg.trim().isNotEmpty) {
+        buffer.writeln(explicitMsg.trim());
+      } else if (cleanParams.isEmpty) {
+        buffer.writeln('The user triggered UI action "${action.name}".');
+      }
     }
 
     final prompt = buffer.toString().trim();
@@ -590,6 +669,12 @@ class McpGenuiChatController extends ChangeNotifier {
     final action = _extractUserAction(message);
     if (action != null) {
       final context = action.context;
+      final userSummary = context['userSummary']?.toString() ??
+          context['summary']?.toString() ??
+          context['message']?.toString();
+      if (userSummary != null && userSummary.isNotEmpty) {
+        return userSummary;
+      }
       final city = context['city']?.toString() ?? '';
       final hours = context['hours']?.toString() ?? '';
       final channels = context['channels'] is List

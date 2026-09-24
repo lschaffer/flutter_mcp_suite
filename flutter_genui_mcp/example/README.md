@@ -28,5 +28,9 @@ flutter run -d windows # or macos / linux / chrome
 
 ## 📂 Other GenUI Examples
 
+- **[`examples/genui/example_genui_pc_builder`](../../examples/genui/example_genui_pc_builder)** – Custom PC Rig Builder & Hardware Store with platform pickers (AM5/LGA1700), product catalog grids, and order checkout.
 - **[`examples/genui/example_genui_weather`](../../examples/genui/example_genui_weather)** – Dynamic weather forecast generator with `fl_chart` multi-line graphs and JPG export.
+- **[`examples/genui/example_genui_finance`](../../examples/genui/example_genui_finance)** – Financial portfolio and budget planner with compound interest curves and expense pie charts.
+- **[`examples/genui/example_genui_smarthome`](../../examples/genui/example_genui_smarthome)** – Smart home climate and energy studio with interactive thermostats.
+- **[`examples/genui/example_genui_data_studio`](../../examples/genui/example_genui_data_studio)** – Data visualizer & query studio with KPI metric cards and tables.
 - **[`examples/genui/example_genui_filesystem`](../../examples/genui/example_genui_filesystem)** – Interactive filesystem explorer with folder tree navigation and file content viewer.

@@ -1,3 +1,9 @@
+## 1.1.0
+
+- Modernized UI text across chat widgets and drawer items ("Chat", "AI Agent Studio", streamlined hints).
+- Added comprehensive Model Size & Embedded Compatibility Matrix in documentation.
+- Upgraded dependencies: `dart_mcp_core: ^1.1.0` and `flutter_ui_mcp_core: ^1.1.0`.
+
 ## 1.0.2
 
 - Updated package documentation and README with correct naming and GitHub links.

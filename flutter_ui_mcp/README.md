@@ -24,6 +24,29 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 
 ---
 
+## 🧠 Model Size & Embedded Compatibility Matrix
+
+[`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp) supports the full spectrum of models, from compact on-device embedded SLMs to state-of-the-art frontier cloud models:
+
+| Model Tier | Representative Models | Tool Calling Support | Recommended Use Cases |
+|:---|:---|:---:|:---|
+| **Ultra-Light SLM (2B – 3.8B)** | **Gemma 2 2B**, **Ministral 3B**, **Qwen 2.5 3B / 3.8B**, **Llama 3.2 3B** | 🟢 Native Tools & Simple APIs | On-device mobile/desktop (`llamadart` GGUF), offline devices, embedded telemetry diagnostics, meeting note summaries, and single-turn tool calling. |
+| **Mid-Size SLM (7B – 9B)** | **Qwen 2.5 7B**, **Ministral 8B**, **Mistral 7B**, **Llama 3.1 8B**, **Gemma 2 9B** | 🟢 Excellent Tool Accuracy | Multi-step agent loops, structured JSON responses, GitHub issue triage, code review drafts, and multiple toolsets. |
+| **Workhorse Models (12B – 24B)** | **Mistral NeMo 12B**, **Qwen 2.5 14B**, **Mistral Small 24B** | 🟢 Robust & Resilient | Complex agentic chaining, deep technical reviews, SQL schema inspection, and multi-turn workflows. |
+| **Frontier Cloud / Big Models (32B – 70B+)** | **Gemini 2.5 Flash / Pro**, **GPT-4o**, **Claude 3.7 Sonnet**, **Qwen 2.5 32B / 72B**, **Llama 3.3 70B** | 🟢 Production Grade | Complex enterprise workflows, large context windows, multi-file inspection, and unrestricted tool iteration loops. |
+
+### Compatibility across Suite Examples
+
+| Example Application | Target Platform | Min. Recommended Model | Best Experience |
+|:---|:---|:---|:---|
+| **[Embedded LLM Showcase](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_embedded)** | Desktop / Mobile | **Qwen 2.5 3B** / **Ministral 3B** (GGUF) | Qwen 2.5 3B / 7B (Offline) |
+| **[Device Diagnostics Copilot](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_device_diagnostics)** | Desktop / Mobile | **Gemma 2 2B** / **Qwen 2.5 3B** | Qwen 2.5 7B / Mistral 7B |
+| **[Audio & Meeting Notes Assistant](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_audio_notes)** | Cross-platform | **Ministral 3B** / **Qwen 2.5 3B** | Ministral 8B / GPT-4o-mini |
+| **[GitHub Issue Triage & PR Review](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_github_triage)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Mistral Small 24B / Claude 3.5 Sonnet |
+| **[Primary Multi-Tool Showcase](example)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Gemini 2.5 Flash / GPT-4o |
+
+---
+
 ## 🎥 Demo
 
 Watch the AI Agent widget in action using an embedded model to call local dart tools:

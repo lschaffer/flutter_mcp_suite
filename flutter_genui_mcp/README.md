@@ -19,9 +19,26 @@ An interactive, dynamic **GenUI & Agentic MCP Widget** for Flutter.
 ---
 
 > [!TIP]
-> **Recommended LLMs**: Rendering dynamic GenUI surfaces requires strict structured JSON output compliant with the GenUI (`A2UI`) protocol. A **medium-to-large sized model** (e.g., Gemini 2.5 Flash / Pro, GPT-4o / latest OpenAI models, Mistral Medium / Large, Llama 3.3 70B+, Gemma 27B, Claude 3.5 / 3.7 Sonnet) is recommended for reliable generative UI generation. Small embedded/on-device SLMs (e.g. 1B–3B parameter models) might not be adequate for complex GenUI catalog schemas.
+> **Recommended LLMs**: Rendering dynamic GenUI surfaces requires strict structured JSON output compliant with the GenUI (`A2UI`) protocol. A **medium-to-large sized model** (e.g., Gemini 2.5 Flash / Pro, GPT-4o, Mistral Medium / Large, Llama 3.3 70B+, Claude 3.5 / 3.7 Sonnet) is recommended for complex generative UI schemas.
 > 
-> If your primary use case requires small embedded or offline on-device models (e.g. GGUF via `llamadart`) with standard chat and attachment rendering, consider using [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp).
+> If your primary use case requires small embedded or offline on-device models (e.g. GGUF via `llamadart`) with standard chat and markdown rendering, consider using [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp).
+
+---
+
+## 🧠 Model Size & Compatibility Matrix
+
+Different examples and workflows require different LLM reasoning and structured JSON output capabilities:
+
+| Example Showcase | Min. Model Size | Recommended Models | GenUI / A2UI Compatibility | Notes |
+|:---|:---|:---|:---:|:---|
+| **[Travel & Stay Planner](example)** | **14B+** | Mistral Medium/Large, Gemini 2.5 Flash/Pro, GPT-4o, Claude 3.7 Sonnet, Qwen 2.5 32B | 🟢 Full Support | Multi-step tool calls + date pickers + SerpAPI parsing + rich itinerary cards. |
+| **[Custom PC Rig Builder & Store](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_pc_builder)** | **14B+** | Mistral Small/Medium, GPT-4o, Gemini 2.5 Flash, Qwen 2.5 14B/32B | 🟢 Full Support | Platform socket compatibility (AM5 vs LGA1700), dynamic product catalog grids, and order invoicing. |
+| **[Dynamic Weather Generator](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_weather)** | **7B – 8B** | Ministral 8B, Qwen 2.5 7B, Mistral 7B, Llama 3.1 8B | 🟢 Full Support | Single/dual tool calls with Open-Meteo and chart component emission. |
+| **[Finance & Budget Planner](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_finance)** | **7B – 8B** | Qwen 2.5 7B, Mistral NeMo 12B, GPT-4o-mini, Gemini 2.5 Flash | 🟢 Full Support | Budget calculations, interactive savings sliders, and compound interest curve charts. |
+| **[Smart Home Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_smarthome)** | **7B – 8B** | Ministral 8B, Qwen 2.5 7B, Mistral 7B, Gemma 2 9B | 🟢 Full Support | Interactive climate sliders, toggle switches, and energy bar charts. |
+| **[Data Visualizer Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_data_studio)** | **14B+** | Mistral Small/Medium, Qwen 2.5 14B/32B, Gemini 2.5 Flash, GPT-4o | 🟢 Full Support | Tabular schema synthesis, KPI metric grids, and dynamic trend charts. |
+| **[Filesystem Explorer](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_filesystem)** | **7B – 8B** | Qwen 2.5 7B, Ministral 8B, Llama 3.1 8B | 🟢 Full Support | Directory tree navigation and file preview cards. |
+| **Small Models (2B – 3B)** *(Gemma 2 2B, Ministral 3B, Qwen 2.5 3B)* | *2B – 3B* | Local GGUF via llamadart or Ollama | 🟡 Basic / Limited | Can handle simple tools and direct chat, but may struggle with strict GenUI JSON schema generation. Use standard [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp) for best small model experience. |
 
 ---
 

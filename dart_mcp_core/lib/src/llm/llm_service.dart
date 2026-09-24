@@ -132,6 +132,72 @@ class LLMService {
   // ═══════════════════════════════════════════════════════════════
   // 1. OpenAI Adapter
   // ═══════════════════════════════════════════════════════════════
+  static List<openai.ChatMessage> _buildOpenAiChatMessages(
+    List<ChatMessage> messages,
+    String? systemPrompt,
+  ) {
+    final List<openai.ChatMessage> openAiMsgs = [];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      openAiMsgs.add(openai.ChatMessage.system(systemPrompt));
+    }
+
+    int i = 0;
+    while (i < messages.length) {
+      final msg = messages[i];
+      if (msg.role == ChatRole.system) {
+        if (msg.content.isNotEmpty) {
+          openAiMsgs.add(openai.ChatMessage.system(msg.content));
+        }
+        i++;
+      } else if (msg.role == ChatRole.user) {
+        openAiMsgs.add(openai.ChatMessage.user(msg.content));
+        i++;
+      } else if (msg.role == ChatRole.tool) {
+        openAiMsgs.add(
+          openai.ChatMessage.tool(toolCallId: msg.id, content: msg.content),
+        );
+        i++;
+      } else if (msg.role == ChatRole.assistant) {
+        final textParts = <String>[];
+        final toolCalls = <openai.ToolCall>[];
+
+        while (i < messages.length && messages[i].role == ChatRole.assistant) {
+          final aMsg = messages[i];
+          if (aMsg.type == MessageType.toolCall && aMsg.toolName != null) {
+            toolCalls.add(
+              openai.ToolCall.functionCall(
+                id: aMsg.id,
+                call: openai.FunctionCall.fromMap(
+                  name: aMsg.toolName!,
+                  arguments: aMsg.toolArguments ?? {},
+                ),
+              ),
+            );
+          } else if (aMsg.content.isNotEmpty) {
+            textParts.add(aMsg.content);
+          }
+          i++;
+        }
+
+        final combinedText = textParts.join('\n');
+        if (toolCalls.isNotEmpty) {
+          openAiMsgs.add(
+            openai.ChatMessage.assistant(
+              content: combinedText.isNotEmpty ? combinedText : null,
+              toolCalls: toolCalls,
+            ),
+          );
+        } else if (combinedText.isNotEmpty) {
+          openAiMsgs.add(openai.ChatMessage.assistant(content: combinedText));
+        }
+      } else {
+        i++;
+      }
+    }
+
+    return openAiMsgs;
+  }
+
   static Future<LLMResponse> _generateOpenAIWithClient(
     openai.OpenAIClient client,
     LlmConfig config,
@@ -139,42 +205,7 @@ class LLMService {
     List<MCPTool> tools,
     String? systemPrompt,
   ) async {
-    final List<openai.ChatMessage> openAiMsgs = [];
-
-    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
-      openAiMsgs.add(openai.ChatMessage.system(systemPrompt));
-    }
-
-    for (final msg in messages) {
-      switch (msg.role) {
-        case ChatRole.user:
-          openAiMsgs.add(openai.ChatMessage.user(msg.content));
-        case ChatRole.assistant:
-          if (msg.type == MessageType.toolCall) {
-            openAiMsgs.add(
-              openai.ChatMessage.assistant(
-                toolCalls: [
-                  openai.ToolCall.functionCall(
-                    id: msg.id,
-                    call: openai.FunctionCall.fromMap(
-                      name: msg.toolName ?? '',
-                      arguments: msg.toolArguments ?? {},
-                    ),
-                  ),
-                ],
-              ),
-            );
-          } else {
-            openAiMsgs.add(openai.ChatMessage.assistant(content: msg.content));
-          }
-        case ChatRole.tool:
-          openAiMsgs.add(
-            openai.ChatMessage.tool(toolCallId: msg.id, content: msg.content),
-          );
-        case ChatRole.system:
-          openAiMsgs.add(openai.ChatMessage.system(msg.content));
-      }
-    }
+    final openAiMsgs = _buildOpenAiChatMessages(messages, systemPrompt);
 
     final List<openai.Tool> openAiTools = [];
     if (tools.isNotEmpty && config.useNativeToolCall) {
@@ -331,41 +362,7 @@ class LLMService {
     List<MCPTool> tools,
     String? systemPrompt,
   ) async* {
-    final List<openai.ChatMessage> openAiMsgs = [];
-    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
-      openAiMsgs.add(openai.ChatMessage.system(systemPrompt));
-    }
-
-    for (final msg in messages) {
-      switch (msg.role) {
-        case ChatRole.user:
-          openAiMsgs.add(openai.ChatMessage.user(msg.content));
-        case ChatRole.assistant:
-          if (msg.type == MessageType.toolCall) {
-            openAiMsgs.add(
-              openai.ChatMessage.assistant(
-                toolCalls: [
-                  openai.ToolCall.functionCall(
-                    id: msg.id,
-                    call: openai.FunctionCall.fromMap(
-                      name: msg.toolName ?? '',
-                      arguments: msg.toolArguments ?? {},
-                    ),
-                  ),
-                ],
-              ),
-            );
-          } else {
-            openAiMsgs.add(openai.ChatMessage.assistant(content: msg.content));
-          }
-        case ChatRole.tool:
-          openAiMsgs.add(
-            openai.ChatMessage.tool(toolCallId: msg.id, content: msg.content),
-          );
-        case ChatRole.system:
-          openAiMsgs.add(openai.ChatMessage.system(msg.content));
-      }
-    }
+    final openAiMsgs = _buildOpenAiChatMessages(messages, systemPrompt);
 
     final List<openai.Tool> openAiTools = [];
     if (tools.isNotEmpty && config.useNativeToolCall) {
@@ -1051,6 +1048,86 @@ class LLMService {
   // ═══════════════════════════════════════════════════════════════
   // 4. Ollama Adapter
   // ═══════════════════════════════════════════════════════════════
+  static List<ollama.ChatMessage> _buildOllamaChatMessages(
+    List<ChatMessage> messages,
+    String? systemPrompt,
+  ) {
+    final List<ollama.ChatMessage> ollamaMsgs = [];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      ollamaMsgs.add(
+        ollama.ChatMessage(
+          role: ollama.MessageRole.system,
+          content: systemPrompt,
+        ),
+      );
+    }
+
+    int i = 0;
+    while (i < messages.length) {
+      final msg = messages[i];
+      if (msg.role == ChatRole.system) {
+        if (msg.content.isNotEmpty) {
+          ollamaMsgs.add(
+            ollama.ChatMessage(
+              role: ollama.MessageRole.system,
+              content: msg.content,
+            ),
+          );
+        }
+        i++;
+      } else if (msg.role == ChatRole.user) {
+        ollamaMsgs.add(
+          ollama.ChatMessage(
+            role: ollama.MessageRole.user,
+            content: msg.content,
+          ),
+        );
+        i++;
+      } else if (msg.role == ChatRole.tool) {
+        ollamaMsgs.add(
+          ollama.ChatMessage(
+            role: ollama.MessageRole.tool,
+            content: msg.content,
+          ),
+        );
+        i++;
+      } else if (msg.role == ChatRole.assistant) {
+        final textParts = <String>[];
+        final toolCalls = <ollama.ToolCall>[];
+
+        while (i < messages.length && messages[i].role == ChatRole.assistant) {
+          final aMsg = messages[i];
+          if (aMsg.type == MessageType.toolCall && aMsg.toolName != null) {
+            toolCalls.add(
+              ollama.ToolCall(
+                function: ollama.ToolCallFunction(
+                  name: aMsg.toolName!,
+                  arguments: aMsg.toolArguments ?? {},
+                ),
+              ),
+            );
+          } else if (aMsg.content.isNotEmpty) {
+            textParts.add(aMsg.content);
+          }
+          i++;
+        }
+
+        final combinedText = textParts.join('\n');
+        ollamaMsgs.add(
+          ollama.ChatMessage(
+            role: ollama.MessageRole.assistant,
+            content: combinedText,
+            toolCalls: toolCalls.isNotEmpty ? toolCalls : null,
+          ),
+        );
+      } else {
+        i++;
+      }
+    }
+
+    return ollamaMsgs;
+  }
+
   static Future<LLMResponse> _generateOllama(
     LlmConfig config,
     List<ChatMessage> messages,
@@ -1072,47 +1149,7 @@ class LLMService {
       ),
     );
 
-    final List<ollama.ChatMessage> ollamaMsgs = [];
-
-    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
-      ollamaMsgs.add(
-        ollama.ChatMessage(
-          role: ollama.MessageRole.system,
-          content: systemPrompt,
-        ),
-      );
-    }
-
-    for (final msg in messages) {
-      ollama.MessageRole role = ollama.MessageRole.user;
-      if (msg.role == ChatRole.assistant) {
-        role = ollama.MessageRole.assistant;
-      } else if (msg.role == ChatRole.system) {
-        role = ollama.MessageRole.system;
-      } else if (msg.role == ChatRole.tool) {
-        role = ollama.MessageRole.tool;
-      }
-
-      List<ollama.ToolCall>? toolCalls;
-      if (msg.type == MessageType.toolCall) {
-        toolCalls = [
-          ollama.ToolCall(
-            function: ollama.ToolCallFunction(
-              name: msg.toolName ?? '',
-              arguments: msg.toolArguments ?? {},
-            ),
-          ),
-        ];
-      }
-
-      ollamaMsgs.add(
-        ollama.ChatMessage(
-          role: role,
-          content: msg.content,
-          toolCalls: toolCalls,
-        ),
-      );
-    }
+    final ollamaMsgs = _buildOllamaChatMessages(messages, systemPrompt);
 
     final List<ollama.ToolDefinition> ollamaTools = [];
     if (tools.isNotEmpty && config.useNativeToolCall) {
@@ -1187,47 +1224,7 @@ class LLMService {
       ),
     );
 
-    final List<ollama.ChatMessage> ollamaMsgs = [];
-
-    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
-      ollamaMsgs.add(
-        ollama.ChatMessage(
-          role: ollama.MessageRole.system,
-          content: systemPrompt,
-        ),
-      );
-    }
-
-    for (final msg in messages) {
-      ollama.MessageRole role = ollama.MessageRole.user;
-      if (msg.role == ChatRole.assistant) {
-        role = ollama.MessageRole.assistant;
-      } else if (msg.role == ChatRole.system) {
-        role = ollama.MessageRole.system;
-      } else if (msg.role == ChatRole.tool) {
-        role = ollama.MessageRole.tool;
-      }
-
-      List<ollama.ToolCall>? toolCalls;
-      if (msg.type == MessageType.toolCall) {
-        toolCalls = [
-          ollama.ToolCall(
-            function: ollama.ToolCallFunction(
-              name: msg.toolName ?? '',
-              arguments: msg.toolArguments ?? {},
-            ),
-          ),
-        ];
-      }
-
-      ollamaMsgs.add(
-        ollama.ChatMessage(
-          role: role,
-          content: msg.content,
-          toolCalls: toolCalls,
-        ),
-      );
-    }
+    final ollamaMsgs = _buildOllamaChatMessages(messages, systemPrompt);
 
     final List<ollama.ToolDefinition> ollamaTools = [];
     if (tools.isNotEmpty && config.useNativeToolCall) {
@@ -1345,13 +1342,21 @@ class _MistralPatchClient extends http.BaseClient {
 
       if (role == 'tool') {
         final toolCallId = (msg['tool_call_id'] ?? '').toString().trim();
-        final prev = sanitized.isNotEmpty && sanitized.last is Map
-            ? Map<String, dynamic>.from(sanitized.last as Map)
-            : null;
+        Map<String, dynamic>? lastAssistant;
+        for (int k = sanitized.length - 1; k >= 0; k--) {
+          final s = sanitized[k];
+          if (s is Map && s['role']?.toString() == 'assistant') {
+            lastAssistant = s as Map<String, dynamic>;
+            break;
+          }
+          if (s is Map && s['role']?.toString() != 'tool') {
+            break;
+          }
+        }
 
         bool hasMatchingAssistantToolCall = false;
-        if (prev != null && (prev['role']?.toString() == 'assistant')) {
-          final toolCalls = prev['tool_calls'];
+        if (lastAssistant != null) {
+          final toolCalls = lastAssistant['tool_calls'];
           if (toolCalls is List) {
             hasMatchingAssistantToolCall = toolCalls.any((tc) {
               if (tc is! Map) return false;
@@ -1362,17 +1367,29 @@ class _MistralPatchClient extends http.BaseClient {
         }
 
         if (!hasMatchingAssistantToolCall && toolCallId.isNotEmpty) {
-          sanitized.add({
-            'role': 'assistant',
-            'content': null,
-            'tool_calls': [
+          if (lastAssistant != null) {
+            final existingCalls = (lastAssistant['tool_calls'] as List?) ?? [];
+            lastAssistant['tool_calls'] = [
+              ...existingCalls,
               {
                 'id': toolCallId,
                 'type': 'function',
-                'function': {'name': 'unknown_tool', 'arguments': '{}'},
+                'function': {'name': 'tool_$toolCallId', 'arguments': '{}'},
               },
-            ],
-          });
+            ];
+          } else {
+            sanitized.add({
+              'role': 'assistant',
+              'content': null,
+              'tool_calls': [
+                {
+                  'id': toolCallId,
+                  'type': 'function',
+                  'function': {'name': 'tool_$toolCallId', 'arguments': '{}'},
+                },
+              ],
+            });
+          }
           changed = true;
         }
       }

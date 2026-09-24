@@ -14,7 +14,7 @@ class McpPlaygroundExampleEmbeddedApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MCP Playground Example Embedded',
+      title: 'Embedded AI Agent',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
       theme: ThemeData(
