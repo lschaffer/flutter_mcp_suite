@@ -591,7 +591,7 @@ class FetchWebTool extends BaseCodingTool {
       final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 15);
       final request = await client.getUrl(uri);
-      request.headers.set('User-Agent', 'TealKit-Agent/1.1.0 (Dart/Pure)');
+      request.headers.set('User-Agent', 'TealKit-Agent/1.1.1 (Dart/Pure)');
       request.headers.set('Accept', 'application/json, text/plain, text/html, */*');
 
       final response = await request.close().timeout(const Duration(seconds: 20));

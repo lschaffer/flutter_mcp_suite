@@ -1,3 +1,8 @@
+## 1.1.1
+
+- Upgraded dependency on `dart_mcp_core: ^1.1.1`.
+- Synchronized release across the Flutter MCP Suite ecosystem.
+
 ## 1.1.0
 
 - Modernized UI text across widgets: updated defaults to "Chat", "AI Agent Studio", and clean action labels.

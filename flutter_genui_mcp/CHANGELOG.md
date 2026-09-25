@@ -1,3 +1,8 @@
+## 1.1.1
+
+- Upgraded dependencies: `dart_mcp_core: ^1.1.1` and `flutter_ui_mcp_core: ^1.1.1`.
+- Synchronized release across the Flutter MCP Suite ecosystem.
+
 ## 1.1.0
 
 - Modernized UI text across GenUI playground and setup screens ("Chat", "AI Agent Studio", clear action headers).

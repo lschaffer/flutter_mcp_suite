@@ -253,9 +253,9 @@ class LLMService {
     final rawUsage = response.usage;
     final usage = rawUsage != null
         ? LLMUsage(
-            promptTokens: rawUsage.promptTokens ?? 0,
+            promptTokens: rawUsage.promptTokens,
             completionTokens: rawUsage.completionTokens ?? 0,
-            totalTokens: rawUsage.totalTokens ?? 0,
+            totalTokens: rawUsage.totalTokens,
           )
         : null;
 

@@ -349,6 +349,14 @@ void main() {
           const SubPromptStep(text: 'Do task 1'),
           SubPromptStep(text: 'Do task 2', stopAfterToolCall: true),
         ],
+        initialMessages: [
+          ChatMessage(
+            id: 'msg-1',
+            role: ChatRole.user,
+            content: 'Initial query',
+            timestamp: DateTime.parse('2026-09-25T08:00:00.000Z'),
+          ),
+        ],
         remoteServers: [
           McpServerConfig(
             id: 'srv-1',
@@ -364,6 +372,11 @@ void main() {
       expect(json['systemPrompt'], 'You are a test agent.');
       expect((json['prompts'] as List).length, 2);
       expect((json['remoteServers'] as List).length, 1);
+      expect((json['initialMessages'] as List).length, 1);
+
+      final restored = Agent.fromJson(json);
+      expect(restored.initialMessages.length, 1);
+      expect(restored.initialMessages.first.content, 'Initial query');
     });
 
     test('deserialization from JSON', () {
@@ -446,6 +459,18 @@ void main() {
       expect(event.prompt, 'User prompt');
       expect(event.response, 'LLM response');
     });
+
+    test('AgentUsageEvent', () {
+      final event = AgentUsageEvent(
+        promptTokens: 120,
+        completionTokens: 45,
+        totalTokens: 165,
+      );
+      expect(event.promptTokens, 120);
+      expect(event.completionTokens, 45);
+      expect(event.totalTokens, 165);
+      expect(event, isA<AgentEvent>());
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -524,6 +549,23 @@ void main() {
   // ═══════════════════════════════════════════════════════════════
 
   group('LLMResponse', () {
+    test('LLMUsage serialization roundtrip', () {
+      const usage = LLMUsage(
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+      );
+      final json = usage.toJson();
+      expect(json['promptTokens'], 100);
+      expect(json['completionTokens'], 50);
+      expect(json['totalTokens'], 150);
+
+      final restored = LLMUsage.fromJson(json);
+      expect(restored.promptTokens, 100);
+      expect(restored.completionTokens, 50);
+      expect(restored.totalTokens, 150);
+    });
+
     test('create with text only', () {
       const response = LLMResponse(text: 'Hello world');
       expect(response.text, 'Hello world');

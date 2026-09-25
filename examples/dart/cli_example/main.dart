@@ -225,6 +225,8 @@ Future<void> main(List<String> args) async {
             break; // handled separately
           case AgentTextChunkEvent():
             break;
+          case AgentUsageEvent():
+            break;
         }
       });
 

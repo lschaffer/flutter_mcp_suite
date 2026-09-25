@@ -1,6 +1,6 @@
 name: flutter_genui_mcp
 description: "Dynamic Generative UI (GenUI) widget for Flutter. Connect to LLMs, execute MCP tools, and render dynamic interactive generative UI widgets."
-version: 1.1.0
+version: 1.1.1
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/flutter_genui_mcp
 
@@ -20,8 +20,8 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.4.0
-  dart_mcp_core: ^1.1.0
-  flutter_ui_mcp_core: ^1.1.0
+  dart_mcp_core: ^1.1.1
+  flutter_ui_mcp_core: ^1.1.1
   genui: ^0.10.3
   genai_primitives: ^0.2.4
   json_schema_builder: ^0.1.7

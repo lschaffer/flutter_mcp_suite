@@ -1,3 +1,15 @@
+## 1.1.1
+
+- **Conversation Session Resumption**:
+  - Added `initialMessages` property to `Agent` definition and JSON serialization (`toJson` / `fromJson`), allowing multi-turn REPL and CLI agents to save, restore, and continue session transcripts seamlessly.
+- **Token Usage Reporting & Metric Events**:
+  - Added `AgentUsageEvent` stream event to `McpAgentEngine` providing `promptTokens`, `completionTokens`, and `totalTokens` emitted after each LLM call.
+  - Added `LLMUsage` model attached to `LLMResponse` capturing usage returned by LLM providers or calculated via fallback token estimation.
+- **Enhanced Coding Tools**:
+  - Improved `FsReadFileTool` with intelligent pagination and safe 800-line chunk truncation, providing clear range hints for large files.
+- **Bug Fixes**:
+  - Cleaned up nullable type assertions in OpenAI provider usage mapping.
+
 ## 1.1.0
 
 - **New Native Coding Tools & Engine Helpers**:
