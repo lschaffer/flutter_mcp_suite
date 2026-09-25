@@ -162,7 +162,8 @@ class GetCurrentTimeTool extends McpLocalTool {
 
 ## 📊 Token Usage Metrics & Multi-Turn Sessions
 
-- **`Agent.initialMessages`**: Pass previous conversation history (`List<ChatMessage>`) to the `Agent` for stateful multi-turn execution without losing context.
+- **`Agent.initialMessages` & Trajectory Preservation**: Pass previous conversation history (`List<ChatMessage>`) to the `Agent` for stateful multi-turn execution without losing context. `AgentFinalResultEvent` returns the full turn trajectory (all tool calls, tool results, and responses) to save or continue sessions.
+- **Configurable Tool Iteration Limit (`maxToolIterations`)**: Configurable exploration budget (defaults to 100 iterations) in `LlmConfig`, `Agent`, and `McpAgentEngine`. When the limit is reached, the engine automatically prompts the model to synthesize all findings and deliver its final response rather than halting abruptly.
 - **`AgentUsageEvent`**: Emits real-time token counts (`promptTokens`, `completionTokens`, `totalTokens`) after each LLM call for precise cost accounting.
 
 ---

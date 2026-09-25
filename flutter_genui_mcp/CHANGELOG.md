@@ -1,3 +1,8 @@
+## 1.1.2
+
+- Upgraded dependencies: `dart_mcp_core: ^1.1.2` and `flutter_ui_mcp_core: ^1.1.2`.
+- Synchronized release across the Flutter MCP Suite ecosystem.
+
 ## 1.1.1
 
 - Upgraded dependencies: `dart_mcp_core: ^1.1.1` and `flutter_ui_mcp_core: ^1.1.1`.

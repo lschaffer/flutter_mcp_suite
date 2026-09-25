@@ -1,11 +1,17 @@
-## 1.1.1
+## 1.1.2
 
-- **Conversation Session Resumption**:
+- **Conversation Session Resumption & Trajectory Preservation**:
   - Added `initialMessages` property to `Agent` definition and JSON serialization (`toJson` / `fromJson`), allowing multi-turn REPL and CLI agents to save, restore, and continue session transcripts seamlessly.
+  - Enhanced `AgentFinalResultEvent` to carry the full `List<ChatMessage> messages` trajectory generated across all tool calls and responses during execution.
+- **Configurable Tool Iteration Limit (`maxToolIterations`)**:
+  - Added configurable `maxToolIterations` (default: 100, up from 10) to `LlmConfig`, `Agent`, and `McpAgentEngine`.
+  - Added graceful final response synthesis when the tool iteration limit is reached instead of halting execution abruptly.
+  - Added automatic recovery prompting if an LLM finishes tool calling with an empty text response.
 - **Token Usage Reporting & Metric Events**:
   - Added `AgentUsageEvent` stream event to `McpAgentEngine` providing `promptTokens`, `completionTokens`, and `totalTokens` emitted after each LLM call.
   - Added `LLMUsage` model attached to `LLMResponse` capturing usage returned by LLM providers or calculated via fallback token estimation.
 - **Enhanced Coding Tools**:
+  - Included full 10-tool autonomous engineering tool suite in `CodingTools.createAll()`: `fs_find`, `fs_list_dir`, `fs_read_file`, `fs_write_file`, `fs_replace_text`, `fs_create_dir`, `fs_move`, `fs_delete`, `terminal_exec`, and `fetch_web`.
   - Improved `FsReadFileTool` with intelligent pagination and safe 800-line chunk truncation, providing clear range hints for large files.
 - **Bug Fixes**:
   - Cleaned up nullable type assertions in OpenAI provider usage mapping.
