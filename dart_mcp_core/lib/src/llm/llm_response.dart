@@ -17,6 +17,31 @@ class LLMToolCall {
   });
 }
 
+/// Token usage report for an LLM turn.
+class LLMUsage {
+  final int promptTokens;
+  final int completionTokens;
+  final int totalTokens;
+
+  const LLMUsage({
+    this.promptTokens = 0,
+    this.completionTokens = 0,
+    this.totalTokens = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'promptTokens': promptTokens,
+        'completionTokens': completionTokens,
+        'totalTokens': totalTokens,
+      };
+
+  factory LLMUsage.fromJson(Map<String, dynamic> json) => LLMUsage(
+        promptTokens: json['promptTokens'] as int? ?? 0,
+        completionTokens: json['completionTokens'] as int? ?? 0,
+        totalTokens: json['totalTokens'] as int? ?? 0,
+      );
+}
+
 /// Represents the completion response returned by the LLM.
 class LLMResponse {
   /// The textual response content from the LLM.
@@ -25,8 +50,15 @@ class LLMResponse {
   /// The list of tool calls requested by the LLM in this response.
   final List<LLMToolCall> toolCalls;
 
+  /// Optional token usage reported by provider.
+  final LLMUsage? usage;
+
   /// Creates a new [LLMResponse] instance.
-  const LLMResponse({required this.text, this.toolCalls = const []});
+  const LLMResponse({
+    required this.text,
+    this.toolCalls = const [],
+    this.usage,
+  });
 }
 
 /// Represents a chunk of text or progress emitted during a streaming LLM call.

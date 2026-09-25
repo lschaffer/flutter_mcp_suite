@@ -75,6 +75,19 @@ class AgentTextChunkEvent extends AgentEvent {
   AgentTextChunkEvent(this.chunk);
 }
 
+/// Token usage and cost metric event emitted after each LLM call.
+class AgentUsageEvent extends AgentEvent {
+  final int promptTokens;
+  final int completionTokens;
+  final int totalTokens;
+
+  AgentUsageEvent({
+    required this.promptTokens,
+    required this.completionTokens,
+    required this.totalTokens,
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Agent Definition
 // ═══════════════════════════════════════════════════════════════
@@ -106,6 +119,9 @@ class Agent {
   /// Local MCP server configurations (python/nodejs, desktop only).
   final List<McpServerConfig> localServers;
 
+  /// Optional pre-existing conversation history for multi-turn sessions.
+  final List<ChatMessage> initialMessages;
+
   /// Creates a new [Agent] instance with the specified configurations and tools.
   const Agent({
     required this.key,
@@ -116,6 +132,7 @@ class Agent {
     this.dartTools = const [],
     this.remoteServers = const [],
     this.localServers = const [],
+    this.initialMessages = const [],
   });
 
   /// Serialize to JSON for external storage.
@@ -127,6 +144,7 @@ class Agent {
     'prompts': prompts.map((p) => p.toJson()).toList(),
     'remoteServers': remoteServers.map((s) => s.toJson()).toList(),
     'localServers': localServers.map((s) => s.toJson()).toList(),
+    'initialMessages': initialMessages.map((m) => m.toJson()).toList(),
   };
 
   /// Deserialize from JSON.
@@ -147,6 +165,11 @@ class Agent {
               .toList() ??
           [],
       dartTools: dartTools,
+      initialMessages:
+          (json['initialMessages'] as List?)
+              ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
       remoteServers:
           (json['remoteServers'] as List?)
               ?.map((e) => McpServerConfig.fromJson(e as Map<String, dynamic>))
@@ -561,7 +584,7 @@ class McpAgentEngine {
       allTools.addAll(mcpManager.availableTools);
 
       // ── Build messages list ────────────────────────────
-      final messages = <ChatMessage>[];
+      final messages = <ChatMessage>[...agent.initialMessages];
 
       // Add system prompt if present
       String effectiveSystem =
@@ -760,6 +783,30 @@ class McpAgentEngine {
           }
 
           if (_cancelTokens[agentKey] == true) break;
+
+          // Emit token usage metrics
+          if (response.usage != null) {
+            emit(
+              AgentUsageEvent(
+                promptTokens: response.usage!.promptTokens,
+                completionTokens: response.usage!.completionTokens,
+                totalTokens: response.usage!.totalTokens,
+              ),
+            );
+          } else {
+            // Estimate tokens (approx 4 chars/token) if provider didn't return usage
+            final inChars = requestMsgs.map((m) => m.content.length).fold(0, (a, b) => a + b) + effectiveSystem.length;
+            final outChars = response.text.length + (response.toolCalls.isNotEmpty ? 100 : 0);
+            final pTokens = (inChars / 4).ceil();
+            final cTokens = (outChars / 4).ceil();
+            emit(
+              AgentUsageEvent(
+                promptTokens: pTokens,
+                completionTokens: cTokens,
+                totalTokens: pTokens + cTokens,
+              ),
+            );
+          }
 
           if (response.toolCalls.isEmpty) {
             if (response.text.isNotEmpty) {

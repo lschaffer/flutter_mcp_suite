@@ -206,12 +206,11 @@ class FsReadFileTool extends BaseCodingTool {
     try {
       final lines = file.readAsLinesSync();
       final totalLines = lines.length;
-
       final start = (arguments['startLine'] as int?) ?? 1;
       final end = (arguments['endLine'] as int?) ?? totalLines;
 
-      final clampedStart = start.clamp(1, totalLines > 0 ? totalLines : 1);
-      final clampedEnd = end.clamp(clampedStart, totalLines > 0 ? totalLines : 1);
+      final int clampedStart = start.clamp(1, totalLines > 0 ? totalLines : 1);
+      final int clampedEnd = end.clamp(clampedStart, totalLines > 0 ? totalLines : 1);
 
       if (totalLines == 0) {
         return MCPToolResult(
@@ -221,10 +220,28 @@ class FsReadFileTool extends BaseCodingTool {
         );
       }
 
+      final hasExplicitRange = arguments['endLine'] != null || arguments['startLine'] != null;
+      int effectiveEnd = clampedEnd;
+      bool truncated = false;
+      if (!hasExplicitRange && totalLines > 800) {
+        effectiveEnd = (clampedStart + 799).clamp(clampedStart, totalLines);
+        truncated = true;
+      } else if (effectiveEnd - clampedStart > 800) {
+        effectiveEnd = clampedStart + 799;
+        truncated = true;
+      }
+
       final buffer = StringBuffer();
-      buffer.writeln('File: $relPath ($clampedStart-$clampedEnd of $totalLines lines):');
-      for (int i = clampedStart; i <= clampedEnd; i++) {
+      buffer.writeln('File: $relPath ($clampedStart-$effectiveEnd of $totalLines lines):');
+      for (int i = clampedStart; i <= effectiveEnd; i++) {
         buffer.writeln('${i.toString().padLeft(4)}: ${lines[i - 1]}');
+      }
+      if (truncated) {
+        buffer.writeln('');
+        buffer.writeln(
+          '[... Truncated: showing lines $clampedStart-$effectiveEnd of $totalLines lines. '
+          'Use startLine=${effectiveEnd + 1} and endLine=${(effectiveEnd + 800).clamp(1, totalLines)} to view more ...]',
+        );
       }
 
       return MCPToolResult(

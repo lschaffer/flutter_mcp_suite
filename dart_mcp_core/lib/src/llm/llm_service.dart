@@ -250,7 +250,16 @@ class LLMService {
       }
     }
 
-    return LLMResponse(text: answer, toolCalls: toolCalls);
+    final rawUsage = response.usage;
+    final usage = rawUsage != null
+        ? LLMUsage(
+            promptTokens: rawUsage.promptTokens ?? 0,
+            completionTokens: rawUsage.completionTokens ?? 0,
+            totalTokens: rawUsage.totalTokens ?? 0,
+          )
+        : null;
+
+    return LLMResponse(text: answer, toolCalls: toolCalls, usage: usage);
   }
 
   static Future<LLMResponse> _generateOpenAI(

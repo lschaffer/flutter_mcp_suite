@@ -139,3 +139,36 @@ class GetCurrentTimeTool extends McpLocalTool {
   }
 }
 ```
+
+---
+
+## 💻 Native Coding Tools (`CodingTools`)
+
+`dart_mcp_core` provides 10 built-in autonomous software engineering tools matching Claude Code / Roo Code style capabilities:
+
+- `CodingTools.createAll({String? workingDirectory})` — Instantiates:
+  - `fs_find` — Recursive glob / wildcard workspace search matching patterns (e.g. `*.dart`, `*.csproj`) with `.gitignore` and default build folder exclusions.
+  - `fs_list_dir` — Structured directory inspection with file sizes and type tags (`[DIR]`, `[FILE]`).
+  - `fs_read_file` — Line-numbered file reading with pagination protection (capped to 800 lines max per read to safeguard LLM context windows).
+  - `fs_write_file` — Atomic file creation and full overwrite with automatic parent directory generation.
+  - `fs_replace_text` — Exact, unique search-and-replace block edits (ideal for small/open models).
+  - `fs_create_dir` — Recursive directory creation.
+  - `fs_move` — File and folder rename or move operations.
+  - `fs_delete` — File and recursive directory deletion (with workspace root protection).
+  - `terminal_exec` — Subprocess shell execution with timeout and output capture.
+  - `fetch_web` — Direct HTTP GET tool for querying web pages, pub.dev API, and documentation.
+
+---
+
+## 📊 Token Usage Metrics & Multi-Turn Sessions
+
+- **`Agent.initialMessages`**: Pass previous conversation history (`List<ChatMessage>`) to the `Agent` for stateful multi-turn execution without losing context.
+- **`AgentUsageEvent`**: Emits real-time token counts (`promptTokens`, `completionTokens`, `totalTokens`) after each LLM call for precise cost accounting.
+
+---
+
+## 🛠️ Real-World Reference Implementation: TealKit CLI
+
+For a complete production CLI application utilizing `dart_mcp_core` for autonomous coding agent workflows, multi-LLM configuration switching, session persistence (JSON/Markdown), and MCP server management, check out:
+- [**TealKit CLI (`tealkit_cli`)**](https://github.com/lschaffer/tealkit/tree/master/cli)
+
