@@ -76,6 +76,7 @@ class LlmConfig {
   // Hyperparameters
   final double temperature;
   final int maxTokens;
+  final int maxToolIterations;
   final double? topP;
   final int? topK;
   final double? repeatPenalty;
@@ -98,6 +99,7 @@ class LlmConfig {
     this.baseUrl = '',
     this.temperature = 0.2,
     this.maxTokens = 0,
+    this.maxToolIterations = 100,
     this.topP,
     this.topK,
     this.repeatPenalty,
@@ -129,6 +131,7 @@ class LlmConfig {
     String? baseUrl,
     double? temperature,
     int? maxTokens,
+    int? maxToolIterations,
     double? topP,
     int? topK,
     double? repeatPenalty,
@@ -149,6 +152,7 @@ class LlmConfig {
       baseUrl: baseUrl ?? this.baseUrl,
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
+      maxToolIterations: maxToolIterations ?? this.maxToolIterations,
       topP: topP ?? this.topP,
       topK: topK ?? this.topK,
       repeatPenalty: repeatPenalty ?? this.repeatPenalty,
@@ -172,6 +176,7 @@ class LlmConfig {
     'baseUrl': baseUrl,
     'temperature': temperature,
     'maxTokens': maxTokens,
+    'maxToolIterations': maxToolIterations,
     if (topP != null) 'topP': topP,
     if (topK != null) 'topK': topK,
     if (repeatPenalty != null) 'repeatPenalty': repeatPenalty,
@@ -194,6 +199,7 @@ class LlmConfig {
       baseUrl: json['baseUrl'] as String? ?? '',
       temperature: (json['temperature'] as num?)?.toDouble() ?? 0.2,
       maxTokens: json['maxTokens'] as int? ?? 0,
+      maxToolIterations: json['maxToolIterations'] as int? ?? 100,
       topP: (json['topP'] as num?)?.toDouble(),
       topK: json['topK'] as int?,
       repeatPenalty: (json['repeatPenalty'] as num?)?.toDouble(),

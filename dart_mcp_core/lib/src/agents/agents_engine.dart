@@ -66,7 +66,8 @@ class AgentErrorEvent extends AgentEvent {
 /// Final result event — emitted once at the end of agent execution.
 class AgentFinalResultEvent extends AgentEvent {
   final String response;
-  AgentFinalResultEvent(this.response);
+  final List<ChatMessage> messages;
+  AgentFinalResultEvent(this.response, {this.messages = const []});
 }
 
 /// Token-by-token text delta from the LLM — emitted during streaming.
@@ -122,6 +123,9 @@ class Agent {
   /// Optional pre-existing conversation history for multi-turn sessions.
   final List<ChatMessage> initialMessages;
 
+  /// Optional override for maximum tool iterations per step (defaults to LLMConfig.maxToolIterations or 100).
+  final int? maxToolIterations;
+
   /// Creates a new [Agent] instance with the specified configurations and tools.
   const Agent({
     required this.key,
@@ -133,6 +137,7 @@ class Agent {
     this.remoteServers = const [],
     this.localServers = const [],
     this.initialMessages = const [],
+    this.maxToolIterations,
   });
 
   /// Serialize to JSON for external storage.
@@ -145,6 +150,7 @@ class Agent {
     'remoteServers': remoteServers.map((s) => s.toJson()).toList(),
     'localServers': localServers.map((s) => s.toJson()).toList(),
     'initialMessages': initialMessages.map((m) => m.toJson()).toList(),
+    if (maxToolIterations != null) 'maxToolIterations': maxToolIterations,
   };
 
   /// Deserialize from JSON.
@@ -170,6 +176,7 @@ class Agent {
               ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      maxToolIterations: json['maxToolIterations'] as int?,
       remoteServers:
           (json['remoteServers'] as List?)
               ?.map((e) => McpServerConfig.fromJson(e as Map<String, dynamic>))
@@ -221,7 +228,8 @@ class McpAgentEngine {
   final Map<String, bool> _cancelTokens = {};
 
   /// Maximum tool loop iterations per sub-prompt step.
-  static const int _maxToolIterations = 10;
+  static const int defaultMaxToolIterations = 100;
+  final int maxToolIterations;
 
   /// Event stream controller for reactive consumers.
   final StreamController<AgentEvent> _eventController =
@@ -230,10 +238,13 @@ class McpAgentEngine {
   /// Broadcast stream of all agent events.
   Stream<AgentEvent> get agentEvents => _eventController.stream;
 
-  final bool _enableLogging;
-  McpAgentEngine({this._enableLogging = false});
+  final bool enableLogging;
+  McpAgentEngine({
+    this.maxToolIterations = defaultMaxToolIterations,
+    this.enableLogging = false,
+  });
   void _log(String message) {
-    if (_enableLogging) {
+    if (enableLogging) {
       print('[McpAgentEngine] $message');
     }
   }
@@ -716,20 +727,22 @@ class McpAgentEngine {
             break;
           }
 
-          if (toolIterationCount >= _maxToolIterations) {
-            final limitMsg =
-                'Maximum tool iteration limit ($_maxToolIterations) reached.';
-            messages.add(
-              ChatMessage(
-                id: _uuid.v4(),
-                content: limitMsg,
-                role: ChatRole.assistant,
-                timestamp: DateTime.now(),
-              ),
-            );
-            emit(AgentLogEvent(limitMsg));
-            onLog?.call(limitMsg);
-            break;
+          final effectiveMaxIterations =
+              agent.maxToolIterations ?? agent.llmConfig.maxToolIterations;
+          if (toolIterationCount >= effectiveMaxIterations) {
+            if (!forceNoToolCalls) {
+              _log(
+                'Tool iteration limit ($effectiveMaxIterations) reached. Forcing final response synthesis...',
+              );
+              forceNoToolCalls = true;
+              forcedNoToolHint =
+                  'You have completed the exploration phase ($effectiveMaxIterations tool calls). '
+                  'Now synthesize all findings and provide your comprehensive final analysis, implementation plan, and response to the user.';
+              continueLoop = true;
+              continue;
+            } else {
+              break;
+            }
           }
 
           final mcpTools = (!forceNoToolCalls && !step.isNoTools)
@@ -832,8 +845,18 @@ class McpAgentEngine {
 
               _log('Assistant Response: ${response.text}');
               lastResponse = response.text;
+              continueLoop = false;
+            } else if (toolIterationCount > 0 && !forceNoToolCalls) {
+              // The model executed tools but returned an empty response. Prompt it to formulate its response.
+              forceNoToolCalls = true;
+              forcedNoToolHint =
+                  'You have executed tools and gathered results above. '
+                  'Now proceed with your task and provide your complete response to the user.';
+              continueLoop = true;
+              continue;
+            } else {
+              continueLoop = false;
             }
-            continueLoop = false;
           } else {
             final call = response.toolCalls.first;
             _log(
@@ -1064,7 +1087,7 @@ class McpAgentEngine {
 
       // ── Final result ────────────────────────────────────
       _statuses[agentKey] = AgentStatus.finished;
-      emit(AgentFinalResultEvent(lastResponse));
+      emit(AgentFinalResultEvent(lastResponse, messages: List.unmodifiable(messages)));
       onFinalResult?.call(lastResponse);
 
       _log(
