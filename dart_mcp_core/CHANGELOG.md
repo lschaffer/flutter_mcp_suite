@@ -1,3 +1,11 @@
+## 1.1.3
+
+- **Upgraded AI SDK Dependencies**:
+  - Upgraded `googleai_dart` to `^13.0.0` (Dart SDK `>=3.12.0`).
+  - Upgraded `openai_dart` to `^10.0.0` (GPT Image 2.5 support, extensible `ImageSize` value class).
+  - Upgraded `anthropic_sdk_dart` to `^9.0.0` (Dart SDK `>=3.12.0`).
+  - Upgraded `ollama_dart` to `^4.0.0` (extended thinking union support).
+
 ## 1.1.2
 
 - **Conversation Session Resumption & Trajectory Preservation**:

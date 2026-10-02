@@ -1,3 +1,9 @@
+## 1.1.3
+
+- Upgraded dependencies: `dart_mcp_core: ^1.1.3` and `flutter_ui_mcp_core: ^1.1.3`.
+- Upgraded `dartssh2` to `^4.1.0` in examples and shared tools.
+- Synchronized release across the Flutter MCP Suite ecosystem.
+
 ## 1.1.2
 
 - Upgraded dependencies: `dart_mcp_core: ^1.1.2` and `flutter_ui_mcp_core: ^1.1.2`.

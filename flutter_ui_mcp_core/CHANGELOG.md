@@ -1,3 +1,13 @@
+## 1.1.3
+
+- Upgraded AI SDK dependencies:
+  - `googleai_dart: ^13.0.0`
+  - `openai_dart: ^10.0.0`
+  - `anthropic_sdk_dart: ^9.0.0`
+  - `ollama_dart: ^4.0.0`
+- Upgraded dependency on `dart_mcp_core: ^1.1.3`.
+- Synchronized release across the Flutter MCP Suite ecosystem.
+
 ## 1.1.2
 
 - Upgraded dependency on `dart_mcp_core: ^1.1.2`.
