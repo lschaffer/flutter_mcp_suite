@@ -36,8 +36,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
-  dart_mcp_core:
-    path: ../dart_mcp_core
-  flutter_ui_mcp_core:
-    path: ../flutter_ui_mcp_core
+  #dart_mcp_core:
+  #  path: ../dart_mcp_core
+  #flutter_ui_mcp_core:
+  #  path: ../flutter_ui_mcp_core
 
