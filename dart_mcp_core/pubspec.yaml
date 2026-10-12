@@ -1,6 +1,6 @@
 name: dart_mcp_core
 description: "Production-ready pure Dart core for Model Context Protocol (MCP). Agent execution engine, LLM adapters, MCP client transports, and tool orchestration — no Flutter dependency."
-version: 1.1.3
+version: 1.1.4
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/dart_mcp_core
 
@@ -17,7 +17,7 @@ dependencies:
   #googleai_dart: '>=12.0.1 <14.0.0'
   # LLM providers (same as main app)
   googleai_dart: ^13.0.0
-  openai_dart: ^10.0.0
+  openai_dart: ^11.0.1
   anthropic_sdk_dart: ^9.0.0
   ollama_dart: ^4.0.0
   path: ^1.9.1

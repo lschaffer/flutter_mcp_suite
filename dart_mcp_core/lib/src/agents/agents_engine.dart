@@ -228,7 +228,7 @@ class McpAgentEngine {
   final Map<String, bool> _cancelTokens = {};
 
   /// Maximum tool loop iterations per sub-prompt step.
-  static const int defaultMaxToolIterations = 100;
+  static const int defaultMaxToolIterations = 400;
   final int maxToolIterations;
 
   /// Event stream controller for reactive consumers.
@@ -929,6 +929,21 @@ class McpAgentEngine {
 
             executedIds.add(call.id);
             executedSignatures.add(signature);
+
+            // If the model produced reasoning/speech text together with the tool call,
+            // preserve it in message history so models (like DeepSeek) don't repeat it.
+            if (response.text.trim().isNotEmpty) {
+              final thoughtText = response.text.trim();
+              final textMsg = ChatMessage(
+                id: _uuid.v4(),
+                content: thoughtText,
+                role: ChatRole.assistant,
+                timestamp: DateTime.now(),
+              );
+              messages.add(textMsg);
+              stepNewMsgs.add(textMsg);
+              _log('Assistant commentary: $thoughtText');
+            }
 
             // Add tool call message
             final callMsg = ChatMessage(

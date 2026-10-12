@@ -27,4 +27,5 @@ export 'src/skills/skill_exporter.dart';
 export 'src/skills/skill_importer.dart';
 
 // Coding Tools
-export 'src/tools/coding_tools.dart';
+export 'src/tools/coding_tools_stub.dart'
+    if (dart.library.io) 'src/tools/coding_tools.dart';

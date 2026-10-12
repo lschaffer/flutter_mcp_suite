@@ -150,7 +150,26 @@ class LLMService {
         }
         i++;
       } else if (msg.role == ChatRole.user) {
-        openAiMsgs.add(openai.ChatMessage.user(msg.content));
+        if (msg.attachments != null && msg.attachments!.isNotEmpty) {
+          final parts = <openai.ContentPart>[];
+          if (msg.content.isNotEmpty) {
+            parts.add(openai.ContentPart.text(msg.content));
+          }
+          for (final att in msg.attachments!) {
+            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+              final base64Str = base64Encode(att.bytes!);
+              final dataUri = 'data:${att.mimeType};base64,$base64Str';
+              parts.add(openai.ContentPart.imageUrl(dataUri));
+            }
+          }
+          if (parts.isNotEmpty) {
+            openAiMsgs.add(openai.ChatMessage.user(parts));
+          } else {
+            openAiMsgs.add(openai.ChatMessage.user(msg.content));
+          }
+        } else {
+          openAiMsgs.add(openai.ChatMessage.user(msg.content));
+        }
         i++;
       } else if (msg.role == ChatRole.tool) {
         openAiMsgs.add(
@@ -493,6 +512,27 @@ class LLMService {
         if (msg.content.isNotEmpty) {
           blocks.add(anthropic.InputContentBlock.text(msg.content));
         }
+        if (msg.attachments != null) {
+          for (final att in msg.attachments!) {
+            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+              final base64Str = base64Encode(att.bytes!);
+              final mediaType = switch (att.mimeType.toLowerCase()) {
+                'image/png' => anthropic.ImageMediaType.png,
+                'image/webp' => anthropic.ImageMediaType.webp,
+                'image/gif' => anthropic.ImageMediaType.gif,
+                _ => anthropic.ImageMediaType.jpeg,
+              };
+              blocks.add(
+                anthropic.InputContentBlock.image(
+                  anthropic.ImageSource.base64(
+                    data: base64Str,
+                    mediaType: mediaType,
+                  ),
+                ),
+              );
+            }
+          }
+        }
       } else if (msg.role == ChatRole.assistant) {
         if (msg.type == MessageType.toolCall) {
           blocks.add(
@@ -614,6 +654,27 @@ class LLMService {
       if (msg.role == ChatRole.user) {
         if (msg.content.isNotEmpty) {
           blocks.add(anthropic.InputContentBlock.text(msg.content));
+        }
+        if (msg.attachments != null) {
+          for (final att in msg.attachments!) {
+            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+              final base64Str = base64Encode(att.bytes!);
+              final mediaType = switch (att.mimeType.toLowerCase()) {
+                'image/png' => anthropic.ImageMediaType.png,
+                'image/webp' => anthropic.ImageMediaType.webp,
+                'image/gif' => anthropic.ImageMediaType.gif,
+                _ => anthropic.ImageMediaType.jpeg,
+              };
+              blocks.add(
+                anthropic.InputContentBlock.image(
+                  anthropic.ImageSource.base64(
+                    data: base64Str,
+                    mediaType: mediaType,
+                  ),
+                ),
+              );
+            }
+          }
         }
       } else if (msg.role == ChatRole.assistant) {
         if (msg.type == MessageType.toolCall) {
@@ -785,6 +846,15 @@ class LLMService {
           geminiRole = 'user';
           if (msg.content.isNotEmpty) {
             parts.add(gemini.Part.text(msg.content));
+          }
+          if (msg.attachments != null) {
+            for (final att in msg.attachments!) {
+              if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+                parts.add(
+                  gemini.Part.bytes(att.bytes!, att.mimeType),
+                );
+              }
+            }
           }
         case ChatRole.assistant:
           geminiRole = 'model';
@@ -963,6 +1033,15 @@ class LLMService {
           geminiRole = 'user';
           if (msg.content.isNotEmpty) {
             parts.add(gemini.Part.text(msg.content));
+          }
+          if (msg.attachments != null) {
+            for (final att in msg.attachments!) {
+              if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+                parts.add(
+                  gemini.Part.bytes(att.bytes!, att.mimeType),
+                );
+              }
+            }
           }
         case ChatRole.assistant:
           geminiRole = 'model';

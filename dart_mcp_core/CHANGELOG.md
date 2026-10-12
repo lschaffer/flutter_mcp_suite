@@ -1,3 +1,19 @@
+## 1.1.4
+
+- **Web & WASM Platform Abstraction for Coding Tools**:
+  - Added conditional export for coding tools with `coding_tools_stub.dart`, allowing `dart_mcp_core` to compile seamlessly in Web and WASM environments where `dart:io` is unavailable.
+- **Multimodal Image & Attachment Support**:
+  - Added multimodal image attachment handling across LLM providers:
+    - OpenAI: `ContentPart.imageUrl` with base64 data URI format.
+    - Anthropic: `InputContentBlock.image` base64 blocks with media type detection (`image/png`, `image/webp`, `image/gif`, `image/jpeg`).
+    - Google Gemini: `Part.bytes` for image attachments.
+- **Model Reasoning & Commentary Preservation**:
+  - In `McpAgentEngine`, preserved model reasoning and commentary text in conversation history alongside tool calls to prevent repeating thought loops on reasoning models (e.g., DeepSeek).
+- **Tool Iteration Limit Increase**:
+  - Increased default `maxToolIterations` from 100 to 400 in `McpAgentEngine` and `LlmConfig`.
+- **Dependency Upgrades**:
+  - Upgraded `openai_dart` to `^11.0.1`.
+
 ## 1.1.3
 
 - **Upgraded AI SDK Dependencies**:

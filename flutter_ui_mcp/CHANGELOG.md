@@ -1,3 +1,11 @@
+## 1.1.4
+
+- Upgraded dependencies:
+  - `openai_dart: ^11.0.1`
+  - `material_ui: ^1.6.0`
+- Upgraded dependencies: `dart_mcp_core: ^1.1.4` and `flutter_ui_mcp_core: ^1.1.4`.
+- Synchronized release across the Flutter MCP Suite ecosystem.
+
 ## 1.1.3
 
 - Upgraded AI SDK dependencies:
