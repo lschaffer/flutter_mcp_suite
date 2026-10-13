@@ -32,7 +32,7 @@ class EmbeddedLlmAdapter {
     int contextSize = 4096,
     void Function(double progress)? onProgress,
   }) async {
-    LlamaEngine.configureLogging(level: LlamaLogLevel.debug);
+    LlamaLogging.configure(level: LlamaLogLevel.debug);
     final effectiveContextSize = _shouldTruncate
         ? contextSize.clamp(1, _mobileMaxContextSize)
         : contextSize;
@@ -89,15 +89,20 @@ class EmbeddedLlmAdapter {
         final params = ModelParams(contextSize: size, gpuLayers: gpuLayers);
         if (_backend.supportsUrlLoading &&
             (modelPath.startsWith('http://') || modelPath.startsWith('https://'))) {
-          await _engine!.loadModelFromUrl(
-            modelPath,
-            modelParams: params,
-            onProgress: onProgress,
+          await _engine!.setModel(
+            LlamaModel(ModelSource.parse(modelPath)),
+            params: params,
+            onProgress: onProgress != null
+                ? (progress) {
+                    final fraction = progress.fraction;
+                    if (fraction != null) onProgress(fraction);
+                  }
+                : null,
           );
         } else {
-          await _engine!.loadModel(
-            modelPath,
-            modelParams: params,
+          await _engine!.setModel(
+            LlamaModel(ModelSource.path(modelPath)),
+            params: params,
           );
         }
         _loadedModelPath = modelPath;

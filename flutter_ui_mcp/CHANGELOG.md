@@ -1,3 +1,16 @@
+## 1.1.6
+
+* **Platform Support & WASM Compatibility**:
+  * Migrated from `flutter_widget_from_html` to `flutter_widget_from_html_core`, restoring full WASM runtime compatibility and clean platform support across Android, iOS, Windows, macOS, Linux, and Web.
+* **Dependencies**:
+  * Upgraded dependency to `flutter_ui_mcp_core: ^1.1.6`.
+  * Synchronized version 1.1.6 across the Flutter MCP Suite ecosystem.
+
+## 1.1.5
+
+* Synchronized release across the Flutter MCP Suite ecosystem.
+* Added support for embedded model discovery and dynamic tool registration.
+
 ## 1.1.4
 
 - Upgraded dependencies:

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/specification/main/schema/mcp-server-config.json",
+  "mcpServers": {
+    "flutter-mcp-suite": {
+      "command": "dart",
+      "args": ["run", "dart_mcp_core:mcp_server"],
+      "env": {
+        "DART_MCP_LOG_LEVEL": "info"
+      },
+      "description": "Flutter MCP Suite server providing Dart tools, code analysis, filesystem utilities, and GenUI generators."
+    },
+    "flutter-mcp-suite-remote": {
+      "url": "http://127.0.0.1:8080/sse",
+      "transport": "sse",
+      "description": "Remote SSE connection to a running Flutter MCP Suite instance."
+    }
+  }
+}

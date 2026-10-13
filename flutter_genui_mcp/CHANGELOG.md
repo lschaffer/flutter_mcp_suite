@@ -1,3 +1,14 @@
+## 1.1.6
+
+* **Dependencies**:
+  * Upgraded dependency to `flutter_ui_mcp_core: ^1.1.6`.
+  * Synchronized version 1.1.6 across the Flutter MCP Suite ecosystem.
+
+## 1.1.5
+
+* Synchronized release across the Flutter MCP Suite ecosystem.
+* Added support for embedded model discovery and dynamic tool registration.
+
 ## 1.1.4
 
 - Upgraded dependencies:

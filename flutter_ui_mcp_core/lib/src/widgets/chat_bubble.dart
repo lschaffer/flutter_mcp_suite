@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import '../utils/html_preview/html_preview.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
