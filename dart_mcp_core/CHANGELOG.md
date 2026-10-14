@@ -1,3 +1,9 @@
+## 1.1.5
+
+- **Robust Multi-Encoding File Support (`fs_read_file`, `fs_replace_text`)**:
+  - Implemented automatic encoding fallback (UTF-8 -> Latin-1 / ISO-8859-1 / Windows-1252 -> UTF-8 with `allowMalformed: true`) in `BaseCodingTool`, `FsReadFileTool`, and `FsReplaceTextTool`.
+  - Fixes crash (`FileSystemException: Failed to decode data using encoding 'utf-8'`) when reading or editing legacy embedded C/C++ source code, header files, or non-UTF-8 workspace documents.
+
 ## 1.1.4
 
 - **Web & WASM Platform Abstraction for Coding Tools**:

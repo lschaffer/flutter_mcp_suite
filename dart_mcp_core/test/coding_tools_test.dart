@@ -155,5 +155,33 @@ void main() {
       expect(errRes.isError, isTrue);
       expect(errRes.content.first.text, contains('Only http:// and https:// are supported'));
     });
+
+    test('FsReadFileTool and FsReplaceTextTool handle non-UTF-8 / Latin-1 files without error', () async {
+      final readTool = FsReadFileTool(workingDirectory: tempDir.path);
+      final replaceTool = FsReplaceTextTool(workingDirectory: tempDir.path);
+
+      // Write a file containing Latin-1 / Windows-1252 bytes that are invalid UTF-8 sequences (e.g. 0xE4, 0xF6, 0xFC)
+      final nonUtf8File = File('${tempDir.path}/legacy_header.h');
+      nonUtf8File.writeAsBytesSync([
+        0x2F, 0x2A, 0x20, 0xE4, 0xF6, 0xFC, 0x20, 0x2A, 0x2F, 0x0A, // /* äöü */\n
+        0x23, 0x64, 0x65, 0x66, 0x69, 0x6E, 0x65, 0x20, 0x4D, 0x41, 0x58, 0x20, 0x31, 0x30, 0x30, 0x0A, // #define MAX 100\n
+      ]);
+
+      final readRes = await readTool.execute({'path': 'legacy_header.h'});
+      expect(readRes.isError, isFalse);
+      expect(readRes.content.first.text, contains('#define MAX 100'));
+
+      final replaceRes = await replaceTool.execute({
+        'path': 'legacy_header.h',
+        'search': '#define MAX 100',
+        'replace': '#define MAX 200',
+      });
+      expect(replaceRes.isError, isFalse);
+
+      final readRes2 = await readTool.execute({'path': 'legacy_header.h'});
+      expect(readRes2.isError, isFalse);
+      expect(readRes2.content.first.text, contains('#define MAX 200'));
+    });
   });
 }
+

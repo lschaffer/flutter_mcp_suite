@@ -26,6 +26,27 @@ abstract class BaseCodingTool extends McpLocalTool {
   String getCanonicalPath(String filePath) {
     return resolvePath(filePath);
   }
+
+  /// Safely reads file text content supporting UTF-8, Latin-1 / ISO-8859-1 / Windows-1252,
+  /// and malformed byte sequences without throwing FormatException.
+  String readFileWithFallback(File file) {
+    final bytes = file.readAsBytesSync();
+    try {
+      return utf8.decode(bytes);
+    } on FormatException {
+      try {
+        return latin1.decode(bytes);
+      } catch (_) {
+        return utf8.decode(bytes, allowMalformed: true);
+      }
+    }
+  }
+
+  /// Safely reads file lines handling multi-encoding fallbacks.
+  List<String> readFileLinesWithFallback(File file) {
+    final content = readFileWithFallback(file);
+    return const LineSplitter().convert(content);
+  }
 }
 
 /// Tool: `fs_find` - Find files and directories using glob-like patterns.
@@ -204,7 +225,7 @@ class FsReadFileTool extends BaseCodingTool {
     }
 
     try {
-      final lines = file.readAsLinesSync();
+      final lines = readFileLinesWithFallback(file);
       final totalLines = lines.length;
       final start = (arguments['startLine'] as int?) ?? 1;
       final end = (arguments['endLine'] as int?) ?? totalLines;
@@ -368,7 +389,7 @@ class FsReplaceTextTool extends BaseCodingTool {
     }
 
     try {
-      final content = file.readAsStringSync();
+      final content = readFileWithFallback(file);
       final normalizedContent = content.replaceAll('\r\n', '\n');
       final normalizedSearch = search.replaceAll('\r\n', '\n');
       final normalizedReplace = replace.replaceAll('\r\n', '\n');
