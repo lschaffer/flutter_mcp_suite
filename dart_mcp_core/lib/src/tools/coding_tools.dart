@@ -457,8 +457,14 @@ class TerminalExecTool extends BaseCodingTool {
   String get name => 'terminal_exec';
 
   @override
-  String get description =>
-      'Execute a command line command in the terminal inside the workspace directory (e.g., "dotnet --version", "dotnet build", "git status", "dart test"). Returns stdout and stderr.';
+  String get description {
+    final os = Platform.operatingSystem;
+    final isWin = Platform.isWindows;
+    final osNotice = isWin
+        ? ' Running on Windows (cmd.exe). IMPORTANT: Do NOT use Linux/POSIX commands ("head", "tail", "cat", "grep", "ls", "export") or bash pipelines. Use native CLI flags (e.g. "git log -n 20") or pure-Dart file tools (fs_read_file, fs_find).'
+        : ' Running on $os (POSIX /bin/sh).';
+    return 'Execute a command line command in the terminal inside the workspace directory (e.g., "dotnet --version", "dotnet build", "git status", "dart test").$osNotice Returns stdout and stderr.';
+  }
 
   @override
   ToolRiskLevel get riskLevel => ToolRiskLevel.execute;
@@ -528,6 +534,28 @@ class TerminalExecTool extends BaseCodingTool {
       }
       if (result.stderr.toString().trim().isNotEmpty) {
         buffer.writeln('STDERR:\n${result.stderr.toString().trim()}');
+      }
+
+      if (result.exitCode != 0 && Platform.isWindows) {
+        final errText = result.stderr.toString().toLowerCase();
+        final cmdLower = command.toLowerCase();
+        final hasUnixPipe = cmdLower.contains('| head') ||
+            cmdLower.contains('| grep') ||
+            cmdLower.contains('| tail') ||
+            cmdLower.contains('| cat') ||
+            cmdLower.contains('| sed') ||
+            cmdLower.contains('| awk');
+        final hasNotRecognized = errText.contains('not recognized') ||
+            errText.contains('cannot find the path') ||
+            errText.contains('is not recognized as an internal or external command');
+        if (hasUnixPipe || hasNotRecognized) {
+          buffer.writeln(
+            '\n[Windows Environment Notice]: The host OS is Windows (cmd.exe). '
+            'Linux utilities such as "head", "tail", "cat", "grep", or bash pipe chains are not available. '
+            'Please use Windows/CMD compatible commands, native CLI flags (e.g. "git log -n <count>", "git status --short"), '
+            'or pure-Dart tools (fs_read_file, fs_find).',
+          );
+        }
       }
 
       return MCPToolResult(
