@@ -1291,6 +1291,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
     final isMobile = MediaQuery.sizeOf(context).width < 600;
     final groups = _getToolsetGroups();
     final enabledGroups = groups.where((g) => _isToolsetEnabled(g)).toList();
+    final l10n = _l10n;
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
