@@ -1302,18 +1302,29 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   }
 
   Widget _buildSetupView(ThemeData theme) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
     final groups = _getToolsetGroups();
     final enabledGroups = groups.where((g) => _isToolsetEnabled(g)).toList();
     final l10n = _l10n;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8.0 : 24.0,
+        vertical: isMobile ? 8.0 : 24.0,
+      ),
       child: Column(
+        spacing: isMobile ? 8 : 16,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Card(
+            margin: isMobile
+                ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1387,12 +1398,17 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
 
           Card(
+            margin: isMobile
+                ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+            ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8.0,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 4.0 : 8.0,
                 vertical: 4.0,
               ),
               child: CheckboxListTile(
@@ -1416,44 +1432,60 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
 
           if (!_chatMode) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'System Prompt',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            Card(
+              margin: isMobile
+                  ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                  : null,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'System Prompt',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        if (_getActiveLlmConfig().isConfigured)
+                          IconButton(
+                            icon: _isGeneratingSystemPrompt
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.auto_awesome_outlined, size: 20),
+                            tooltip: 'Generate System Prompt',
+                            onPressed: _isGeneratingSystemPrompt
+                                ? null
+                                : _generateSystemPrompt,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _systemPromptCtrl,
+                      maxLines: isMobile ? 4 : 5,
+                      minLines: 2,
+                      decoration: const InputDecoration(
+                        hintText:
+                            'Enter instructions, catalog rules, persona details, or system guidelines...',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: EdgeInsets.all(12.0),
+                      ),
+                    ),
+                  ],
                 ),
-                if (_getActiveLlmConfig().isConfigured)
-                  IconButton(
-                    icon: _isGeneratingSystemPrompt
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.auto_awesome_outlined, size: 20),
-                    tooltip: 'Generate System Prompt',
-                    onPressed: _isGeneratingSystemPrompt
-                        ? null
-                        : _generateSystemPrompt,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            TextFormField(
-              controller: _systemPromptCtrl,
-              maxLines: 5,
-              minLines: 2,
-              decoration: const InputDecoration(
-                hintText:
-                    'Enter instructions, catalog rules, persona details, or system guidelines...',
-                border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 16),
           ],
 
           const Text(
@@ -1490,8 +1522,14 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
 
           if (_useCustomLlm)
             Card(
+              margin: isMobile
+                  ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                  : null,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1551,27 +1589,44 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
 
           ActiveSkillBanner(controller: _controller),
 
-          Text(
-            l10n.get('initialPrompt'),
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-          const SizedBox(height: 8),
-          SubPromptListEditor(
-            controller: _initialPromptCtrl,
-            chatMode: _chatMode,
-            availableToolGroups: _getToolsetGroups()
-                .where((g) => _isToolsetEnabled(g))
-                .map(
-                  (g) => ToolGroup(
-                    name: g.name,
-                    toolNames: g.tools.map((t) => t.name).toList(),
+          // Initial Prompt Card
+          Card(
+            margin: isMobile
+                ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.get('initialPrompt'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
-                )
-                .toList(),
-            minLines: 2,
-            maxLines: 8,
-            hintText:
-                'Enter an optional first message to execute immediately on launch...',
+                  const SizedBox(height: 8),
+                  SubPromptListEditor(
+                    controller: _initialPromptCtrl,
+                    chatMode: _chatMode,
+                    availableToolGroups: _getToolsetGroups()
+                        .where((g) => _isToolsetEnabled(g))
+                        .map(
+                          (g) => ToolGroup(
+                            name: g.name,
+                            toolNames: g.tools.map((t) => t.name).toList(),
+                          ),
+                        )
+                        .toList(),
+                    minLines: 2,
+                    maxLines: 8,
+                    hintText:
+                        'Enter an optional first message to execute immediately on launch...',
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -1981,6 +2036,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     final isGen = _genuiController?.isGenerating ?? false;
     final showButton =
         _inputCtrl.text.isNotEmpty || _attachments.isNotEmpty || !isGen;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return Container(
       decoration: BoxDecoration(
@@ -1990,13 +2046,16 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 6.0 : 12.0,
+            vertical: isMobile ? 4.0 : 8.0,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ActiveSkillBanner(
                 controller: _controller,
-                padding: const EdgeInsets.only(bottom: 6.0),
+                padding: const EdgeInsets.only(bottom: 4.0),
               ),
               _buildAttachmentPreviews(),
               SubPromptListEditor(
