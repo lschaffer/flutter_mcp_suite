@@ -15,6 +15,11 @@
   - Added `requestStop` flag to gracefully terminate execution loops upon task completion.
   - Added `metadata` map for rich telemetry, timestamps, and custom tool payloads.
   - Added ergonomic factories: `MCPToolResult.text`, `MCPToolResult.error`, `MCPToolResult.stop`, and `MCPToolResult.image`.
+- **Context Window Auto-Compression (`ContextCompressor`)**:
+  - Pure Dart token estimation and auto-compression utility designed for SLMs and long-running sessions.
+  - Automatically summarizes earlier conversation turns via the LLM when approaching context limits while preserving recent turns and system instructions.
+  - Emits `AgentContextCompressedEvent` with token reduction metrics (`originalTokens`, `compressedTokens`, `compressedTurnCount`).
+  - Pluggable via `McpAgentEngine(contextCompressor: ...)` or `Agent(contextCompressor: ...)`.
 - **Progressive MCP Tool Discovery**:
   - Added `McpListToolsTool` and `McpCallToolTool` to support workspaces with hundreds of MCP tools without blowing LLM context windows.
 

@@ -87,6 +87,14 @@ graph TD
   - `McpListToolsTool`: lists available tools with descriptions and parameters across connected servers on demand.
   - `McpCallToolTool`: invokes an MCP tool by name using discovered arguments.
 
+### 1.6 Context Window Auto-Compression (`ContextCompressor`)
+- **Motivation**: On-device SLMs (e.g. Gemini Nano, Apple FoundationModels) and local GGUFs have limited context budgets (4k–8k tokens). Long multi-turn agent sessions and verbose tool results exhaust context limits quickly.
+- **Components**:
+  - `ContextCompressor`: Pure Dart utility monitoring message history token count against a configurable threshold.
+  - `compress(...)`: Automatically prompts the LLM to summarize older conversation turns, replaces them with a single `[Context Summary]` system message, and preserves recent turns and system prompts.
+  - `AgentContextCompressedEvent`: Engine event notifying UI when compression occurred with old vs new token metrics.
+  - Pluggable directly via `McpAgentEngine(contextCompressor: ...)` or `Agent(contextCompressor: ...)`.
+
 ---
 
 ## 🎨 Phase 2: Local AI & UI Ecosystem Enhancements
@@ -120,7 +128,7 @@ graph TD
 ## 🚀 Execution Steps
 
 1. **Step 1**: Complete `LlmProvider.localAi` and delegates in `dart_mcp_core` (`LLMService.localAiHandler` / `localAiStreamHandler`).
-2. **Step 2**: Wire `AgentHook`, `MCPToolResult`, `WriteTodosTool`, and progressive discovery in `dart_mcp_core` with tests.
+2. **Step 2**: Wire `AgentHook`, `MCPToolResult`, `WriteTodosTool`, progressive discovery, and `ContextCompressor` in `dart_mcp_core` with tests.
 3. **Step 3**: Implement `LocalAiAdapter` in `flutter_ui_mcp_core` to connect `flutter_local_ai`.
 4. **Step 4**: Add `UiApprovalAgentHook` and live task planning checklist widget in `flutter_ui_mcp` and `flutter_ui_mcp_core`.
 5. **Step 5**: Verify with examples and document configuration.

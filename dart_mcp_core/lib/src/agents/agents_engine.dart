@@ -14,6 +14,7 @@ import '../mcp/local_mcp_client_stub.dart'
 import '../skills/skill_importer.dart';
 import 'agent_hook.dart';
 import 'agent_plan.dart';
+import '../context/context_compressor.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Agent Status
@@ -98,6 +99,21 @@ class AgentPlanEvent extends AgentEvent {
   AgentPlanEvent(this.plan);
 }
 
+/// Context auto-compression event emitted when older conversation turns are summarized.
+class AgentContextCompressedEvent extends AgentEvent {
+  final int originalTokens;
+  final int compressedTokens;
+  final String summary;
+  final int compressedTurnCount;
+
+  AgentContextCompressedEvent({
+    required this.originalTokens,
+    required this.compressedTokens,
+    required this.summary,
+    required this.compressedTurnCount,
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Agent Definition
 // ═══════════════════════════════════════════════════════════════
@@ -144,6 +160,9 @@ class Agent {
   /// Whether to use progressive MCP tool discovery instead of loading all server schemas upfront.
   final bool progressiveMcpDiscovery;
 
+  /// Optional context window auto-compressor for long sessions or SLMs.
+  final ContextCompressor? contextCompressor;
+
   /// Creates a new [Agent] instance with the specified configurations and tools.
   const Agent({
     required this.key,
@@ -159,6 +178,7 @@ class Agent {
     this.hooks = const [],
     this.enablePlanning = false,
     this.progressiveMcpDiscovery = false,
+    this.contextCompressor,
   });
 
   /// Serialize to JSON for external storage.
@@ -176,11 +196,48 @@ class Agent {
     if (progressiveMcpDiscovery) 'progressiveMcpDiscovery': true,
   };
 
+  /// Returns a copy of this [Agent] with updated fields.
+  Agent copyWith({
+    String? key,
+    String? name,
+    LlmConfig? llmConfig,
+    String? systemPrompt,
+    List<SubPromptStep>? prompts,
+    List<McpLocalTool>? dartTools,
+    List<McpServerConfig>? remoteServers,
+    List<McpServerConfig>? localServers,
+    List<ChatMessage>? initialMessages,
+    int? maxToolIterations,
+    List<AgentHook>? hooks,
+    bool? enablePlanning,
+    bool? progressiveMcpDiscovery,
+    ContextCompressor? contextCompressor,
+  }) {
+    return Agent(
+      key: key ?? this.key,
+      name: name ?? this.name,
+      llmConfig: llmConfig ?? this.llmConfig,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
+      prompts: prompts ?? this.prompts,
+      dartTools: dartTools ?? this.dartTools,
+      remoteServers: remoteServers ?? this.remoteServers,
+      localServers: localServers ?? this.localServers,
+      initialMessages: initialMessages ?? this.initialMessages,
+      maxToolIterations: maxToolIterations ?? this.maxToolIterations,
+      hooks: hooks ?? this.hooks,
+      enablePlanning: enablePlanning ?? this.enablePlanning,
+      progressiveMcpDiscovery:
+          progressiveMcpDiscovery ?? this.progressiveMcpDiscovery,
+      contextCompressor: contextCompressor ?? this.contextCompressor,
+    );
+  }
+
   /// Deserialize from JSON.
   factory Agent.fromJson(
     Map<String, dynamic> json, {
     List<McpLocalTool> dartTools = const [],
     List<AgentHook> hooks = const [],
+    ContextCompressor? contextCompressor,
   }) {
     return Agent(
       key: json['key'] as String,
@@ -214,6 +271,7 @@ class Agent {
               ?.map((e) => McpServerConfig.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      contextCompressor: contextCompressor,
     );
   }
 }
@@ -270,10 +328,14 @@ class McpAgentEngine {
   /// Global lifecycle interceptor hooks registered on this engine instance.
   final List<AgentHook> hooks;
 
+  /// Optional context window auto-compressor.
+  final ContextCompressor? contextCompressor;
+
   McpAgentEngine({
     this.maxToolIterations = defaultMaxToolIterations,
     this.enableLogging = false,
     this.hooks = const [],
+    this.contextCompressor,
   });
   void _log(String message) {
     if (enableLogging) {
@@ -798,6 +860,32 @@ class McpAgentEngine {
             } else {
               break;
             }
+          }
+
+          // Optional Context Auto-Compression
+          final compressor = agent.contextCompressor ?? contextCompressor;
+          if (compressor != null &&
+              compressor.shouldCompress(messages, systemPrompt: effectiveSystem)) {
+            emit(AgentLogEvent(
+              'Context threshold reached (${compressor.estimateTokens(messages, systemPrompt: effectiveSystem)} tokens). Compressing conversation turns...',
+            ));
+            final compression = await compressor.compress(
+              messages: messages,
+              llmConfig: agent.llmConfig,
+              systemPrompt: effectiveSystem,
+            );
+            messages.clear();
+            messages.addAll(compression.compressedMessages);
+            emit(AgentContextCompressedEvent(
+              originalTokens: compression.originalTokens,
+              compressedTokens: compression.compressedTokens,
+              summary: compression.summary,
+              compressedTurnCount: compression.compressedTurnCount,
+            ));
+            final compMsg =
+                'Context compressed from ${compression.originalTokens} to ${compression.compressedTokens} tokens (${compression.compressedTurnCount} turns summarized).';
+            emit(AgentLogEvent(compMsg));
+            onLog?.call(compMsg);
           }
 
           final mcpTools = (!forceNoToolCalls && !step.isNoTools)

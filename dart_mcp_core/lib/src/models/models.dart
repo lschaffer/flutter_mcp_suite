@@ -550,6 +550,10 @@ class MCPToolResult {
     this.metadata,
   });
 
+  /// Extracts concatenated text from all text content blocks in this result.
+  String get text =>
+      content.map((c) => c.text ?? '').where((s) => s.isNotEmpty).join('\n');
+
   /// Convenience factory for a standard text tool result.
   factory MCPToolResult.text(
     String text, {

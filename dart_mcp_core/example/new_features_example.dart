@@ -131,6 +131,7 @@ Future<void> main() async {
     progressiveMcpDiscovery: true, // Enables mcp_list_tools and mcp_call_tool
     hooks: [SafetyPolicyHook()], // Lifecycle interceptors
     dartTools: [FastFinishTool()],
+    contextCompressor: const ContextCompressor(tokenThreshold: 2000), // Auto-summarizes long history
     prompts: [
       const SubPromptStep(text: 'Create a plan and checklist for my daily weather.'),
       const SubPromptStep(text: 'Now finish the task.'),
@@ -148,6 +149,8 @@ Future<void> main() async {
         print('   [${step.status.label.padRight(11)}] ${step.id}: ${step.description}');
       }
       print('');
+    } else if (event is AgentContextCompressedEvent) {
+      print('⚡ [STREAM CONTEXT COMPRESSED] ${event.originalTokens} -> ${event.compressedTokens} tokens (${event.compressedTurnCount} turns)');
     } else if (event is AgentToolResultEvent) {
       print('🔧 [STREAM TOOL RESULT] ${event.toolName}: ${event.result}');
     } else if (event is AgentFinalResultEvent) {
@@ -159,6 +162,6 @@ Future<void> main() async {
   await sub.cancel();
 
   print('\n================================================================');
-  print('✨ All new features (Local AI, AgentHook, Planning, Stop signals) tested successfully!');
+  print('✨ All new features (Local AI, AgentHook, Planning, Stop signals, ContextCompressor) tested successfully!');
   print('================================================================');
 }

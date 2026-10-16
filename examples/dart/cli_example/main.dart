@@ -227,6 +227,14 @@ Future<void> main(List<String> args) async {
             print('');
             print('ERROR: $error');
             print('');
+          case AgentContextCompressedEvent(
+            :final originalTokens,
+            :final compressedTokens,
+            :final compressedTurnCount,
+          ):
+            print(
+              '⚡ Context auto-compressed: $originalTokens -> $compressedTokens tokens ($compressedTurnCount turns summarized)',
+            );
           case AgentFinalResultEvent():
             break; // handled separately
           case AgentTextChunkEvent():

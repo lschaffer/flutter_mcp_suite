@@ -22,6 +22,7 @@ export 'src/mcp/local_mcp_client_stub.dart'
 export 'src/agents/agents_engine.dart';
 export 'src/agents/agent_hook.dart';
 export 'src/agents/agent_plan.dart';
+export 'src/context/context_compressor.dart';
 export 'src/utils/change_notifier.dart';
 
 // Skills

@@ -460,15 +460,28 @@ void main() {
       expect(event.response, 'LLM response');
     });
 
-    test('AgentUsageEvent', () {
-      final event = AgentUsageEvent(
-        promptTokens: 120,
-        completionTokens: 45,
-        totalTokens: 165,
+    test('AgentPlanEvent', () {
+      final plan = PlanState(
+        steps: [
+          PlanStep(id: 's1', description: 'Step 1'),
+        ],
       );
-      expect(event.promptTokens, 120);
-      expect(event.completionTokens, 45);
-      expect(event.totalTokens, 165);
+      final event = AgentPlanEvent(plan);
+      expect(event.plan.steps.first.description, 'Step 1');
+      expect(event, isA<AgentEvent>());
+    });
+
+    test('AgentContextCompressedEvent', () {
+      final event = AgentContextCompressedEvent(
+        originalTokens: 5000,
+        compressedTokens: 800,
+        summary: '- Key findings summary',
+        compressedTurnCount: 6,
+      );
+      expect(event.originalTokens, 5000);
+      expect(event.compressedTokens, 800);
+      expect(event.summary, '- Key findings summary');
+      expect(event.compressedTurnCount, 6);
       expect(event, isA<AgentEvent>());
     });
   });
