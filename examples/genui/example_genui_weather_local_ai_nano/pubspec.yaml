@@ -1,0 +1,38 @@
+name: example_genui_weather_local_ai_nano
+description: "On-device GenUI Weather Generator powered by Google Gemini Nano (Samsung Galaxy S25 / Android AICore)."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_genui_mcp:
+    path: ../../../flutter_genui_mcp
+  dart_mcp_core: ^1.2.0
+  flutter_ui_mcp_core: ^1.2.0
+  http: ^1.6.0
+  fl_chart: ^1.2.0
+  genui: ^0.10.4
+  image: ^4.8.0
+  file_picker: ^13.1.0
+  material_ui: ^1.6.0
+
+dependency_overrides:
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
+  flutter_ui_mcp_core:
+    path: ../../../flutter_ui_mcp_core
+  flutter_genui_mcp:
+    path: ../../../flutter_genui_mcp
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
