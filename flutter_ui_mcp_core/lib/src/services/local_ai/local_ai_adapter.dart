@@ -170,6 +170,34 @@ class LocalAiAdapter {
     final clean = userText.toLowerCase();
     for (final tool in tools) {
       final name = tool.name.toLowerCase();
+
+      // Check if prompt directly mentions parts of tool name (e.g. "telemetry", "battery", "weather")
+      final nameKeywords = name.split('_').where((part) => part != 'get' && part.length > 2);
+      for (final kw in nameKeywords) {
+        if (clean.contains(kw)) {
+          return tool;
+        }
+      }
+
+      // Semantic heuristics for common queries
+      if (name.contains('telemetry') &&
+          (clean.contains('telemetry') ||
+              clean.contains('specs') ||
+              clean.contains('device') ||
+              clean.contains('hardware') ||
+              clean.contains('cpu') ||
+              clean.contains('npu') ||
+              clean.contains('system'))) {
+        return tool;
+      }
+      if (name.contains('battery') &&
+          (clean.contains('battery') ||
+              clean.contains('power') ||
+              clean.contains('charge') ||
+              clean.contains('charging') ||
+              clean.contains('level'))) {
+        return tool;
+      }
       if (name.contains('weather') &&
           (clean.contains('weather') ||
               clean.contains('forecast') ||
