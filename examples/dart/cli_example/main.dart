@@ -213,6 +213,12 @@ Future<void> main(List<String> args) async {
               print('│ ... (${result.split('\n').length} lines total)');
             }
             print('└──────────────────────────────────────────');
+          case AgentPlanEvent(:final plan):
+            print('┌─ TASK PLAN ──────────────────────────────');
+            for (final step in plan.steps) {
+              print('│ [${step.status.label.padRight(11)}] ${step.id}: ${step.description}');
+            }
+            print('└──────────────────────────────────────────');
           case AgentAssistantResultEvent(:final response):
             print('');
             print(response);
