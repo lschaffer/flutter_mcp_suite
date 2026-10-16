@@ -132,13 +132,16 @@ class LocalAiNanoScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      body: Column(
-        children: [
-          // On-device status banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: theme.colorScheme.primaryContainer,
-            child: Row(
+      resizeToAvoidBottomInset: false,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // On-device status banner
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: theme.colorScheme.primaryContainer,
+              child: Row(
               children: [
                 Icon(
                   Icons.shield_outlined,
@@ -207,6 +210,7 @@ class LocalAiNanoScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

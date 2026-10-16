@@ -1632,14 +1632,11 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
     return Column(
       children: [
-        // Top Bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
+        // Top Bar (horizontal scroll to prevent vertical wrap overflow on mobile with keyboard)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+          child: Row(
             children: [
               ActionChip(
                 avatar: const Icon(Icons.edit_note, size: 16),
@@ -1694,6 +1691,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   );
                 },
               ),
+              const SizedBox(width: 8),
               ActionChip(
                 avatar: const Icon(Icons.build_circle_outlined, size: 16),
                 label: Text('$enabledToolsCount tools selected'),

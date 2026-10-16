@@ -1102,7 +1102,10 @@ class GenuiWeatherScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      body: Column(
+      resizeToAvoidBottomInset: false,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1173,6 +1176,7 @@ class GenuiWeatherScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
