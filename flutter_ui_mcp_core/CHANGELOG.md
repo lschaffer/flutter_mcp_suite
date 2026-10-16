@@ -2,11 +2,17 @@
 
 * **OS-Native Local AI Adapter (`LocalAiAdapter`)**:
   * Added `LocalAiAdapter` bridging OS-native inference backends (Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry, Chrome Prompt API) to `dart_mcp_core`.
+  * Added on-device multimodal visual inspection & classification for image attachments.
+  * Added `onDeviceExecutor` delegate hook for native Android AICore / llama.cpp runners.
+  * Added hybrid cloud fallback routing to Gemini Flash / OpenAI / Ollama when an API key or local URL is configured.
+  * Context-aware on-device generative synthesis for general queries, calculations, and local hardware tool orchestration.
   * Integrated on-device model routing in `PlaygroundController` and `LlmConfigForm`.
+* **Multimodal Image Optimization (`ImageOptimizer`)**:
+  * Added `ImageOptimizer.shrinkToOptimalSize` using Flutter native hardware decoders to automatically downscale large photos (e.g. 200MP mobile camera shots) to optimal 768px dimensions for on-device SLMs and multimodal APIs without memory bloat.
 * **Zero-Cost Telemetry**:
   * Configured `AgentInspector` token cost tracking to recognize `LlmProvider.localAi` as zero-cost on-device execution.
 * **Dependencies**:
-  * Upgraded dependency to `dart_mcp_core: ^1.2.0`.
+  * Upgraded dependency to `dart_mcp_core: '>=1.1.6 <2.0.0'`.
 
 ## 1.1.7
 

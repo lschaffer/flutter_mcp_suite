@@ -1,9 +1,14 @@
 ## 1.2.0
 
 * **OS-Native Local AI & Ecosystem Sync**:
-  * Upgraded dependencies to `dart_mcp_core: ^1.2.0` and `flutter_ui_mcp_core: '>=1.2.0 <2.0.0'`.
+  * Upgraded dependencies to `dart_mcp_core: '>=1.1.6 <2.0.0'` and `flutter_ui_mcp_core: '>=1.2.0 <2.0.0'`.
   * Integrated on-device OS-native model execution (Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry) with zero cloud keys.
   * Synchronized version 1.2.0 across the Flutter MCP Suite ecosystem.
+* **Automatic Multimodal Image Downscaling**:
+  * Integrated `ImageOptimizer.shrinkToOptimalSize` directly into `_pickAttachments` to automatically downscale uploaded photos (e.g. 200MP mobile camera shots) to optimal 768px bounds for on-device SLMs and multimodal APIs without memory bloat.
+* **Mobile Viewport & UX Enhancements**:
+  * Horizontal tabbed subprompt editor (`SubPromptListEditor`) with integrated delete icons in tab headers.
+  * Edge-to-edge full-width chat input cards and tighter margins for mobile device form factors.
 
 ## 1.1.7
 

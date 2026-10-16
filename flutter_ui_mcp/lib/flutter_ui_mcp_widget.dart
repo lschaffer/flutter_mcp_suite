@@ -296,16 +296,23 @@ class _McpPlaygroundState extends State<McpPlayground> {
       final files = await FilePicker.pickFiles();
       if (files.isNotEmpty) {
         for (final file in files) {
-          final bytes = await file.readAsBytes();
+          final rawBytes = await file.readAsBytes();
           final name = file.name;
           final mime = _mimeFromExtension(name);
-          final size = bytes.length;
+          Uint8List finalBytes = rawBytes;
+
+          // Automatically downscale large images for optimal on-device/multimodal inference
+          if (ImageOptimizer.isImageMime(mime)) {
+            finalBytes = await ImageOptimizer.shrinkToOptimalSize(rawBytes);
+          }
+
+          final size = finalBytes.length;
           _attachments.add(
             MessageAttachment(
               id: const Uuid().v4(),
               name: name,
               path: file.path ?? '',
-              bytes: bytes,
+              bytes: finalBytes,
               mimeType: mime,
               size: size,
             ),

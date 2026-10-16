@@ -9,6 +9,7 @@ Ideal for building pure Dart CLI applications, background workers, backend servi
 ## ✨ Features
 
 - **Multi-LLM Provider Support** — Unified SDK wrappers for:
+  - **OS-Native Local AI** (`LlmProvider.localAi` for Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry)
   - **OpenAI** (`openai_dart`)
   - **Anthropic Claude** (`anthropic_sdk_dart`)
   - **Google Gemini** (`googleai_dart`)
@@ -16,12 +17,16 @@ Ideal for building pure Dart CLI applications, background workers, backend servi
   - **Mistral AI** (OpenAI-compatible client with tool call/assistant formatting patches)
   - **OpenAI-Compatible** (vLLM, LiteLLM, or custom local endpoints)
   - **Embedded GGUF Models** (on-device execution via `llamadart`)
+- **Context Window Auto-Compression (`ContextCompressor`)** — Pure Dart token monitoring and automatic LLM-powered summarization of older conversation turns for SLMs and long-running sessions.
+- **Structured Agent Planning (`PlanState`, `PlanStep`, `WriteTodosTool`)** — Native task checklist planning and live progress tracking with reactive `AgentPlanEvent` streams.
+- **Agent Lifecycle Hooks (`AgentHook`)** — Security interceptors (`beforeToolCall`, `afterToolCall`, `beforeModelCall`, `afterModelCall`) with `ToolCallDecision` (`proceed`, `deny`, `modify`).
+- **Progressive MCP Tool Discovery (`McpListToolsTool`, `McpCallToolTool`)** — On-demand schema loading to support hundreds of tools without exhausting context windows.
 - **Model Context Protocol (MCP) Clients**
   - **Remote HTTP/SSE Transport** — Connection checking, Basic/Bearer authentication, automatic health monitoring, and reconnect loops.
   - **Local Stdio Transport** — Desktop-only (macOS, Windows, Linux) stdio subprocess client that automatically launches and interacts with local Node.js (`npx`/`npm`) or Python (`uvx`/`pip`) MCP servers.
-- **Local Tools Framework** — Clean abstract class `McpLocalTool` to register any custom Dart-native functions as LLM-executable tools.
+- **Local Tools Framework** — Clean abstract class `McpLocalTool` to register any custom Dart-native functions as LLM-executable tools with enhanced `MCPToolResult.text`, `MCPToolResult.stop`, and `MCPToolResult.image`.
 - **McpAgentEngine**
-  - Iterative agentic tool execution loop.
+  - Iterative agentic tool execution loop with reactive `AgentEvent` streams.
   - Multi-step sub-prompt chaining with output substitution placeholders (`${tool_result}`, `${task_result}`).
   - Built-in duplicate call loop protection and cancellation tokens.
   - Interactive callbacks for real-time console logging, tool execution, and assistant thoughts.

@@ -6,6 +6,7 @@ export 'playground_controller.dart';
 export 'src/local_mcp_client.dart';
 export 'src/mcp_localizations.dart';
 export 'src/utils/mime_utils.dart';
+export 'src/utils/image_optimizer.dart';
 export 'src/utils/markdown_style_sheet.dart';
 export 'src/utils/platform_file/platform_file.dart';
 export 'src/utils/platform_directory/platform_directory.dart';

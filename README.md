@@ -23,6 +23,7 @@ Welcome to the **Flutter MCP Suite** monorepo! This project is modularized into 
 We provide several runnable example applications across Flutter, GenUI, and headless Dart:
 
 ### 🎨 GenUI (Generative UI) Examples
+* **[On-Device GenUI Weather Copilot](examples/genui/example_genui_weather_local_ai_nano)**: Dynamic GenUI weather card generator powered by on-device Google Gemini Nano (Android AICore on Samsung Galaxy S25) and Open-Meteo with zero external API keys.
 * **[Travel & Accommodation Planner](flutter_genui_mcp/example)**: Primary showcase — interactive travel and stay planner with SerpAPI live search, date range pickers, accommodation style chips (hotels, apartments, glamping), rich photo cards, day-by-day itineraries, and JPG export.
 * **[Custom PC Rig Builder & Hardware Store](examples/genui/example_genui_pc_builder)**: Interactive hardware store configurator with socket platform selectors (AMD AM5 vs Intel LGA1700), dynamic product catalog grids with photos and specs, cart invoicing, and order checkout.
 * **[Dynamic Weather Generator](examples/genui/example_genui_weather)**: Interactive weather generator demonstrating model-generated input forms, live `fl_chart` visualizations, JPG export, and native Open-Meteo tool integrations.
@@ -32,6 +33,8 @@ We provide several runnable example applications across Flutter, GenUI, and head
 * **[Filesystem Explorer](examples/genui/example_genui_filesystem)**: Interactive GenUI filesystem explorer showcasing folder tree navigation and file content inspection surfaces.
 
 ### 📱 Flutter (Classic UI) Examples
+* **[On-Device Gemini Nano AI Copilot](examples/flutter/example_local_ai_nano)**: Native on-device mobile copilot running Google Gemini Nano (Android AICore on Samsung Galaxy S25 / Pixel 8+) with real hardware battery manager, CPU/NPU telemetry tools, automatic multimodal image downscaling (`ImageOptimizer`), and zero cloud latency.
+* **[Interactive Live Canvas](examples/flutter/example_interactive_canvas)**: Live dynamic canvas drawing copilot with tool-driven visual rendering and real-time generation.
 * **[Primary Showcase App](flutter_ui_mcp/example)**: A comprehensive Flutter application demonstrating the `McpPlayground` UI widget with custom SSH, Open-Meteo weather, and fl_chart tool integrations.
 * **[Device & Network Diagnostics Copilot](examples/flutter/example_device_diagnostics)**: Telemetry monitor with custom chat cards for battery, memory, CPU load, and network latency pings.
 * **[Meeting Notes & Action Items Assistant](examples/flutter/example_audio_notes)**: Transcript processor with interactive action item checklist cards and markdown export.
