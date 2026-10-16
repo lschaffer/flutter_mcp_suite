@@ -68,6 +68,12 @@ class EnvLoader {
         return LlmProvider.openaiCompatible;
       case 'mistral':
         return LlmProvider.mistral;
+      case 'local_ai':
+      case 'localai':
+      case 'gemini_nano':
+      case 'gemini-nano':
+      case 'nano':
+        return LlmProvider.localAi;
       default:
         return LlmProvider.none;
     }

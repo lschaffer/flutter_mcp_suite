@@ -1,3 +1,23 @@
+## 1.2.0
+
+- **OS-Native Local AI Support (`LlmProvider.localAi`)**:
+  - Direct integration with OS-native on-device models: Google Gemini Nano via Android AICore (Samsung Galaxy S25 Ultra, Pixel 8+), Apple FoundationModels (iOS 18.1+, macOS 15+), Windows AI Foundry, and Chrome Prompt API.
+  - Zero cloud latency, zero external API keys required, and pure Dart architecture without native FFI lock-in.
+  - Pluggable `LLMService.localAiHandler` and `LLMService.localAiStreamHandler` delegates.
+- **Agent Lifecycle Hooks (`AgentHook`)**:
+  - Added lifecycle interceptors: `beforeToolCall`, `afterToolCall`, `beforeModelCall`, and `afterModelCall`.
+  - Added `ToolCallDecision` (`proceed`, `deny`, `modify`) for security guardrails, parameter sanitization, and enterprise compliance.
+- **Structured Agent Planning (`PlanState`, `PlanStep`, `WriteTodosTool`)**:
+  - Native multi-step agent planning and tracking.
+  - `AgentPlanEvent` stream emitted through `McpAgentEngine.agentEvents` for reactive UI progress visualization.
+  - Optional `enablePlanning` flag on `Agent` automatically injecting the `write_todos` planning tool.
+- **Enhanced `MCPToolResult`**:
+  - Added `requestStop` flag to gracefully terminate execution loops upon task completion.
+  - Added `metadata` map for rich telemetry, timestamps, and custom tool payloads.
+  - Added ergonomic factories: `MCPToolResult.text`, `MCPToolResult.error`, `MCPToolResult.stop`, and `MCPToolResult.image`.
+- **Progressive MCP Tool Discovery**:
+  - Added `McpListToolsTool` and `McpCallToolTool` to support workspaces with hundreds of MCP tools without blowing LLM context windows.
+
 ## 1.1.6
 
 - **OpenAI-Compatible & Mistral HTTP Response Patching**:

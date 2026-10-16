@@ -586,6 +586,135 @@ void main() {
       expect(response.toolCalls.first.arguments, {'city': 'Vienna'});
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Enhanced MCPToolResult Tests
+  // ═══════════════════════════════════════════════════════════════
+
+  group('Enhanced MCPToolResult', () {
+    test('convenience factories', () {
+      final textRes = MCPToolResult.text('hello', metadata: {'key': 'val'});
+      expect(textRes.content.first.text, 'hello');
+      expect(textRes.isError, false);
+      expect(textRes.requestStop, false);
+      expect(textRes.metadata?['key'], 'val');
+
+      final errRes = MCPToolResult.error('bad input');
+      expect(errRes.content.first.text, 'bad input');
+      expect(errRes.isError, true);
+
+      final stopRes = MCPToolResult.stop('task finished');
+      expect(stopRes.requestStop, true);
+
+      final imgRes = MCPToolResult.image('base64data', mimeType: 'image/jpeg');
+      expect(imgRes.content.first.type, 'image');
+      expect(imgRes.content.first.data, 'base64data');
+      expect(imgRes.content.first.mimeType, 'image/jpeg');
+    });
+
+    test('serializes and deserializes requestStop and metadata', () {
+      final res = MCPToolResult.stop('done', metadata: {'cost': 0.05});
+      final json = res.toJson();
+      expect(json['requestStop'], true);
+      expect(json['metadata'], {'cost': 0.05});
+
+      final restored = MCPToolResult.fromJson(json);
+      expect(restored.requestStop, true);
+      expect(restored.metadata?['cost'], 0.05);
+      expect(restored.content.first.text, 'done');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Task Planning Tests
+  // ═══════════════════════════════════════════════════════════════
+
+  group('Task Planning & WriteTodosTool', () {
+    test('parses and updates plan', () async {
+      PlanState? updatedPlan;
+      final tool = WriteTodosTool(
+        onPlanUpdated: (plan) {
+          updatedPlan = plan;
+        },
+      );
+
+      final res = await tool.execute({
+        'todos': [
+          {'id': 'step_1', 'description': 'Analyze requirements', 'status': 'completed'},
+          {'id': 'step_2', 'description': 'Implement changes', 'status': 'in_progress'},
+          {'id': 'step_3', 'description': 'Write tests', 'status': 'pending'},
+        ],
+      });
+
+      expect(res.isError, false);
+      expect(res.metadata?['plan'], isNotNull);
+      expect(updatedPlan, isNotNull);
+      expect(updatedPlan!.steps.length, 3);
+      expect(updatedPlan!.steps[0].status, PlanStepStatus.completed);
+      expect(updatedPlan!.steps[1].status, PlanStepStatus.inProgress);
+      expect(updatedPlan!.steps[2].status, PlanStepStatus.pending);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // AgentHook Tests
+  // ═══════════════════════════════════════════════════════════════
+
+  group('AgentHook & ToolCallDecision', () {
+    test('ToolCallDecision proceed & deny', () {
+      const proceed = ToolCallDecision.proceed({'rewritten': true});
+      expect(proceed.isDenied, false);
+      expect(proceed.modifiedArguments?['rewritten'], true);
+
+      const deny = ToolCallDecision.deny('Forbidden by policy');
+      expect(deny.isDenied, true);
+      expect(deny.denialReason, 'Forbidden by policy');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Local AI (OS-Native) Provider Tests
+  // ═══════════════════════════════════════════════════════════════
+
+  group('Local AI Provider (OS-Native)', () {
+    test('LlmProvider.localAi config properties', () {
+      expect(LlmProvider.localAi.configKey, 'local_ai');
+      expect(LlmProvider.fromConfigKey('local_ai'), LlmProvider.localAi);
+
+      const config = LlmConfig(
+        provider: LlmProvider.localAi,
+        model: 'gemini-nano',
+        apiKey: '',
+      );
+      expect(config.isConfigured, true);
+    });
+
+    test('LLMService delegates to localAiHandler', () async {
+      LLMService.localAiHandler = ({
+        required config,
+        required messages,
+        required tools,
+        systemPrompt,
+      }) async {
+        return const LLMResponse(text: 'Response from OS Native Model');
+      };
+
+      const config = LlmConfig(
+        provider: LlmProvider.localAi,
+        model: 'apple-foundation',
+        apiKey: '',
+      );
+
+      final response = await LLMService.generate(
+        config: config,
+        messages: [],
+        tools: [],
+      );
+
+      expect(response.text, 'Response from OS Native Model');
+      LLMService.localAiHandler = null;
+    });
+  });
 }
 
 /// Simple test implementation of [McpLocalTool].

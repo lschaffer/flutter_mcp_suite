@@ -12,6 +12,7 @@ export 'src/utils/platform_directory/platform_directory.dart';
 export 'src/services/embedded_llm/embedded_model.dart';
 export 'src/services/embedded_llm/embedded_model_manager.dart';
 export 'src/services/embedded_llm/embedded_llm_adapter.dart';
+export 'src/services/local_ai/local_ai_adapter.dart';
 export 'src/skills/file_system_skill_storage_adapter.dart';
 export 'src/skills/web_skill_storage_adapter.dart';
 export 'src/skills/skill_zip_importer.dart';

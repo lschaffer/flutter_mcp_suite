@@ -8,9 +8,12 @@ import '../llm/llm_response.dart';
 import '../mcp/local_tools.dart';
 import '../mcp/mcp_client.dart';
 import '../mcp/mcp_client_def.dart';
+import '../mcp/progressive_tools.dart';
 import '../mcp/local_mcp_client_stub.dart'
     if (dart.library.io) '../mcp/local_mcp_client.dart';
 import '../skills/skill_importer.dart';
+import 'agent_hook.dart';
+import 'agent_plan.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Agent Status
@@ -89,6 +92,12 @@ class AgentUsageEvent extends AgentEvent {
   });
 }
 
+/// Task checklist / plan update event.
+class AgentPlanEvent extends AgentEvent {
+  final PlanState plan;
+  AgentPlanEvent(this.plan);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Agent Definition
 // ═══════════════════════════════════════════════════════════════
@@ -126,6 +135,15 @@ class Agent {
   /// Optional override for maximum tool iterations per step (defaults to LLMConfig.maxToolIterations or 100).
   final int? maxToolIterations;
 
+  /// Optional lifecycle interceptor hooks for this agent.
+  final List<AgentHook> hooks;
+
+  /// Whether to automatically inject the structured planning tool ([WriteTodosTool]).
+  final bool enablePlanning;
+
+  /// Whether to use progressive MCP tool discovery instead of loading all server schemas upfront.
+  final bool progressiveMcpDiscovery;
+
   /// Creates a new [Agent] instance with the specified configurations and tools.
   const Agent({
     required this.key,
@@ -138,6 +156,9 @@ class Agent {
     this.localServers = const [],
     this.initialMessages = const [],
     this.maxToolIterations,
+    this.hooks = const [],
+    this.enablePlanning = false,
+    this.progressiveMcpDiscovery = false,
   });
 
   /// Serialize to JSON for external storage.
@@ -151,12 +172,15 @@ class Agent {
     'localServers': localServers.map((s) => s.toJson()).toList(),
     'initialMessages': initialMessages.map((m) => m.toJson()).toList(),
     if (maxToolIterations != null) 'maxToolIterations': maxToolIterations,
+    if (enablePlanning) 'enablePlanning': true,
+    if (progressiveMcpDiscovery) 'progressiveMcpDiscovery': true,
   };
 
   /// Deserialize from JSON.
   factory Agent.fromJson(
     Map<String, dynamic> json, {
     List<McpLocalTool> dartTools = const [],
+    List<AgentHook> hooks = const [],
   }) {
     return Agent(
       key: json['key'] as String,
@@ -171,6 +195,9 @@ class Agent {
               .toList() ??
           [],
       dartTools: dartTools,
+      hooks: hooks,
+      enablePlanning: json['enablePlanning'] as bool? ?? false,
+      progressiveMcpDiscovery: json['progressiveMcpDiscovery'] as bool? ?? false,
       initialMessages:
           (json['initialMessages'] as List?)
               ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
@@ -239,9 +266,14 @@ class McpAgentEngine {
   Stream<AgentEvent> get agentEvents => _eventController.stream;
 
   final bool enableLogging;
+
+  /// Global lifecycle interceptor hooks registered on this engine instance.
+  final List<AgentHook> hooks;
+
   McpAgentEngine({
     this.maxToolIterations = defaultMaxToolIterations,
     this.enableLogging = false,
+    this.hooks = const [],
   });
   void _log(String message) {
     if (enableLogging) {
@@ -590,9 +622,32 @@ class McpAgentEngine {
       }
 
       // ── Build full tool list ────────────────────────────
+      final localTools = List<McpLocalTool>.from(agent.dartTools);
+
+      if (agent.enablePlanning) {
+        final planTool = WriteTodosTool(
+          onPlanUpdated: (plan) {
+            emit(AgentPlanEvent(plan));
+          },
+        );
+        localTools.add(planTool);
+      }
+
       final allTools = <MCPTool>[];
-      allTools.addAll(agent.dartTools.map((t) => t.toMCPTool()));
-      allTools.addAll(mcpManager.availableTools);
+      allTools.addAll(localTools.map((t) => t.toMCPTool()));
+
+      if (agent.progressiveMcpDiscovery) {
+        final listTool = McpListToolsTool(mcpManager: mcpManager);
+        final callTool = McpCallToolTool(mcpManager: mcpManager);
+        localTools.add(listTool);
+        localTools.add(callTool);
+        allTools.add(listTool.toMCPTool());
+        allTools.add(callTool.toMCPTool());
+      } else {
+        allTools.addAll(mcpManager.availableTools);
+      }
+
+      final allHooks = [...hooks, ...agent.hooks];
 
       // ── Build messages list ────────────────────────────
       final messages = <ChatMessage>[...agent.initialMessages];
@@ -749,7 +804,9 @@ class McpAgentEngine {
               ? activeStepTools
               : <MCPTool>[];
 
-          final requestMsgs = List<ChatMessage>.from(messages);
+          List<ChatMessage> requestMsgs = List<ChatMessage>.from(messages);
+          String callSystemPrompt = effectiveSystem;
+
           if (forceNoToolCalls && forcedNoToolHint != null) {
             requestMsgs.add(
               ChatMessage(
@@ -763,6 +820,25 @@ class McpAgentEngine {
             forcedNoToolHint = null;
           }
 
+          // Before model call hook execution
+          for (final hook in allHooks) {
+            final hookDecision = await hook.beforeModelCall(
+              ModelCallHookContext(
+                messages: requestMsgs,
+                systemPrompt: callSystemPrompt,
+                tools: mcpTools,
+                config: agent.llmConfig,
+                agentKey: agentKey,
+              ),
+            );
+            if (hookDecision.modifiedMessages != null) {
+              requestMsgs = hookDecision.modifiedMessages!;
+            }
+            if (hookDecision.modifiedSystemPrompt != null) {
+              callSystemPrompt = hookDecision.modifiedSystemPrompt!;
+            }
+          }
+
           _log('Generating LLM response (step ${stepIdx + 1})...');
           final LLMResponse response;
           if (agent.llmConfig.useStreaming || agent.llmConfig.isSlm) {
@@ -772,7 +848,7 @@ class McpAgentEngine {
               config: agent.llmConfig,
               messages: requestMsgs,
               tools: mcpTools,
-              systemPrompt: effectiveSystem,
+              systemPrompt: callSystemPrompt,
             )) {
               if (_cancelTokens[agentKey] == true) break;
               if (chunk.textDelta.isNotEmpty) {
@@ -791,11 +867,21 @@ class McpAgentEngine {
               config: agent.llmConfig,
               messages: requestMsgs,
               tools: mcpTools,
-              systemPrompt: effectiveSystem,
+              systemPrompt: callSystemPrompt,
             );
           }
 
           if (_cancelTokens[agentKey] == true) break;
+
+          // After model call hook execution
+          for (final hook in allHooks) {
+            await hook.afterModelCall(
+              ModelResultHookContext(
+                response: response,
+                agentKey: agentKey,
+              ),
+            );
+          }
 
           // Emit token usage metrics
           if (response.usage != null) {
@@ -964,18 +1050,65 @@ class McpAgentEngine {
             onLog?.call(logMessage);
 
             // Determine risk level
-            final localMatch = agent.dartTools
+            final localMatch = localTools
                 .where((t) => t.name == call.name)
                 .toList();
             final riskLevel = localMatch.isNotEmpty
                 ? localMatch.first.riskLevel
                 : ToolRiskLevel.network;
 
+            // Agent Hook interceptor (beforeToolCall)
+            Map<String, dynamic> toolArgs = Map<String, dynamic>.from(call.arguments);
+            bool toolDenied = false;
+            String? toolDenialReason;
+
+            for (final hook in allHooks) {
+              final decision = await hook.beforeToolCall(
+                ToolCallHookContext(
+                  toolName: call.name,
+                  arguments: toolArgs,
+                  riskLevel: riskLevel,
+                  agentKey: agentKey,
+                  stepIndex: stepIdx,
+                  messages: List.unmodifiable(messages),
+                ),
+              );
+              if (decision.isDenied) {
+                toolDenied = true;
+                toolDenialReason = decision.denialReason ??
+                    'Tool execution of "${call.name}" was blocked by policy.';
+                break;
+              }
+              if (decision.modifiedArguments != null) {
+                toolArgs = decision.modifiedArguments!;
+              }
+            }
+
+            if (toolDenied) {
+              final rejectMsg = toolDenialReason!;
+              emit(AgentLogEvent(rejectMsg));
+              onLog?.call(rejectMsg);
+
+              final resMsg = ChatMessage(
+                id: call.id,
+                content: rejectMsg,
+                role: ChatRole.tool,
+                type: MessageType.toolResponse,
+                toolName: call.name,
+                toolResult: MCPToolResult.error(rejectMsg),
+                timestamp: DateTime.now(),
+              );
+              messages.add(resMsg);
+              stepNewMsgs.add(resMsg);
+              continueLoop = true;
+              continue;
+            }
+
             // Human-in-the-loop approval check
             if (onToolApproval != null) {
               final approved = await onToolApproval(
                 toolName: call.name,
-                parameters: call.arguments,
+                parameters: toolArgs,
                 riskLevel: riskLevel,
               );
               if (!approved) {
@@ -990,10 +1123,7 @@ class McpAgentEngine {
                   role: ChatRole.tool,
                   type: MessageType.toolResponse,
                   toolName: call.name,
-                  toolResult: MCPToolResult(
-                    isError: true,
-                    content: [MCPContent(type: 'text', text: rejectMsg)],
-                  ),
+                  toolResult: MCPToolResult.error(rejectMsg),
                   timestamp: DateTime.now(),
                 );
                 messages.add(resMsg);
@@ -1006,9 +1136,21 @@ class McpAgentEngine {
             // Execute tool
             MCPToolResult result;
             if (localMatch.isNotEmpty) {
-              result = await localMatch.first.execute(call.arguments);
+              result = await localMatch.first.execute(toolArgs);
             } else {
-              result = await mcpManager.callTool(call.name, call.arguments);
+              result = await mcpManager.callTool(call.name, toolArgs);
+            }
+
+            // Agent Hook interceptor (afterToolCall)
+            for (final hook in allHooks) {
+              await hook.afterToolCall(
+                ToolResultHookContext(
+                  toolName: call.name,
+                  arguments: toolArgs,
+                  result: result,
+                  agentKey: agentKey,
+                ),
+              );
             }
 
             final responseContentText = result.content
@@ -1047,15 +1189,15 @@ class McpAgentEngine {
             emit(
               AgentToolResultEvent(
                 toolName: call.name,
-                parameters: call.arguments,
+                parameters: toolArgs,
                 result: responseContentText,
               ),
             );
-            onToolResult?.call(call.name, call.arguments, responseContentText);
+            onToolResult?.call(call.name, toolArgs, responseContentText);
             _log('Tool Result: $responseContentText');
 
             final bool shouldStop =
-                step.stopAfterToolCall || nextNeedsToolResult;
+                step.stopAfterToolCall || nextNeedsToolResult || result.requestStop;
             if (shouldStop) {
               continueLoop = false;
             }

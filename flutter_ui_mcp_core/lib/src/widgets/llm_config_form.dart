@@ -51,6 +51,12 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
     ],
     LlmProvider.ollama: [],
     LlmProvider.openaiCompatible: [],
+    LlmProvider.localAi: [
+      'gemini-nano',
+      'apple-foundation',
+      'windows-ai',
+      'chrome-prompt',
+    ],
   };
 
   bool get showBaseUrl {
@@ -245,6 +251,9 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
                 } else if (val == LlmProvider.mistral &&
                     widget.modelCtrl.text.isEmpty) {
                   widget.modelCtrl.text = 'mistral-large-latest';
+                } else if (val == LlmProvider.localAi &&
+                    widget.modelCtrl.text.isEmpty) {
+                  widget.modelCtrl.text = 'gemini-nano';
                 }
               });
             }
@@ -295,16 +304,50 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
             },
           ),
 
-          // API Key
-          TextFormField(
-            controller: widget.apiKeyCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'API Key',
-              border: OutlineInputBorder(),
-              isDense: true,
+          // API Key or OS-Native banner
+          if (widget.provider == LlmProvider.localAi)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.offline_bolt_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'OS-Native Local AI (Apple Intelligence / Android Gemini Nano on Samsung Galaxy S25 / Windows AI Foundry). Zero model download, no API key required.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            TextFormField(
+              controller: widget.apiKeyCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'API Key',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
             ),
-          ),
 
           // Base Endpoint Url (Visible for Ollama / Custom API / Mistral)
           if (showBaseUrl)

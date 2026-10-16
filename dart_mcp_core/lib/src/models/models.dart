@@ -13,7 +13,8 @@ enum LlmProvider {
   ollama,
   openaiCompatible,
   mistral,
-  embedded;
+  embedded,
+  localAi;
 
   String get configKey {
     switch (this) {
@@ -33,6 +34,8 @@ enum LlmProvider {
         return 'mistral';
       case LlmProvider.embedded:
         return 'embedded';
+      case LlmProvider.localAi:
+        return 'local_ai';
     }
   }
 
@@ -62,7 +65,9 @@ enum LlmProvider {
       case LlmProvider.mistral:
         return 'Mistral AI';
       case LlmProvider.embedded:
-        return 'Embedded (on-device)';
+        return 'Embedded (on-device GGUF)';
+      case LlmProvider.localAi:
+        return 'Local AI (OS-Native: Apple/Gemini Nano/Windows)';
     }
   }
 }
@@ -115,8 +120,11 @@ class LlmConfig {
   });
 
   bool get isConfigured {
-    if (provider == LlmProvider.none || model.trim().isEmpty) return false;
-    if (provider == LlmProvider.embedded) return true;
+    if (provider == LlmProvider.none) return false;
+    if (provider == LlmProvider.embedded || provider == LlmProvider.localAi) {
+      return true;
+    }
+    if (model.trim().isEmpty) return false;
     if (provider == LlmProvider.ollama ||
         provider == LlmProvider.openaiCompatible) {
       return baseUrl.trim().isNotEmpty;
@@ -528,13 +536,80 @@ class MCPToolResult {
   final List<MCPContent> content;
   final bool isError;
 
-  const MCPToolResult({required this.content, this.isError = false});
+  /// Optional flag indicating that the agent loop should stop immediately
+  /// after receiving this tool result and synthesize the final answer.
+  final bool requestStop;
+
+  /// Optional metadata attached to the tool execution (e.g. chart properties, UI hints).
+  final Map<String, dynamic>? metadata;
+
+  const MCPToolResult({
+    required this.content,
+    this.isError = false,
+    this.requestStop = false,
+    this.metadata,
+  });
+
+  /// Convenience factory for a standard text tool result.
+  factory MCPToolResult.text(
+    String text, {
+    bool isError = false,
+    bool requestStop = false,
+    Map<String, dynamic>? metadata,
+  }) {
+    return MCPToolResult(
+      content: [MCPContent(type: 'text', text: text)],
+      isError: isError,
+      requestStop: requestStop,
+      metadata: metadata,
+    );
+  }
+
+  /// Convenience factory for an error tool result.
+  factory MCPToolResult.error(
+    String message, {
+    Map<String, dynamic>? metadata,
+  }) {
+    return MCPToolResult(
+      content: [MCPContent(type: 'text', text: message)],
+      isError: true,
+      metadata: metadata,
+    );
+  }
+
+  /// Convenience factory for a result that instructs the agent loop to stop immediately.
+  factory MCPToolResult.stop(
+    String text, {
+    Map<String, dynamic>? metadata,
+  }) {
+    return MCPToolResult(
+      content: [MCPContent(type: 'text', text: text)],
+      requestStop: true,
+      metadata: metadata,
+    );
+  }
+
+  /// Convenience factory for an image tool result.
+  factory MCPToolResult.image(
+    String base64Data, {
+    String mimeType = 'image/png',
+    bool requestStop = false,
+    Map<String, dynamic>? metadata,
+  }) {
+    return MCPToolResult(
+      content: [MCPContent(type: 'image', data: base64Data, mimeType: mimeType)],
+      requestStop: requestStop,
+      metadata: metadata,
+    );
+  }
 
   factory MCPToolResult.fromJson(Map<String, dynamic> json) {
     final contentList = json['content'] as List? ?? [];
     return MCPToolResult(
       content: contentList.map((item) => MCPContent.fromJson(item)).toList(),
       isError: json['isError'] as bool? ?? false,
+      requestStop: json['requestStop'] as bool? ?? false,
+      metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
 
@@ -542,6 +617,8 @@ class MCPToolResult {
     return {
       'content': content.map((item) => item.toJson()).toList(),
       'isError': isError,
+      if (requestStop) 'requestStop': requestStop,
+      if (metadata != null) 'metadata': metadata,
     };
   }
 }

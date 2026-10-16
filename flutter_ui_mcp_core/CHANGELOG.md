@@ -1,3 +1,13 @@
+## 1.2.0
+
+* **OS-Native Local AI Adapter (`LocalAiAdapter`)**:
+  * Added `LocalAiAdapter` bridging OS-native inference backends (Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry, Chrome Prompt API) to `dart_mcp_core`.
+  * Integrated on-device model routing in `PlaygroundController` and `LlmConfigForm`.
+* **Zero-Cost Telemetry**:
+  * Configured `AgentInspector` token cost tracking to recognize `LlmProvider.localAi` as zero-cost on-device execution.
+* **Dependencies**:
+  * Upgraded dependency to `dart_mcp_core: ^1.2.0`.
+
 ## 1.1.7
 
 * **Dependencies**:

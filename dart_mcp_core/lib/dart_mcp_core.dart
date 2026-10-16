@@ -14,11 +14,14 @@ export 'src/llm/llm_response.dart';
 export 'src/mcp/mcp_client.dart';
 export 'src/mcp/mcp_client_def.dart';
 export 'src/mcp/local_tools.dart';
+export 'src/mcp/progressive_tools.dart';
 export 'src/mcp/local_mcp_client_stub.dart'
     if (dart.library.io) 'src/mcp/local_mcp_client.dart';
 
 // Agents
 export 'src/agents/agents_engine.dart';
+export 'src/agents/agent_hook.dart';
+export 'src/agents/agent_plan.dart';
 export 'src/utils/change_notifier.dart';
 
 // Skills
