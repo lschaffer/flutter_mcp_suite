@@ -1,3 +1,11 @@
+## 1.1.6
+
+- **OpenAI-Compatible & Mistral HTTP Response Patching**:
+  - Introduced `_OpenAiCompatiblePatchClient` to patch HTTP responses and SSE streams (`text/event-stream`) for OpenAI-compatible endpoints (such as OpenRouter, vLLM, local LLMs) and Mistral.
+  - Sanitizes `usage.prompt_tokens_details` and `usage.completion_tokens_details` by stripping `null` and non-integer values, preventing `FormatException` / `ParseException` in `openai_dart`'s `requireJsonInt` (such as on `cache_write_tokens`).
+  - Automatically injects missing `type: "function"` into tool calls.
+  - Coerces empty list `content: []` to `null` in streaming delta and completion messages.
+
 ## 1.1.5
 
 - **Robust Multi-Encoding File Support (`fs_read_file`, `fs_replace_text`)**:

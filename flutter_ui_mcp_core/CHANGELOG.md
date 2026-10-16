@@ -1,3 +1,9 @@
+## 1.1.7
+
+* **Dependencies**:
+  * Upgraded dependency to `dart_mcp_core: ^1.1.6` for OpenAI-compatible endpoint token detail sanitization, tool call schema patching, and SSE stream handling.
+  * Synchronized version 1.1.7 across the Flutter MCP Suite ecosystem.
+
 ## 1.1.6
 
 * **Platform Support & WASM Compatibility**:

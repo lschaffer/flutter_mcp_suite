@@ -298,6 +298,7 @@ class LLMService {
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
         ),
+        httpClient: _OpenAiCompatiblePatchClient(http.Client()),
       ),
     );
     return await _generateOpenAIWithClient(
@@ -355,6 +356,7 @@ class LLMService {
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
         ),
+        httpClient: _OpenAiCompatiblePatchClient(http.Client()),
       ),
     );
     return _streamOpenAIWithClient(client, config, messages, tools, systemPrompt);
@@ -1382,11 +1384,93 @@ class LLMService {
   }
 }
 
-/// HTTP client wrapper that patches requests/responses for Mistral
-/// compatibility (tool_call type field, tool messages, image_url format).
-class _MistralPatchClient extends http.BaseClient {
-  _MistralPatchClient(this._inner);
+/// HTTP client wrapper that patches requests/responses for OpenAI-compatible
+/// and Mistral endpoints.
+///
+/// It patches:
+/// - Request message ordering and formatting for Mistral (when [isMistral] is true).
+/// - Missing `type: "function"` in tool calls.
+/// - Empty `content: []` lists converted to null.
+/// - Strips null or non-integer values from `usage.prompt_tokens_details` and
+///   `usage.completion_tokens_details` (preventing FormatException/ParseException
+///   in openai_dart's requireJsonInt for fields like cache_write_tokens).
+/// - Both non-streaming responses and SSE streams (text/event-stream).
+class _OpenAiCompatiblePatchClient extends http.BaseClient {
+  _OpenAiCompatiblePatchClient(this._inner, {this.isMistral = false});
   final http.Client _inner;
+  final bool isMistral;
+
+  static bool _sanitizeUsage(Map<String, dynamic> decoded) {
+    bool changed = false;
+    final usage = decoded['usage'];
+    if (usage is Map) {
+      final promptDetails = usage['prompt_tokens_details'];
+      if (promptDetails is Map) {
+        final lenBefore = promptDetails.length;
+        promptDetails.removeWhere((k, v) => v == null || v is! int);
+        if (promptDetails.length != lenBefore) changed = true;
+      }
+      final completionDetails = usage['completion_tokens_details'];
+      if (completionDetails is Map) {
+        final lenBefore = completionDetails.length;
+        completionDetails.removeWhere((k, v) => v == null || v is! int);
+        if (completionDetails.length != lenBefore) changed = true;
+      }
+    }
+    return changed;
+  }
+
+  static bool _sanitizeChoices(dynamic choices) {
+    if (choices is! List) return false;
+    bool changed = false;
+    for (final choice in choices) {
+      if (choice is! Map) continue;
+
+      final delta = choice['delta'];
+      if (delta is Map) {
+        if (delta['content'] is List) {
+          delta['content'] = null;
+          changed = true;
+        }
+        final toolCalls = delta['tool_calls'];
+        if (toolCalls is List) {
+          for (final tc in toolCalls) {
+            if (tc is Map && !tc.containsKey('type')) {
+              tc['type'] = 'function';
+              changed = true;
+            }
+          }
+        }
+      }
+
+      final msg = choice['message'];
+      if (msg is Map) {
+        if (msg['content'] is List) {
+          msg['content'] = null;
+          changed = true;
+        }
+        final toolCalls = msg['tool_calls'];
+        if (toolCalls is List) {
+          for (final tc in toolCalls) {
+            if (tc is Map && !tc.containsKey('type')) {
+              tc['type'] = 'function';
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
+  static bool _sanitizeResponseMap(Map<String, dynamic> decoded) {
+    bool changed = false;
+    if (_sanitizeUsage(decoded)) changed = true;
+    if (decoded.containsKey('choices') && _sanitizeChoices(decoded['choices'])) {
+      changed = true;
+    }
+    return changed;
+  }
 
   Map<String, dynamic> _sanitizeMistralChatRequest(
     Map<String, dynamic> payload,
@@ -1495,7 +1579,8 @@ class _MistralPatchClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     http.BaseRequest requestToSend = request;
 
-    if (request.method.toUpperCase() == 'POST' &&
+    if (isMistral &&
+        request.method.toUpperCase() == 'POST' &&
         request.url.path.contains('chat/completions') &&
         request is http.Request) {
       try {
@@ -1515,12 +1600,54 @@ class _MistralPatchClient extends http.BaseClient {
 
     final streamed = await _inner.send(requestToSend);
 
-    final bool isStreaming = (requestToSend is http.Request &&
-            requestToSend.body.contains('"stream":true')) ||
-        (requestToSend.headers['accept']?.contains('text/event-stream') ?? false);
-
-    if (!request.url.path.contains('chat/completions') || isStreaming) {
+    if (!request.url.path.contains('chat/completions')) {
       return streamed;
+    }
+
+    final contentType = (streamed.headers['content-type'] ?? '').toLowerCase();
+    final bool isStreaming = contentType.contains('text/event-stream') ||
+        contentType.contains('event-stream') ||
+        (requestToSend is http.Request &&
+            requestToSend.body.contains('"stream":true'));
+
+    if (isStreaming) {
+      final transformer = StreamTransformer<List<int>, List<int>>.fromHandlers(
+        handleData: (bytes, sink) {
+          final text = utf8.decode(bytes);
+          final lines = text.split('\n');
+          final patchedLines = <String>[];
+          for (final line in lines) {
+            final trimmed = line.trim();
+            if (trimmed.startsWith('data: ') && trimmed.length > 6) {
+              final jsonStr = trimmed.substring(6).trim();
+              if (jsonStr == '[DONE]') {
+                patchedLines.add(line);
+                continue;
+              }
+              try {
+                final decoded = jsonDecode(jsonStr);
+                if (decoded is Map<String, dynamic>) {
+                  if (_sanitizeResponseMap(decoded)) {
+                    patchedLines.add('data: ${jsonEncode(decoded)}');
+                    continue;
+                  }
+                }
+              } catch (_) {}
+            }
+            patchedLines.add(line);
+          }
+          sink.add(utf8.encode(patchedLines.join('\n')));
+        },
+      );
+
+      return http.StreamedResponse(
+        streamed.stream.transform(transformer),
+        streamed.statusCode,
+        headers: streamed.headers,
+        isRedirect: streamed.isRedirect,
+        persistentConnection: streamed.persistentConnection,
+        reasonPhrase: streamed.reasonPhrase,
+      );
     }
 
     final bodyBytes = await streamed.stream.toBytes();
@@ -1530,24 +1657,7 @@ class _MistralPatchClient extends http.BaseClient {
     try {
       final dynamic decoded = jsonDecode(bodyStr);
       if (decoded is Map<String, dynamic>) {
-        bool changed = false;
-        final choices = decoded['choices'];
-        if (choices is List) {
-          for (final choice in choices) {
-            if (choice is! Map<String, dynamic>) continue;
-            final msg = choice['message'];
-            if (msg is! Map<String, dynamic>) continue;
-            final toolCalls = msg['tool_calls'];
-            if (toolCalls is! List) continue;
-            for (final tc in toolCalls) {
-              if (tc is Map<String, dynamic> && !tc.containsKey('type')) {
-                tc['type'] = 'function';
-                changed = true;
-              }
-            }
-          }
-        }
-        if (changed) {
+        if (_sanitizeResponseMap(decoded)) {
           patched = jsonEncode(decoded);
         }
       }
@@ -1567,4 +1677,9 @@ class _MistralPatchClient extends http.BaseClient {
 
   @override
   void close() => _inner.close();
+}
+
+/// Backwards compatible subclass for Mistral-specific configuration.
+class _MistralPatchClient extends _OpenAiCompatiblePatchClient {
+  _MistralPatchClient(http.Client inner) : super(inner, isMistral: true);
 }
