@@ -68,15 +68,15 @@ Future<void> main() async {
   print('🚀 Testing New dart_mcp_core Features');
   print('================================================================\n');
 
-  // 1. Setup OS-Native Local AI delegate (e.g. Gemini Nano on Android / Apple FoundationModels)
+  // 1. Setup On-Device Embedded model delegate (e.g. .bin, .task, or .gguf)
   // No API key required!
-  LLMService.localAiHandler = ({
+  LLMService.embeddedHandler = ({
     required LlmConfig config,
     required List<ChatMessage> messages,
     required List<MCPTool> tools,
     String? systemPrompt,
   }) async {
-    print('📲 [Local AI Engine] Executing on-device Gemini Nano model...');
+    print('📲 [Embedded Engine] Executing on-device model: ${config.model}...');
     final lastMsg = messages.last.content;
 
     // Simulate on-device reasoning and tool calls
@@ -110,13 +110,13 @@ Future<void> main() async {
       );
     }
 
-    return LLMResponse(text: 'On-device Gemini Nano analyzed your request: "$lastMsg".');
+    return LLMResponse(text: 'On-device model analyzed your request: "$lastMsg".');
   };
 
-  // 2. Configure Local AI Provider
+  // 2. Configure Embedded On-Device Provider
   const localConfig = LlmConfig(
-    provider: LlmProvider.localAi,
-    model: 'gemini-nano',
+    provider: LlmProvider.embedded,
+    model: 'model.bin',
     apiKey: '', // Zero API key required on-device
   );
   print('• Configured provider: ${localConfig.provider.displayName}');

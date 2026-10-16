@@ -689,32 +689,35 @@ void main() {
   // Local AI (OS-Native) Provider Tests
   // ═══════════════════════════════════════════════════════════════
 
-  group('Local AI Provider (OS-Native)', () {
-    test('LlmProvider.localAi config properties', () {
-      expect(LlmProvider.localAi.configKey, 'local_ai');
-      expect(LlmProvider.fromConfigKey('local_ai'), LlmProvider.localAi);
+  group('Embedded and On-Device Provider', () {
+    test('LlmProvider.embedded config properties and legacy migration', () {
+      expect(LlmProvider.embedded.configKey, 'embedded');
+      expect(LlmProvider.fromConfigKey('embedded'), LlmProvider.embedded);
+      // Legacy local_ai key migrates to embedded
+      expect(LlmProvider.fromConfigKey('local_ai'), LlmProvider.embedded);
+      expect(LlmProvider.fromConfigKey('localai'), LlmProvider.embedded);
 
       const config = LlmConfig(
-        provider: LlmProvider.localAi,
-        model: 'gemini-nano',
+        provider: LlmProvider.embedded,
+        model: 'model.bin',
         apiKey: '',
       );
       expect(config.isConfigured, true);
     });
 
-    test('LLMService delegates to localAiHandler', () async {
-      LLMService.localAiHandler = ({
+    test('LLMService delegates to embeddedHandler', () async {
+      LLMService.embeddedHandler = ({
         required config,
         required messages,
         required tools,
         systemPrompt,
       }) async {
-        return const LLMResponse(text: 'Response from OS Native Model');
+        return const LLMResponse(text: 'Response from Embedded / On-Device Model');
       };
 
       const config = LlmConfig(
-        provider: LlmProvider.localAi,
-        model: 'apple-foundation',
+        provider: LlmProvider.embedded,
+        model: 'model.bin',
         apiKey: '',
       );
 
@@ -724,8 +727,8 @@ void main() {
         tools: [],
       );
 
-      expect(response.text, 'Response from OS Native Model');
-      LLMService.localAiHandler = null;
+      expect(response.text, 'Response from Embedded / On-Device Model');
+      LLMService.embeddedHandler = null;
     });
   });
 }

@@ -73,8 +73,20 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
     final maxContentHeight = availableHeight * 0.6;
     final theme = Theme.of(context);
 
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
     return AlertDialog(
-      title: const Row(children: [Icon(Icons.add_link, size: 22), SizedBox(width: 8), Text('Add GGUF Model')]),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 24,
+        vertical: isMobile ? 12 : 24,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 24,
+        20,
+        isMobile ? 12 : 24,
+        16,
+      ),
+      title: const Row(children: [Icon(Icons.add_link, size: 22), SizedBox(width: 8), Text('Add On-Device Model URL')]),
       content: Form(
         key: _formKey,
         child: ConstrainedBox(
@@ -87,8 +99,8 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Enter the direct download URL of a .gguf file. '
-                    'You can find models on HuggingFace or other GGUF repositories.',
+                    'Enter the direct download URL of a .bin, .task, or .gguf file. '
+                    'You can find models on HuggingFace, MediaPipe, or LiteRT repositories.',
                     style: TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 16),
@@ -106,8 +118,8 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                   TextFormField(
                     controller: _urlCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'GGUF download URL *',
-                      hintText: 'https://huggingface.co/.../model.gguf',
+                      labelText: 'Model download URL *',
+                      hintText: 'https://huggingface.co/.../model.bin or model.gguf',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.link),
                       isDense: true,
@@ -116,8 +128,13 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                       if (v == null || v.trim().isEmpty) return 'URL is required';
                       final uri = Uri.tryParse(v.trim());
                       if (uri == null || !uri.hasScheme) return 'Enter a valid URL';
-                      if (!v.trim().toLowerCase().contains('.gguf') && !v.trim().contains('?')) {
-                        return 'URL does not appear to point to a .gguf file';
+                      final clean = v.trim().toLowerCase();
+                      final isValid = clean.contains('.gguf') ||
+                          clean.contains('.bin') ||
+                          clean.contains('.task') ||
+                          clean.contains('?');
+                      if (!isValid) {
+                        return 'URL should point to a .bin, .task, or .gguf model file';
                       }
                       return null;
                     },

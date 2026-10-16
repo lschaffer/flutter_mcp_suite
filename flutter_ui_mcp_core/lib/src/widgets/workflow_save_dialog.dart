@@ -163,6 +163,16 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
     final isWide = MediaQuery.sizeOf(context).width >= 600;
 
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isWide ? 24 : 8,
+        vertical: isWide ? 24 : 12,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        isWide ? 24 : 12,
+        20,
+        isWide ? 24 : 12,
+        16,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Row(
         children: [
@@ -175,7 +185,7 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
         width: isWide ? 500 : double.maxFinite,
         child: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_errorMessage != null)

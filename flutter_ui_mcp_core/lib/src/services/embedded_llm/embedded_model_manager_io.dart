@@ -40,7 +40,13 @@ class EmbeddedModelManager {
     final dir = await getModelsDirectory();
     if (!await dir.exists()) return {};
     final files = dir.listSync().whereType<File>();
-    return files.map((f) => f.uri.pathSegments.last).toSet();
+    return files
+        .map((f) => f.uri.pathSegments.last)
+        .where((name) {
+          final lower = name.toLowerCase();
+          return lower.endsWith('.gguf') || lower.endsWith('.bin') || lower.endsWith('.task');
+        })
+        .toSet();
   }
 
   Future<String> fullPathForFilename(String filename) async {
@@ -204,7 +210,7 @@ class EmbeddedModelManager {
     int limit = 20,
   }) async {
     final queryParams = {
-      'filter': 'gguf',
+      if (query == null || !query.toLowerCase().contains('.bin')) 'filter': 'gguf',
       'sort': sort,
       'limit': '$limit',
       'full': 'true',
@@ -230,7 +236,9 @@ class EmbeddedModelManager {
       final ggufFiles = siblings
           .where((s) {
             final name = (s as Map<String, dynamic>)['rfilename'] as String? ?? '';
-            return name.toLowerCase().endsWith('.gguf') && !name.toLowerCase().contains('mmproj');
+            final lower = name.toLowerCase();
+            return (lower.endsWith('.gguf') || lower.endsWith('.bin') || lower.endsWith('.task')) &&
+                !lower.contains('mmproj');
           })
           .map((s) {
             final sMap = s as Map<String, dynamic>;

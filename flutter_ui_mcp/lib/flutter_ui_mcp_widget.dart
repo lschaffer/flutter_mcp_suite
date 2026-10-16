@@ -56,6 +56,9 @@ class McpPlayground extends StatefulWidget {
   /// Optional list of tool names to pre-select as active on startup.
   final List<String>? initialEnabledTools;
 
+  /// Optional custom action widgets to display in the AppBar.
+  final List<Widget>? customAppBarActions;
+
   /// Creates a new [McpPlayground] widget instance.
   const McpPlayground({
     super.key,
@@ -71,6 +74,7 @@ class McpPlayground extends StatefulWidget {
     this.showAgentInspector = true,
     this.initialSystemPrompt,
     this.initialEnabledTools,
+    this.customAppBarActions,
   });
 
   @override
@@ -276,6 +280,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
   }
 
   void _handleSend() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final text = _inputCtrl.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
 
@@ -805,6 +810,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
       _playgroundStarted = false;
       _controller.clearChat();
       _attachments.clear();
+      _controller.customLlmConfig = _buildNextCustomLlmConfig();
     });
   }
 
@@ -1231,33 +1237,35 @@ class _McpPlaygroundState extends State<McpPlayground> {
     }
   }
 
+  LlmConfig? _buildNextCustomLlmConfig() {
+    if (!_useCustomLlm) return null;
+    return LlmConfig(
+      provider: _customProvider,
+      model: _customModelCtrl.text.trim(),
+      apiKey: _customApiKeyCtrl.text.trim(),
+      baseUrl: _customBaseUrlCtrl.text.trim(),
+      temperature: double.tryParse(_customTempCtrl.text.trim()) ?? 0.2,
+      maxTokens: int.tryParse(_customMaxTokensCtrl.text.trim()) ?? 0,
+      maxToolOutputSize:
+          int.tryParse(_customMaxToolOutputSizeCtrl.text.trim()) ?? 2560000,
+      tokenWarningThreshold:
+          int.tryParse(_customTokenWarningThresholdCtrl.text.trim()) ??
+          1500000,
+      topK: int.tryParse(_customTopKCtrl.text.trim()),
+      topP: double.tryParse(_customTopPCtrl.text.trim()),
+      repeatPenalty: double.tryParse(_customRepeatPenaltyCtrl.text.trim()),
+      seed: int.tryParse(_customSeedCtrl.text.trim()),
+      thinking: _customThinking,
+      isSlm: _customIsSlm,
+      isMultiModal: _customIsMultiModal,
+      useNativeToolCall: _customUseNativeTool,
+      useStreaming: _customUseStreaming,
+    );
+  }
+
   void _startPlayground() async {
     // 1. Check if LLM is configured
-    LlmConfig? nextCustom;
-    if (_useCustomLlm) {
-      nextCustom = LlmConfig(
-        provider: _customProvider,
-        model: _customModelCtrl.text.trim(),
-        apiKey: _customApiKeyCtrl.text.trim(),
-        baseUrl: _customBaseUrlCtrl.text.trim(),
-        temperature: double.tryParse(_customTempCtrl.text.trim()) ?? 0.2,
-        maxTokens: int.tryParse(_customMaxTokensCtrl.text.trim()) ?? 0,
-        maxToolOutputSize:
-            int.tryParse(_customMaxToolOutputSizeCtrl.text.trim()) ?? 2560000,
-        tokenWarningThreshold:
-            int.tryParse(_customTokenWarningThresholdCtrl.text.trim()) ??
-            1500000,
-        topK: int.tryParse(_customTopKCtrl.text.trim()),
-        topP: double.tryParse(_customTopPCtrl.text.trim()),
-        repeatPenalty: double.tryParse(_customRepeatPenaltyCtrl.text.trim()),
-        seed: int.tryParse(_customSeedCtrl.text.trim()),
-        thinking: _customThinking,
-        isSlm: _customIsSlm,
-        isMultiModal: _customIsMultiModal,
-        useNativeToolCall: _customUseNativeTool,
-        useStreaming: _customUseStreaming,
-      );
-    }
+    final nextCustom = _buildNextCustomLlmConfig();
 
     final tempActiveConfig = nextCustom ?? _controller.llmConfig;
     if (!tempActiveConfig.isConfigured) {
@@ -1282,6 +1290,8 @@ class _McpPlaygroundState extends State<McpPlayground> {
     final loaded = await _ensureEmbeddedModelLoaded();
     if (!loaded) return;
 
+    FocusManager.instance.primaryFocus?.unfocus();
+
     setState(() {
       _playgroundStarted = true;
     });
@@ -1302,23 +1312,23 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 8.0 : 24.0,
-        vertical: isMobile ? 8.0 : 24.0,
+        horizontal: isMobile ? 4.0 : 24.0,
+        vertical: isMobile ? 6.0 : 24.0,
       ),
       child: Column(
-        spacing: isMobile ? 8 : 16,
+        spacing: isMobile ? 6 : 16,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Tool Selector section
           Card(
             margin: isMobile
-                ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                ? const EdgeInsets.symmetric(vertical: 2.0, horizontal: 0)
                 : null,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+              borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
             ),
             child: Padding(
-              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+              padding: EdgeInsets.all(isMobile ? 8.0 : 16.0),
               child: Column(
                 spacing: 10,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1434,13 +1444,13 @@ class _McpPlaygroundState extends State<McpPlayground> {
           if (!_chatMode) ...[
             Card(
               margin: isMobile
-                  ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                  ? const EdgeInsets.symmetric(vertical: 2.0, horizontal: 0)
                   : null,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+                borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
               ),
               child: Padding(
-                padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+                padding: EdgeInsets.all(isMobile ? 8.0 : 16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1480,12 +1490,15 @@ class _McpPlaygroundState extends State<McpPlayground> {
                       controller: _systemPromptCtrl,
                       maxLines: isMobile ? 4 : 5,
                       minLines: 2,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText:
                             'Enter instructions, persona details, or system guidelines...',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                         isDense: true,
-                        contentPadding: EdgeInsets.all(12.0),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 10.0 : 12.0,
+                          vertical: 10.0,
+                        ),
                       ),
                     ),
                   ],
@@ -1522,6 +1535,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 if (_useCustomLlm && _customModelCtrl.text.isEmpty) {
                   _applyLlmDefaults();
                 }
+                _controller.customLlmConfig = _buildNextCustomLlmConfig();
               });
             },
           ),
@@ -1584,6 +1598,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
                         }
                         setState(() {
                           _customProvider = val;
+                          if (_useCustomLlm) {
+                            _controller.customLlmConfig =
+                                _buildNextCustomLlmConfig();
+                          }
                         });
                       },
                       modelCtrl: _customModelCtrl,
@@ -1639,13 +1657,13 @@ class _McpPlaygroundState extends State<McpPlayground> {
           // Initial User message Prompt
           Card(
             margin: isMobile
-                ? const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0)
+                ? const EdgeInsets.symmetric(vertical: 2.0, horizontal: 0)
                 : null,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+              borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
             ),
             child: Padding(
-              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+              padding: EdgeInsets.all(isMobile ? 8.0 : 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1720,9 +1738,20 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   final promptCtrl = TextEditingController(
                     text: _controller.systemPrompt,
                   );
+                  final isMobile = MediaQuery.sizeOf(context).width < 600;
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
+                      insetPadding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 8 : 24,
+                        vertical: isMobile ? 12 : 24,
+                      ),
+                      contentPadding: EdgeInsets.fromLTRB(
+                        isMobile ? 12 : 24,
+                        16,
+                        isMobile ? 12 : 24,
+                        12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -1734,15 +1763,19 @@ class _McpPlaygroundState extends State<McpPlayground> {
                         ],
                       ),
                       content: SizedBox(
-                        width: 700,
+                        width: isMobile ? double.maxFinite : 700,
                         child: TextFormField(
                           controller: promptCtrl,
-                          maxLines: 12,
+                          maxLines: isMobile ? 10 : 12,
                           minLines: 6,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             hintText:
                                 'Enter instructions, persona details, or system guidelines...',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 14,
+                              vertical: 12,
+                            ),
                           ),
                         ),
                       ),
@@ -1912,41 +1945,34 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 hintText: isGen
                     ? 'Agent is working...'
                     : 'Type a message or ask a tool to run...',
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.attach_file_outlined),
-                    tooltip: 'Attach Files / Images',
-                    onPressed: isGen ? null : _pickAttachments,
-                  ),
-                  const Spacer(),
-                  if (isGen)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12.0),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                leading: IconButton(
+                  icon: const Icon(Icons.attach_file_outlined),
+                  tooltip: 'Attach Files / Images',
+                  onPressed: isGen ? null : _pickAttachments,
+                ),
+                trailing: isGen
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12.0),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                      )
+                    : IconButton(
+                        icon: Icon(
+                          Icons.send_rounded,
+                          color:
+                              showButton &&
+                                  _controller.activeLlmConfig.isConfigured
+                              ? theme.colorScheme.primary
+                              : Colors.grey,
+                        ),
+                        onPressed:
+                            showButton && _controller.activeLlmConfig.isConfigured
+                            ? _handleSend
+                            : null,
                       ),
-                    )
-                  else
-                    IconButton(
-                      icon: Icon(
-                        Icons.send_rounded,
-                        color:
-                            showButton &&
-                                _controller.activeLlmConfig.isConfigured
-                            ? theme.colorScheme.primary
-                            : Colors.grey,
-                      ),
-                      onPressed:
-                          showButton && _controller.activeLlmConfig.isConfigured
-                          ? _handleSend
-                          : null,
-                    ),
-                ],
               ),
             ],
           ),
@@ -2116,6 +2142,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
     if (isWide) {
       return [
+        if (widget.customAppBarActions != null) ...widget.customAppBarActions!,
         IconButton(
           icon: const Icon(Icons.restart_alt),
           tooltip: l10n.get('resetTooltip'),
@@ -2176,6 +2203,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
     // Mobile / Narrow: Pinned buttons + Overflow
     return [
+      if (widget.customAppBarActions != null) ...widget.customAppBarActions!,
       IconButton(
         icon: const Icon(Icons.restart_alt),
         tooltip: l10n.get('resetTooltip'),

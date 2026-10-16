@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:http/http.dart' as http;
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+import '../services/foundry/foundry_process.dart';
 import 'embedded_llm/embedded_model_picker_widget.dart';
 
 /// Reusable widget for base LLM configuration: Provider, Model (with autocomplete),
@@ -29,6 +31,7 @@ class LlmConfigForm extends StatefulWidget {
 class _LlmConfigFormState extends State<LlmConfigForm> {
   bool _fetchingModels = false;
   bool _testingLlm = false;
+  bool _loadingModel = false;
   List<String> _fetchedModels = [];
 
   final Map<LlmProvider, List<String>> _defaultModels = const {
@@ -51,13 +54,32 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
     ],
     LlmProvider.ollama: [],
     LlmProvider.openaiCompatible: [],
-    LlmProvider.localAi: [
-      'gemini-nano',
-      'apple-foundation',
-      'windows-ai',
-      'chrome-prompt',
-    ],
   };
+
+  List<String> _getModelsForProvider(LlmProvider provider) {
+    return _defaultModels[provider] ?? [];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _applyDefaultBaseUrlIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(LlmConfigForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.provider != oldWidget.provider) {
+      _applyDefaultBaseUrlIfNeeded();
+    }
+  }
+
+  Future<void> _applyDefaultBaseUrlIfNeeded() async {
+    if (widget.provider == LlmProvider.ollama &&
+        widget.baseUrlCtrl.text.trim().isEmpty) {
+      widget.baseUrlCtrl.text = 'http://localhost:11434/api';
+    }
+  }
 
   bool get showBaseUrl {
     return widget.provider == LlmProvider.ollama ||
@@ -175,9 +197,27 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
             resolvedBaseUrl = 'https://api.openai.com/v1';
           } else if (provider == LlmProvider.mistral) {
             resolvedBaseUrl = 'https://api.mistral.ai/v1';
+          } else if (provider == LlmProvider.openaiCompatible &&
+              defaultTargetPlatform == TargetPlatform.windows) {
+            final activeFoundry = await getFoundryActiveUrl();
+            if (activeFoundry != null) {
+              resolvedBaseUrl = activeFoundry;
+            }
           }
         }
-        if (resolvedBaseUrl.isNotEmpty) {
+
+        // On Windows with Foundry / local server, check CLI cached models first
+        if (defaultTargetPlatform == TargetPlatform.windows &&
+            (resolvedBaseUrl.contains('58101') ||
+                resolvedBaseUrl.contains('127.0.0.1') ||
+                resolvedBaseUrl.contains('localhost'))) {
+          final cached = await getFoundryCachedModels();
+          if (cached.isNotEmpty) {
+            list.addAll(cached);
+          }
+        }
+
+        if (list.isEmpty && resolvedBaseUrl.isNotEmpty) {
           final base = resolvedBaseUrl.replaceAll(RegExp(r'/+$'), '');
           final url = Uri.parse('$base/models');
           final headers = {
@@ -206,10 +246,67 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           }
         });
       }
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _fetchingModels = false);
+      }
+    }
+  }
+
+  Future<void> _loadCurrentModel() async {
+    final modelName = widget.modelCtrl.text.trim();
+    if (modelName.isEmpty) return;
+
+    setState(() => _loadingModel = true);
+    try {
+      final isFoundry = defaultTargetPlatform == TargetPlatform.windows &&
+          (widget.baseUrlCtrl.text.contains('58101') ||
+              widget.baseUrlCtrl.text.contains('127.0.0.1') ||
+              widget.baseUrlCtrl.text.contains('localhost'));
+
+      if (isFoundry) {
+        final success = await loadFoundryModel(modelName);
+        if (!mounted) return;
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('Model "$modelName" loaded successfully into Foundry memory.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Failed to load "$modelName". Verify name or run: foundry model load "$modelName"'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        await _testLlmConnection();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading model: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingModel = false);
       }
     }
   }
@@ -256,115 +353,149 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
                 } else if (val == LlmProvider.mistral &&
                     widget.modelCtrl.text.isEmpty) {
                   widget.modelCtrl.text = 'mistral-large-latest';
-                } else if (val == LlmProvider.localAi &&
-                    widget.modelCtrl.text.isEmpty) {
-                  widget.modelCtrl.text = 'gemini-nano';
                 }
               });
             }
           },
         ),
+        const SizedBox(height: 12),
         if (widget.provider != LlmProvider.none &&
             widget.provider != LlmProvider.embedded) ...[
-          // Autocomplete for Model name
-          Autocomplete<String>(
-            initialValue: widget.modelCtrl.value,
-            optionsBuilder: (textEditingValue) {
-              final defaultOpts = _defaultModels[widget.provider] ?? [];
-              final models = _fetchedModels.isNotEmpty
-                  ? _fetchedModels
-                  : defaultOpts;
-              if (textEditingValue.text.isEmpty) {
-                return models;
-              }
-              return models.where(
-                (m) => m.toLowerCase().contains(
-                  textEditingValue.text.toLowerCase(),
-                ),
-              );
-            },
-            fieldViewBuilder: (ctx, controller, focusNode, onSubmitted) {
-              if (controller.text != widget.modelCtrl.text) {
-                controller.text = widget.modelCtrl.text;
-              }
-              return TextFormField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: (value) {
-                  widget.modelCtrl.text = value;
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Model Name',
-                  hintText: 'Enter or select model name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Model name is required'
-                    : null,
-              );
-            },
-            onSelected: (v) {
-              widget.modelCtrl.text = v;
-            },
-          ),
-
-          // API Key or OS-Native banner
-          if (widget.provider == LlmProvider.localAi)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primaryContainer
-                    .withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.offline_bolt_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'OS-Native Local AI (Apple Intelligence / Android Gemini Nano on Samsung Galaxy S25 / Windows AI Foundry). Zero model download, no API key required.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            TextFormField(
-              controller: widget.apiKeyCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'API Key',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-
           // Base Endpoint Url (Visible for Ollama / Custom API / Mistral)
-          if (showBaseUrl)
+          if (showBaseUrl) ...[
             TextFormField(
               controller: widget.baseUrlCtrl,
               decoration: const InputDecoration(
                 labelText: 'Base Endpoint URL (optional)',
-                hintText: 'e.g. http://localhost:11434/api',
+                hintText: 'e.g. http://localhost:11434/api or http://127.0.0.1:58101/v1',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
+              onChanged: (_) {
+                if (_fetchedModels.isNotEmpty) {
+                  setState(() => _fetchedModels = []);
+                }
+              },
             ),
+            if (defaultTargetPlatform == TargetPlatform.windows &&
+                widget.provider == LlmProvider.openaiCompatible) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.bolt, size: 16),
+                    label: const Text('Detect Foundry (127.0.0.1:58101)', style: TextStyle(fontSize: 11)),
+                    onPressed: () async {
+                      final active = await getFoundryActiveUrl();
+                      widget.baseUrlCtrl.text = active ?? 'http://127.0.0.1:58101/v1';
+                      _fetchAvailableModels();
+                    },
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+          ],
+
+          // API Key
+          TextFormField(
+            controller: widget.apiKeyCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'API Key',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Autocomplete for Model name + Load Model Button
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth <= 450;
+              final autocompleteField = Autocomplete<String>(
+                key: ValueKey(
+                  '${widget.provider}_${_fetchedModels.length}_${widget.modelCtrl.text}',
+                ),
+                initialValue: widget.modelCtrl.value,
+                optionsBuilder: (textEditingValue) {
+                  final defaultOpts = _getModelsForProvider(widget.provider);
+                  final models = _fetchedModels.isNotEmpty
+                      ? _fetchedModels
+                      : defaultOpts;
+                  if (textEditingValue.text.isEmpty) {
+                    return models;
+                  }
+                  return models.where(
+                    (m) => m.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    ),
+                  );
+                },
+                fieldViewBuilder: (ctx, controller, focusNode, onSubmitted) {
+                  if (controller.text != widget.modelCtrl.text) {
+                    controller.text = widget.modelCtrl.text;
+                  }
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    onChanged: (value) {
+                      widget.modelCtrl.text = value;
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Model Name',
+                      hintText: 'Enter or select model name',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Model name is required'
+                        : null,
+                  );
+                },
+                onSelected: (v) {
+                  widget.modelCtrl.text = v;
+                },
+              );
+
+              final loadButton = FilledButton.tonalIcon(
+                onPressed: _loadingModel ? null : _loadCurrentModel,
+                icon: _loadingModel
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_circle_outline, size: 16),
+                label: Text(_loadingModel ? 'Loading...' : 'Load Model'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    autocompleteField,
+                    const SizedBox(height: 8),
+                    loadButton,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: autocompleteField),
+                  const SizedBox(width: 8),
+                  loadButton,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
 
           // Action Buttons: Fetch and Test
           Row(
@@ -383,7 +514,10 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.sync, size: 16),
+                        : const Icon(
+                            Icons.sync,
+                            size: 16,
+                          ),
                     label: Text(
                       _fetchedModels.isEmpty
                           ? 'Fetch Available Models'
@@ -410,6 +544,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
         ],
         if (widget.provider == LlmProvider.embedded) ...[
           EmbeddedModelPickerWidget(

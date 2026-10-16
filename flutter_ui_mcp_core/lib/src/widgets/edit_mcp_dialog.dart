@@ -80,13 +80,22 @@ class _EditMcpServerDialogState extends State<EditMcpServerDialog> {
     final dialogBgColor = isDark ? const Color(0xFF1E2530) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
 
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
     return Dialog(
       backgroundColor: dialogBgColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 24,
+        vertical: isMobile ? 12 : 24,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 480),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 24,
+            vertical: 24,
+          ),
           child: Form(
             key: _formKey,
             child: Column(

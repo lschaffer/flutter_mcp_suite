@@ -6,7 +6,7 @@ Shared UI components, dialogs, drawers, controllers, and services for **Flutter 
 
 ## ✨ Features
 
-- **OS-Native Local AI (`LocalAiAdapter`)** – Bridges on-device system models (Google Gemini Nano via Android AICore on Samsung Galaxy S25 / Pixel 8+, Apple FoundationModels on iOS 18.1+, Windows AI Foundry, Chrome Prompt API) with zero cloud latency and zero external keys.
+- **On-Device & Embedded AI (`EmbeddedLlmAdapter`)** – Runs local on-device models (.bin / MediaPipe LiteRT NPU, .task / Apple Neural Engine, and .gguf via llamadart) with zero cloud latency and zero external keys. Windows AI Foundry and Ollama connect seamlessly via standard OpenAI-compatible endpoints.
 - **Multimodal Image Optimization (`ImageOptimizer`)** – Automatically scales large camera photos down to optimal dimensions (max 768px) with native hardware decoders to prevent mobile NPU memory bottlenecks and out-of-memory errors.
 - **`PlaygroundController`** – Full lifecycle and state manager for agent conversations, tool execution, MCP server synchronization, and inspector tracing.
 - **Workflow Automation & Execution** – Define, save, load, and run multi-step agent workflows (`WorkflowDef`, `WorkflowSaveDialog`, `WorkflowLoadDialog`, `WorkflowStep`, sub-prompt pipelines).
@@ -42,5 +42,5 @@ dependencies:
 ## 📂 Examples
 
 - [`example/lib/main.dart`](example/lib/main.dart) – Standalone runnable example showcasing configuring LLMs, managing MCP servers, and inspecting tool execution.
-- [**On-Device Gemini Nano Copilot**](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_local_ai_nano) – Native mobile copilot on Samsung Galaxy S25 / Android AICore with hardware battery, telemetry, and multimodal image inspection.
-- [**GenUI Weather with Local AI**](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_weather_local_ai_nano) – Dynamic generative UI weather dashboard powered by on-device Gemini Nano and Open-Meteo tools.
+- [**Embedded On-Device LLM Showcase**](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_embedded) – Local on-device LLM runner via llamadart with zero cloud dependencies.
+- [**GenUI Dynamic Weather**](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_weather) – Dynamic generative UI weather dashboard powered by Open-Meteo tools and on-device/cloud LLMs.

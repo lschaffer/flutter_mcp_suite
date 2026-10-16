@@ -222,58 +222,123 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_entries.length > 1) _buildTabBar(theme),
+        _buildTopTabBarWithActions(context, theme, activeIdx),
         _buildActiveStep(context, activeIdx),
       ],
     );
   }
 
-  Widget _buildTabBar(ThemeData theme) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+  Widget _buildTopTabBarWithActions(
+    BuildContext context,
+    ThemeData theme,
+    int activeIdx,
+  ) {
+    final entry = _entries[activeIdx];
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final hasTools = widget.availableToolGroups.isNotEmpty;
+
+    return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          for (int i = 0; i < _entries.length; i++) ...[
-            _buildTabHeader(theme, i),
-            const SizedBox(width: 6),
-          ],
-          Tooltip(
-            message: 'Add step',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => _addEntryAfter(_entries.length - 1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.add_rounded,
-                      size: 16,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Step',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
+          // Horizontally scrollable tabs on the left
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (int i = 0; i < _entries.length; i++) ...[
+                    _buildTabHeader(theme, i),
+                    const SizedBox(width: 6),
+                  ],
+                  Tooltip(
+                    message: 'Add step',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _addEntryAfter(_entries.length - 1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.add_rounded,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Step',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
+          const SizedBox(width: 6),
+          // Fixed width action controls aligned to the right on the same line
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!widget.chatMode && hasTools) ...[
+                _ToolsChecklistButton(
+                  entry: entry,
+                  stepIndex: activeIdx,
+                  availableToolGroups: widget.availableToolGroups,
+                  isMobile: isMobile,
+                  onChanged: (names) => _setEnabledTools(activeIdx, names),
+                ),
+                const SizedBox(width: 4),
+              ],
+              if (!widget.chatMode) ...[
+                _StopAfterToolCallBtn(
+                  active: entry.stopAfterToolCall,
+                  onToggle: () => _setStopAfterToolCall(
+                    activeIdx,
+                    !entry.stopAfterToolCall,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              _IconBtn(
+                icon: Icons.add_circle_outline,
+                color: const Color(0xFF00ACC1),
+                tooltip: 'Add step after this one',
+                onPressed: () => _addEntryAfter(activeIdx),
+              ),
+              if (_entries.length > 1) ...[
+                const SizedBox(width: 4),
+                _IconBtn(
+                  icon: Icons.remove_circle_outline,
+                  color: theme.colorScheme.error,
+                  tooltip: 'Remove this step',
+                  onPressed: () => _removeEntry(activeIdx),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -346,77 +411,40 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
 
   Widget _buildActiveStep(BuildContext context, int index) {
     final entry = _entries[index];
-    final theme = Theme.of(context);
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    final hasTools = widget.availableToolGroups.isNotEmpty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
+    final textField = TextField(
+      controller: entry.controller,
+      minLines: widget.minLines,
+      maxLines: widget.maxLines,
+      decoration: InputDecoration(
+        hintText: index == 0
+            ? (widget.hintText ?? 'Message AI...')
+            : 'Continue...  use \${tool_result} to inject prior step output',
+        border: const OutlineInputBorder(),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+      ),
+    );
+
+    if (widget.leading == null && widget.trailing == null) {
+      return textField;
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        if (index == 0 && widget.leading != null) ...[
+        if (widget.leading != null) ...[
           widget.leading!,
-          const SizedBox(height: 6),
+          const SizedBox(width: 4),
         ],
-        TextField(
-          controller: entry.controller,
-          minLines: widget.minLines,
-          maxLines: widget.maxLines,
-          decoration: InputDecoration(
-            hintText: index == 0
-                ? (widget.hintText ?? 'Message AI...')
-                : 'Continue...  use \${tool_result} to inject prior step output',
-            border: const OutlineInputBorder(),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 10,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            if (!widget.chatMode && hasTools) ...[
-              _ToolsChecklistButton(
-                entry: entry,
-                stepIndex: index,
-                availableToolGroups: widget.availableToolGroups,
-                isMobile: isMobile,
-                onChanged: (names) => _setEnabledTools(index, names),
-              ),
-              const SizedBox(width: 6),
-            ],
-            if (!widget.chatMode) ...[
-              _StopAfterToolCallBtn(
-                active: entry.stopAfterToolCall,
-                onToggle: () =>
-                    _setStopAfterToolCall(index, !entry.stopAfterToolCall),
-              ),
-              const SizedBox(width: 6),
-            ],
-            _IconBtn(
-              icon: Icons.add_circle_outline,
-              color: const Color(0xFF00ACC1),
-              tooltip: 'Add step after this one',
-              onPressed: () => _addEntryAfter(index),
-            ),
-            if (_entries.length > 1) ...[
-              const SizedBox(width: 6),
-              _IconBtn(
-                icon: Icons.remove_circle_outline,
-                color: theme.colorScheme.error,
-                tooltip: 'Remove this step',
-                onPressed: () => _removeEntry(index),
-              ),
-            ],
-            if (index == 0 && widget.trailing != null) ...[
-              const SizedBox(width: 6),
-              widget.trailing!,
-            ],
-          ],
-        ),
+        Expanded(child: textField),
+        if (widget.trailing != null) ...[
+          const SizedBox(width: 4),
+          widget.trailing!,
+        ],
       ],
     );
   }

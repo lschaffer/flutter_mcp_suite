@@ -345,11 +345,14 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isWide ? 20 : 8,
+        vertical: isWide ? 20 : 12,
+      ),
       child: Container(
         width: isWide ? 850 : double.maxFinite,
         height: 780,
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isWide ? 20 : 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -375,7 +378,7 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_errorMessage != null)
                       Container(

@@ -8,8 +8,8 @@ class McpPlaygroundLocalizations {
   static const _localizedValues = {
     'en': {
       'ok': 'OK',
-      'playground': 'Chat',
-      'chat': 'Chat',
+      'playground': 'Assistant',
+      'chat': 'Assistant',
       'newChat': 'New Chat',
       'playgroundSettings': 'Agent Settings',
       'agentSettings': 'Agent Settings',
@@ -103,8 +103,8 @@ class McpPlaygroundLocalizations {
     },
     'de': {
       'ok': 'OK',
-      'playground': 'Chat',
-      'chat': 'Chat',
+      'playground': 'Assistent',
+      'chat': 'Assistent',
       'newChat': 'Neuer Chat',
       'playgroundSettings': 'Agent-Einstellungen',
       'agentSettings': 'Agent-Einstellungen',

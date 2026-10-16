@@ -1086,12 +1086,12 @@ class GenuiWeatherScreen extends StatelessWidget {
     // if no cloud provider is specified in .env.
     final effectiveProvider = configuredProvider != LlmProvider.none
         ? configuredProvider
-        : (isAndroid ? LlmProvider.localAi : LlmProvider.none);
+        : (isAndroid ? LlmProvider.embedded : LlmProvider.none);
 
     final initialModel = EnvLoader.get(
       'LLM_MODEL',
-      defaultValue: effectiveProvider == LlmProvider.localAi
-          ? 'gemini-nano'
+      defaultValue: effectiveProvider == LlmProvider.embedded
+          ? 'model.bin'
           : 'gpt-4o',
     );
 
@@ -1105,7 +1105,7 @@ class GenuiWeatherScreen extends StatelessWidget {
     return Scaffold(
       body: Column(
         children: [
-          if (effectiveProvider == LlmProvider.localAi)
+          if (effectiveProvider == LlmProvider.embedded)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: Theme.of(context).colorScheme.primaryContainer,

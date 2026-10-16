@@ -38,8 +38,6 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 ### Compatibility across Suite Examples
 
 | Example Application | Target Platform | Min. Recommended Model | Best Experience |
-|:---|:---|:---|:---|
-| **[On-Device Gemini Nano Copilot](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_local_ai_nano)** | Mobile (Android / iOS) | **Gemini Nano** / **Apple FoundationModels** | Gemini Nano (Samsung S25 / Pixel 9 NPU) |
 | **[Interactive Live Canvas](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_interactive_canvas)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | GPT-4o / Claude 3.5 Sonnet |
 | **[Embedded LLM Showcase](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_embedded)** | Desktop / Mobile | **Qwen 2.5 3B** / **Ministral 3B** (GGUF) | Qwen 2.5 3B / 7B (Offline) |
 | **[Device Diagnostics Copilot](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_device_diagnostics)** | Desktop / Mobile | **Gemma 2 2B** / **Qwen 2.5 3B** | Qwen 2.5 7B / Mistral 7B |

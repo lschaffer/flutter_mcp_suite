@@ -73,7 +73,16 @@ class EnvLoader {
       case 'gemini_nano':
       case 'gemini-nano':
       case 'nano':
-        return LlmProvider.localAi;
+      case 'apple-intelligence':
+      case 'embedded':
+        return LlmProvider.embedded;
+      case 'windows_ai':
+      case 'windows-ai':
+      case 'windows-ai-foundry':
+      case 'phi-silica':
+      case 'directml':
+      case 'foundry':
+        return LlmProvider.openaiCompatible;
       default:
         return LlmProvider.none;
     }

@@ -152,8 +152,11 @@ class EmbeddedModelManager {
           .where((s) {
             final name =
                 (s as Map<String, dynamic>)['rfilename'] as String? ?? '';
-            return name.toLowerCase().endsWith('.gguf') &&
-                !name.toLowerCase().contains('mmproj');
+            final lower = name.toLowerCase();
+            return (lower.endsWith('.gguf') ||
+                    lower.endsWith('.bin') ||
+                    lower.endsWith('.task')) &&
+                !lower.contains('mmproj');
           })
           .map((s) {
             final sMap = s as Map<String, dynamic>;

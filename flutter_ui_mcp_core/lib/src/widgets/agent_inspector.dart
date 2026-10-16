@@ -343,7 +343,6 @@ ModelTokenPrice? _getModelTokenPrice(LlmProvider provider, String model) {
       }
       break;
     case LlmProvider.embedded:
-    case LlmProvider.localAi:
     case LlmProvider.ollama:
     case LlmProvider.none:
       return null;

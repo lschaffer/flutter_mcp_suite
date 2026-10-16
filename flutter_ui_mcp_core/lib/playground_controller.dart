@@ -9,7 +9,6 @@ import 'src/models/skill_def.dart';
 import 'src/models/workflow_def.dart';
 import 'src/utils/mime_utils.dart';
 import 'src/services/embedded_llm/embedded_llm_adapter.dart';
-import 'src/services/local_ai/local_ai_adapter.dart';
 import 'src/skills/file_system_skill_storage_adapter.dart';
 import 'src/skills/web_skill_storage_adapter.dart';
 
@@ -404,7 +403,6 @@ class PlaygroundController extends ChangeNotifier {
       _localTools.addAll(customLocalTools);
     }
     _registerEmbeddedLlmHandlers();
-    LocalAiAdapter.instance.registerHandlers();
     _mcpManager.addListener(notifyListeners);
     _initAndLoad();
   }
@@ -585,6 +583,7 @@ class PlaygroundController extends ChangeNotifier {
           required List<MCPTool> tools,
           String? systemPrompt,
         }) async {
+
           final combinedMessages = <ChatMessage>[];
           if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
             combinedMessages.add(
@@ -616,6 +615,7 @@ class PlaygroundController extends ChangeNotifier {
           required List<MCPTool> tools,
           String? systemPrompt,
         }) {
+
           final controller = StreamController<LLMStreamChunk>();
 
           final combinedMessages = <ChatMessage>[];

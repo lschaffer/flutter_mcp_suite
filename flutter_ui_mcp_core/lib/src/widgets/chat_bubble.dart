@@ -119,6 +119,9 @@ class ChatBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (message.attachments != null &&
+                      message.attachments!.isNotEmpty)
+                    _buildAttachments(context, message.attachments!, theme),
                   if (showTypingIndicator)
                     const Padding(
                       padding: EdgeInsets.symmetric(
@@ -1376,6 +1379,169 @@ class ChatBubble extends StatelessWidget {
           icon: const Icon(Icons.download_outlined),
           onPressed: () => _downloadFile(context, bytes, fileName),
           tooltip: 'Download File',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachments(
+    BuildContext context,
+    List<MessageAttachment> attachments,
+    ThemeData theme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: attachments.map((att) {
+          final mime = att.mimeType.toLowerCase();
+          final name = att.name.toLowerCase();
+          final isImage = mime.startsWith('image/') ||
+              name.endsWith('.png') ||
+              name.endsWith('.jpg') ||
+              name.endsWith('.jpeg') ||
+              name.endsWith('.webp') ||
+              name.endsWith('.gif');
+
+          if (isImage && att.bytes != null && att.bytes!.isNotEmpty) {
+            return GestureDetector(
+              onTap: () => _showImagePreviewDialog(context, att),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  constraints: const BoxConstraints(
+                    maxWidth: 240,
+                    maxHeight: 180,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Image.memory(
+                        att.bytes!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.broken_image, size: 20),
+                              const SizedBox(width: 6),
+                              Text(att.name, style: const TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${((att.bytes?.length ?? att.size ?? 0) / 1024).toStringAsFixed(0)} KB',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.5,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.attach_file,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    att.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${((att.bytes?.length ?? att.size ?? 0) / 1024).toStringAsFixed(0)} KB',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _showImagePreviewDialog(BuildContext context, MessageAttachment att) {
+    if (att.bytes == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              clipBehavior: Clip.none,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(
+                  att.bytes!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                radius: 16,
+                child: Icon(Icons.close, color: Colors.white, size: 18),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
         ),
       ),
     );

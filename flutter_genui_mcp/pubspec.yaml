@@ -23,6 +23,7 @@ dependencies:
   dart_mcp_core: ^1.2.0
   flutter_ui_mcp_core: '>=1.2.0 <2.0.0'
   genui: ^0.10.4
+  a2ui_core: ^0.1.1
   genai_primitives: ^0.2.4
   json_schema_builder: ^0.1.7
   uuid: ^4.6.0

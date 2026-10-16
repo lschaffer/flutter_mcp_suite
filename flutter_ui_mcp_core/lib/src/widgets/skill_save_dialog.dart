@@ -181,11 +181,22 @@ class _SkillSaveDialogState extends State<SkillSaveDialog> {
   @override
   Widget build(BuildContext context) {
     final stepCount = _gatherPromptSteps().length;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 24,
+        vertical: isMobile ? 12 : 24,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 24,
+        20,
+        isMobile ? 12 : 24,
+        16,
+      ),
       title: const Text('Save Skill'),
       content: SizedBox(
-        width: 420,
+        width: isMobile ? double.maxFinite : 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

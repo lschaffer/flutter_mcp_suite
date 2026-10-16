@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:a2ui_core/a2ui_core.dart' as a2ui_core;
 import 'package:genui/genui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart' as mp;
 import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
@@ -89,6 +91,9 @@ class McpGenuiChatController extends ChangeNotifier {
       controller: _surfaceController,
       transport: _transport,
     );
+    _surfaceSubscription = _surfaceController.surfaceUpdates.listen((_) {
+      _syncSurfaces();
+    });
   }
 
   final PlaygroundController? _playgroundController;
@@ -101,6 +106,7 @@ class McpGenuiChatController extends ChangeNotifier {
   late final A2uiTransportAdapter _transport;
   late final SurfaceController _surfaceController;
   late final Conversation _conversation;
+  StreamSubscription? _surfaceSubscription;
 
   final List<GenuiChatEntry> _entries = [];
   final List<mp.ChatMessage> _history = [];
@@ -111,6 +117,7 @@ class McpGenuiChatController extends ChangeNotifier {
   bool _isGenerating = false;
 
   void _syncSurfaces() {
+    var added = false;
     for (final sId in _surfaceController.activeSurfaceIds) {
       if (_knownSurfaces.add(sId)) {
         _entries.add(
@@ -121,8 +128,41 @@ class McpGenuiChatController extends ChangeNotifier {
             surfaceId: sId,
           ),
         );
+        added = true;
       }
     }
+    if (added) {
+      notifyListeners();
+    }
+  }
+
+  void _parseAndApplyA2uiBlocks(String text) {
+    final matches =
+        RegExp(r'```(?:json)?\s*([\s\S]*?)\s*```').allMatches(text);
+    for (final m in matches) {
+      final jsonStr = m.group(1)?.trim();
+      if (jsonStr == null || !jsonStr.startsWith('{')) continue;
+      try {
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is Map<String, dynamic>) {
+          if (decoded.containsKey('version') &&
+              (decoded.containsKey('createSurface') ||
+                  decoded.containsKey('updateComponents') ||
+                  decoded.containsKey('updateDataModel') ||
+                  decoded.containsKey('deleteSurface'))) {
+            if (decoded.containsKey('createSurface')) {
+              final cs = decoded['createSurface'];
+              if (cs is Map<String, dynamic> && !cs.containsKey('catalogId')) {
+                cs['catalogId'] = _catalog.catalogId;
+              }
+            }
+            final msg = a2ui_core.A2uiMessage.fromJson(decoded);
+            _surfaceController.handleMessage(msg);
+          }
+        }
+      } catch (_) {}
+    }
+    _syncSurfaces();
   }
 
   /// The GenUI [SurfaceController] backing this chat.
@@ -187,6 +227,12 @@ class McpGenuiChatController extends ChangeNotifier {
     _pendingAttachments = null;
 
     final prompt = _messageToPrompt(message);
+    if (prompt.trim().isEmpty && (atts == null || atts.isEmpty)) {
+      _isGenerating = false;
+      notifyListeners();
+      return;
+    }
+
     final userDisplay = _messageToDisplayJson(message);
     if (message.text.isEmpty && userDisplay.isNotEmpty) {
       _entries.add(
@@ -339,8 +385,9 @@ class McpGenuiChatController extends ChangeNotifier {
           }
         }
 
-        _syncSurfaces();
         final rawIterationText = iterationBuffer.toString();
+        _parseAndApplyA2uiBlocks(rawIterationText);
+        _syncSurfaces();
         if (rawIterationText.isNotEmpty) {
           final assistantMsg = mp.ChatMessage(
             id: iterationEntryId,
@@ -499,6 +546,16 @@ class McpGenuiChatController extends ChangeNotifier {
             normalizedOp: argsCopy,
           };
         }
+        if (normalizedOp == 'createSurface') {
+          final body = a2uiPayload['createSurface'] as Map<String, dynamic>?;
+          if (body != null && !body.containsKey('catalogId')) {
+            body['catalogId'] = _catalog.catalogId;
+          }
+        }
+        try {
+          final msg = a2ui_core.A2uiMessage.fromJson(a2uiPayload);
+          _surfaceController.handleMessage(msg);
+        } catch (_) {}
         final a2uiJson = jsonEncode(a2uiPayload);
         _transport.addChunk('\n$a2uiJson\n');
         _syncSurfaces();
@@ -721,6 +778,7 @@ class McpGenuiChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _surfaceSubscription?.cancel();
     _conversation.dispose();
     _transport.dispose();
     _surfaceController.dispose();

@@ -31,22 +31,6 @@ class LLMService {
     String? systemPrompt,
   })? embeddedStreamHandler;
 
-  /// Pluggable delegate to handle OS-native Local AI (Apple FoundationModels,
-  /// Android Gemini Nano, Windows AI Foundry, Chrome Prompt API via flutter_local_ai).
-  static Future<LLMResponse> Function({
-    required LlmConfig config,
-    required List<ChatMessage> messages,
-    required List<MCPTool> tools,
-    String? systemPrompt,
-  })? localAiHandler;
-
-  /// Pluggable delegate to handle streaming OS-native Local AI execution.
-  static Stream<LLMStreamChunk> Function({
-    required LlmConfig config,
-    required List<ChatMessage> messages,
-    required List<MCPTool> tools,
-    String? systemPrompt,
-  })? localAiStreamHandler;
 
   static T _getOrCreateClient<T>({
     required String key,
@@ -102,20 +86,6 @@ class LLMService {
           tools: tools,
           systemPrompt: systemPrompt,
         );
-      case LlmProvider.localAi:
-        final handler = localAiHandler;
-        if (handler == null) {
-          throw Exception(
-            'OS-native Local AI handler not registered on LLMService. '
-            'Ensure LocalAiAdapter is initialized.',
-          );
-        }
-        return await handler(
-          config: config,
-          messages: messages,
-          tools: tools,
-          systemPrompt: systemPrompt,
-        );
       default:
         throw Exception(
           'LLM provider not configured or unsupported: ${config.provider}',
@@ -146,20 +116,6 @@ class LLMService {
         final streamHandler = embeddedStreamHandler;
         if (streamHandler == null) {
           throw Exception('Embedded model stream handler not registered on LLMService.');
-        }
-        yield* streamHandler(
-          config: config,
-          messages: messages,
-          tools: tools,
-          systemPrompt: systemPrompt,
-        );
-      case LlmProvider.localAi:
-        final streamHandler = localAiStreamHandler;
-        if (streamHandler == null) {
-          throw Exception(
-            'OS-native Local AI stream handler not registered on LLMService. '
-            'Ensure LocalAiAdapter is initialized.',
-          );
         }
         yield* streamHandler(
           config: config,

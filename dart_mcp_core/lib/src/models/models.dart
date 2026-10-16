@@ -13,8 +13,7 @@ enum LlmProvider {
   ollama,
   openaiCompatible,
   mistral,
-  embedded,
-  localAi;
+  embedded;
 
   String get configKey {
     switch (this) {
@@ -34,14 +33,16 @@ enum LlmProvider {
         return 'mistral';
       case LlmProvider.embedded:
         return 'embedded';
-      case LlmProvider.localAi:
-        return 'local_ai';
     }
   }
 
   static LlmProvider fromConfigKey(String? key) {
     if (key == null) return LlmProvider.none;
     final clean = key.trim().toLowerCase();
+    // Legacy migration: local_ai maps to embedded
+    if (clean == 'local_ai' || clean == 'localai') {
+      return LlmProvider.embedded;
+    }
     return LlmProvider.values.firstWhere(
       (v) => v.configKey == clean,
       orElse: () => LlmProvider.none,
@@ -65,9 +66,7 @@ enum LlmProvider {
       case LlmProvider.mistral:
         return 'Mistral AI';
       case LlmProvider.embedded:
-        return 'Embedded (on-device GGUF)';
-      case LlmProvider.localAi:
-        return 'Local AI (On-Device: Gemini Nano / Apple)';
+        return 'Embedded / On-Device (.bin, .task, .gguf)';
     }
   }
 }
@@ -121,7 +120,7 @@ class LlmConfig {
 
   bool get isConfigured {
     if (provider == LlmProvider.none) return false;
-    if (provider == LlmProvider.embedded || provider == LlmProvider.localAi) {
+    if (provider == LlmProvider.embedded) {
       return true;
     }
     if (model.trim().isEmpty) return false;
