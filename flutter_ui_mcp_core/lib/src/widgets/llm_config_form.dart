@@ -223,6 +223,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
         DropdownButtonFormField<LlmProvider>(
           key: ValueKey(widget.provider),
           initialValue: widget.provider,
+          isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Provider',
             border: OutlineInputBorder(),
@@ -231,7 +232,11 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           items: LlmProvider.values.map((provider) {
             return DropdownMenuItem(
               value: provider,
-              child: Text(provider.displayName),
+              child: Text(
+                provider.displayName,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             );
           }).toList(),
           onChanged: (val) {

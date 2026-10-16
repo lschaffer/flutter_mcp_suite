@@ -67,7 +67,7 @@ enum LlmProvider {
       case LlmProvider.embedded:
         return 'Embedded (on-device GGUF)';
       case LlmProvider.localAi:
-        return 'Local AI (OS-Native: Apple/Gemini Nano/Windows)';
+        return 'Local AI (On-Device: Gemini Nano / Apple)';
     }
   }
 }
