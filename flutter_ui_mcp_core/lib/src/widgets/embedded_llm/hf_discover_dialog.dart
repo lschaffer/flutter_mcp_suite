@@ -8,7 +8,10 @@ class HfDiscoverDialog extends StatefulWidget {
   const HfDiscoverDialog({super.key});
 
   /// Open the dialog. Returns a list of [EmbeddedGgufModel] added by the user.
-  static Future<List<EmbeddedGgufModel>?> show(BuildContext context) {
+  static Future<List<EmbeddedGgufModel>?> show(
+    BuildContext context, {
+    String? initialFormat,
+  }) {
     return Navigator.of(context).push<List<EmbeddedGgufModel>>(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => const HfDiscoverDialog(),
@@ -41,6 +44,10 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  String _getSearchHint() {
+    return 'Search for GGUF models (e.g. Qwen, Llama, Gemma, SmolLM)…';
   }
 
   Future<void> _search() async {
@@ -90,6 +97,7 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Discover Models (HuggingFace)'),
@@ -105,7 +113,7 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
                   child: TextField(
                     controller: _searchCtrl,
                     decoration: InputDecoration(
-                      hintText: 'Search for GGUF models…',
+                      hintText: _getSearchHint(),
                       prefixIcon: const Icon(Icons.search),
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -147,20 +155,25 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              'Results from HuggingFace. Tap a file to add it to your model list. '
-              'You can download it from the model picker afterwards.',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Results from HuggingFace. Tap a file to add it to your model list. '
+                    'You can download it from the model picker afterwards.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
             ),
           ),
-          if (_results.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FilterChip(
-                  label: const Text('Hide too large for CPU'),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                FilterChip(
+                  label: const Text('Hide too large for CPU (>1.5 GB)'),
                   selected: _hideOversized,
                   onSelected: (v) => setState(() => _hideOversized = v),
                   avatar: Icon(Icons.filter_list, size: 14, color: _hideOversized ? Colors.orange : null),
@@ -169,10 +182,10 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
                   side: BorderSide(color: Colors.orange.withValues(alpha: _hideOversized ? 0.5 : 0.2)),
                   visualDensity: VisualDensity.compact,
                 ),
-              ),
+              ],
             ),
-          ],
-          const SizedBox(height: 4),
+          ),
+          const SizedBox(height: 6),
           const Divider(height: 1),
           Expanded(
             child: _loading
@@ -308,7 +321,7 @@ class _RepoCardState extends State<_RepoCard> {
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
-                  'No .gguf files listed for this repo.',
+                  'No compatible GGUF (.gguf) model files listed for this repo.',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )
@@ -332,7 +345,33 @@ class _RepoCardState extends State<_RepoCard> {
                         opacity: tooLarge ? 0.55 : 1.0,
                         child: ListTile(
                           dense: true,
-                          title: Text(file.filename, style: const TextStyle(fontSize: 13, fontFamily: 'monospace')),
+                          title: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'GGUF',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  file.filename,
+                                  style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                           subtitle: Row(
                             children: [
                               Text(file.sizeLabel, style: theme.textTheme.bodySmall),

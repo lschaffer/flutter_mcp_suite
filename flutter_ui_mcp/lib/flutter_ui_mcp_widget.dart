@@ -59,6 +59,10 @@ class McpPlayground extends StatefulWidget {
   /// Optional custom action widgets to display in the AppBar.
   final List<Widget>? customAppBarActions;
 
+  /// Whether to use on-demand progressive tool discovery ([McpListToolsTool] & [McpCallToolTool])
+  /// instead of sending all MCP tool schemas in the initial prompt context.
+  final bool progressiveMcpDiscovery;
+
   /// Creates a new [McpPlayground] widget instance.
   const McpPlayground({
     super.key,
@@ -75,6 +79,7 @@ class McpPlayground extends StatefulWidget {
     this.initialSystemPrompt,
     this.initialEnabledTools,
     this.customAppBarActions,
+    this.progressiveMcpDiscovery = false,
   });
 
   @override
@@ -146,6 +151,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
       customLocalTools: widget.customLocalTools,
       storageDelegate: widget.storageDelegate,
       enableLogging: widget.enableLogging,
+      progressiveMcpDiscovery: widget.progressiveMcpDiscovery,
     );
     _controller.messageContentBuilder = widget.messageContentBuilder;
     _controller.addListener(_onStateChange);
@@ -923,7 +929,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
       context: context,
       builder: (ctx) {
         final screenWidth = MediaQuery.of(ctx).size.width;
-        final isMobile = screenWidth < 600;
+        final isMobile = (!kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.android ||
+                    defaultTargetPlatform == TargetPlatform.iOS)) ||
+            screenWidth < 700;
         if (isMobile) {
           return Dialog.fullscreen(
             child: SettingsPanel(controller: _controller),

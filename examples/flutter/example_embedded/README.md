@@ -1,12 +1,14 @@
 # Embedded LLM Playground Showcase (`example_embedded`)
 
-A complete Flutter application configured to run local, on-device GGUF language models with zero external network dependencies, powered by [`llamadart`](https://pub.dev/packages/llamadart) and [`mcp_playground_flutter`](https://pub.dev/packages/mcp_playground_flutter).
+A complete Flutter application configured to run local, on-device language models with zero external network dependencies, powered by [`llamadart`](https://pub.dev/packages/llamadart) (`.gguf`).
 
 ---
 
 ## ✨ Features
 
-- **On-Device Offline LLM Execution**: Runs local GGUF models directly on device via `llamadart` (C++ llama.cpp bindings).
+- **On-Device Offline LLM Execution**:
+  - Runs local GGUF models directly in-process via `llamadart` (`llama.cpp` bindings) across desktop (Windows, macOS, Linux), mobile (Android, iOS), and web (WebGPU).
+  - Resilient, crash-safe execution with graceful Dart error handling.
 - **Hugging Face Model Discovery**: Search, browse, and download quantized GGUF models directly within the application with progress bars.
 - **Native Dart Tool Execution**: Equipped with Open-Meteo weather tools and dynamic chart generation (`fl_chart` to PNG).
 - **Real-Time Token Streaming**: Real-time token-by-token generation with live Agent Inspector tracing.

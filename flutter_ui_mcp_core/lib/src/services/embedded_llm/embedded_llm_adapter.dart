@@ -19,27 +19,7 @@ class EmbeddedLlmAdapter {
   String? _loadedModelPath;
   Future<void>? _loadingFuture;
 
-  /// Optional native on-device inference executor for running .bin or .task models
-  /// (e.g. MediaPipe / LiteRT on Android or CoreML on iOS/macOS).
-  Future<String?> Function({
-    required String prompt,
-    List<MessageAttachment>? attachments,
-    String? systemPrompt,
-  })? onDeviceExecutor;
-
-  /// Optional callback to discover on-device models dynamically from native storage.
-  Future<List<String>> Function()? nativeModelsScanner;
-
-  /// Optional callback to load a specific on-device model file into native memory (e.g. MediaPipe).
-  Future<bool> Function(String modelPath)? nativeModelLoader;
-
-  bool get isLoaded {
-    final ext = (_loadedModelPath ?? '').split('.').last.toLowerCase();
-    if (ext == 'bin' || ext == 'task') {
-      return _loadedModelPath != null;
-    }
-    return _engine?.isReady == true;
-  }
+  bool get isLoaded => _engine?.isReady == true;
 
   String? get loadedModelPath => _loadedModelPath;
 
@@ -53,19 +33,6 @@ class EmbeddedLlmAdapter {
     int contextSize = 4096,
     void Function(double progress)? onProgress,
   }) async {
-    final ext = modelPath.split('.').last.toLowerCase();
-    if (ext == 'bin' || ext == 'task') {
-      if (nativeModelLoader != null) {
-        final success = await nativeModelLoader!(modelPath);
-        if (!success) {
-          throw Exception('Native loader failed to load on-device model: $modelPath');
-        }
-      }
-      _loadedModelPath = modelPath;
-      onProgress?.call(1.0);
-      return;
-    }
-
     LlamaLogging.configure(level: LlamaLogLevel.debug);
     final effectiveContextSize = _shouldTruncate
         ? contextSize.clamp(1, _mobileMaxContextSize)
@@ -200,24 +167,6 @@ class EmbeddedLlmAdapter {
     double penalty = 1.15,
     void Function(String chunk)? onStreamChunk,
   }) async {
-    final ext = (_loadedModelPath ?? '').split('.').last.toLowerCase();
-    if (onDeviceExecutor != null && (ext == 'bin' || ext == 'task')) {
-      final userMsg = messages.lastWhere(
-        (m) => m.role == ChatRole.user,
-        orElse: () => messages.last,
-      );
-      final systemMsg = messages.lastWhereOrNull((m) => m.role == ChatRole.system);
-      final output = await onDeviceExecutor!(
-        prompt: userMsg.content,
-        attachments: userMsg.attachments,
-        systemPrompt: systemMsg?.content,
-      );
-      if (output != null && onStreamChunk != null) {
-        onStreamChunk(output);
-      }
-      return LLMResponse(text: output ?? '');
-    }
-
     final engine = _engine;
     if (engine == null || !engine.isReady) {
       throw StateError('Embedded model not loaded. Call initialize() first.');

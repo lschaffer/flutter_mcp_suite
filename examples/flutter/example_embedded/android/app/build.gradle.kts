@@ -19,10 +19,16 @@ android {
         applicationId = "com.example.mcp_playground_example"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = flutter.minSdkVersion.let { if (it < 24) 24 else it }
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    packaging {
+        resources {
+            pickFirsts += "**/libc++_shared.so"
+        }
     }
 
     buildTypes {

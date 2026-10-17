@@ -8,7 +8,6 @@ import 'edit_mcp_dialog.dart';
 import 'llm_config_form.dart';
 import 'mcp_server_registry_tab.dart';
 import '../mcp_localizations.dart';
-import 'embedded_llm/embedded_model_picker_widget.dart';
 
 class SettingsDrawer extends StatelessWidget {
   final PlaygroundController controller;
@@ -353,7 +352,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
             defaultTargetPlatform == TargetPlatform.linux ||
             defaultTargetPlatform == TargetPlatform.macOS);
     return DefaultTabController(
-      length: isDesktop ? 4 : 3,
+      length: isDesktop ? 3 : 2,
       child: Scaffold(
         body: SafeArea(
           child: Column(
@@ -382,10 +381,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   const Tab(
                     icon: Icon(Icons.psychology_outlined),
                     text: 'LLM Settings',
-                  ),
-                  const Tab(
-                    icon: Icon(Icons.memory_outlined),
-                    text: 'Embedded',
                   ),
                   const Tab(
                     icon: Icon(Icons.hub_outlined),
@@ -496,26 +491,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         ],
                       ),
                     ),
-                    // Tab 2: Embedded Models
-                    ListView(
-                      padding: const EdgeInsets.all(16.0),
-                      children: [
-                        EmbeddedModelPickerWidget(
-                          selectedFilename: _modelCtrl.text,
-                          onFilenameSelected: (val) async {
-                            _modelCtrl.text = val;
-                            if (_selectedProvider == LlmProvider.embedded) {
-                              final updated = widget.controller.llmConfig.copyWith(
-                                provider: LlmProvider.embedded,
-                                model: val,
-                              );
-                              await widget.controller.updateLlmConfig(updated);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    // Tab 3: MCP Servers
+                    // Tab 2: MCP Servers
                     ListView(
                       padding: const EdgeInsets.all(16.0),
                       children: [

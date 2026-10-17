@@ -6,7 +6,7 @@ Shared UI components, dialogs, drawers, controllers, and services for **Flutter 
 
 ## ✨ Features
 
-- **On-Device & Embedded AI (`EmbeddedLlmAdapter`)** – Runs local on-device models (.bin / MediaPipe LiteRT NPU, .task / Apple Neural Engine, and .gguf via llamadart) with zero cloud latency and zero external keys. Windows AI Foundry and Ollama connect seamlessly via standard OpenAI-compatible endpoints.
+- **On-Device & Embedded AI (`EmbeddedLlmAdapter`)** – Runs local on-device `.gguf` models in-process via `llamadart` (`llama.cpp`) across Android, iOS, Windows, macOS, Linux, and Web (WebGPU) with zero cloud latency and zero external keys. Ollama and local LLM servers connect seamlessly via standard OpenAI-compatible endpoints.
 - **Multimodal Image Optimization (`ImageOptimizer`)** – Automatically scales large camera photos down to optimal dimensions (max 768px) with native hardware decoders to prevent mobile NPU memory bottlenecks and out-of-memory errors.
 - **`PlaygroundController`** – Full lifecycle and state manager for agent conversations, tool execution, MCP server synchronization, and inspector tracing.
 - **Workflow Automation & Execution** – Define, save, load, and run multi-step agent workflows (`WorkflowDef`, `WorkflowSaveDialog`, `WorkflowLoadDialog`, `WorkflowStep`, sub-prompt pipelines).

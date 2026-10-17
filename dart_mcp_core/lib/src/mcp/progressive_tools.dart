@@ -6,15 +6,16 @@ import 'mcp_client_def.dart';
 /// on-demand, without bloating the prompt context with dozens of tool schemas.
 class McpListToolsTool extends McpLocalTool {
   final MultiMCPManager mcpManager;
+  final List<McpLocalTool>? localTools;
 
-  McpListToolsTool({required this.mcpManager});
+  McpListToolsTool({required this.mcpManager, this.localTools});
 
   @override
   String get name => 'mcp_list_tools';
 
   @override
   String get description =>
-      'List all available tools across connected MCP servers with their descriptions and parameter summaries. '
+      'List all available tools across connected MCP servers and local extensions with their descriptions and parameter summaries. '
       'Use this to discover specialized tools when needed without cluttering the initial context.';
 
   @override
@@ -28,27 +29,72 @@ class McpListToolsTool extends McpLocalTool {
             'type': 'string',
             'description': 'Optional filter to list tools from a specific server only.',
           },
+          'query': {
+            'type': 'string',
+            'description': 'Optional search keyword or capability query to filter tools.',
+          },
         },
       };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final serverFilter = arguments['server_name'] as String?;
-    final tools = mcpManager.availableTools;
+    final serverFilter = (arguments['server_name'] as String?)?.toLowerCase().trim();
+    final query = (arguments['query'] as String?)?.toLowerCase().trim();
 
-    if (tools.isEmpty) {
+    final allTools = <MCPTool>[];
+    final seen = <String>{};
+
+    // Add local tools (excluding meta discovery tools)
+    final includeLocal =
+        serverFilter == null || serverFilter.isEmpty || serverFilter == 'local';
+    if (includeLocal && localTools != null) {
+      for (final lt in localTools!) {
+        if (lt.name == 'mcp_list_tools' || lt.name == 'mcp_call_tool') continue;
+        if (seen.add(lt.name)) {
+          allTools.add(lt.toMCPTool());
+        }
+      }
+    }
+
+    // Add connected MCP tools
+    for (final clientDef in mcpManager.clients) {
+      if (!clientDef.isConnected) continue;
+      if (serverFilter != null &&
+          serverFilter.isNotEmpty &&
+          !clientDef.name.toLowerCase().contains(serverFilter)) {
+        continue;
+      }
+      for (final tool in clientDef.availableTools) {
+        if (seen.add(tool.name)) {
+          allTools.add(tool);
+        }
+      }
+    }
+
+    if (allTools.isEmpty) {
       return MCPToolResult.text('No MCP tools are currently available.');
     }
 
-    final buffer = StringBuffer();
-    buffer.writeln('Available MCP tools (${tools.length}):\n');
+    var matching = allTools;
+    if (query != null && query.isNotEmpty) {
+      matching = matching.where((t) {
+        final inName = t.name.toLowerCase().contains(query);
+        final inDesc = (t.description ?? '').toLowerCase().contains(query);
+        return inName || inDesc;
+      }).toList();
+    }
 
-    for (final tool in tools) {
-      if (serverFilter != null && serverFilter.isNotEmpty) {
-        // If server filter is provided, check if client matches
-        // (Tool name resolution will match on call)
-      }
-      buffer.writeln('• ${tool.name}: ${tool.description}');
+    if (matching.isEmpty) {
+      return MCPToolResult.text(
+        'No tools matched query "$query". Total available tools: ${allTools.length} (call without query to view all).',
+      );
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('Available tools (${matching.length}):\n');
+
+    for (final tool in matching) {
+      buffer.writeln('• ${tool.name}: ${tool.description ?? 'No description'}');
       final props = tool.inputSchema?['properties'];
       if (props is Map && props.isNotEmpty) {
         final paramNames = props.keys.join(', ');
@@ -63,15 +109,16 @@ class McpListToolsTool extends McpLocalTool {
 /// Tool allowing LLMs to dynamically invoke an MCP tool discovered via [McpListToolsTool].
 class McpCallToolTool extends McpLocalTool {
   final MultiMCPManager mcpManager;
+  final List<McpLocalTool>? localTools;
 
-  McpCallToolTool({required this.mcpManager});
+  McpCallToolTool({required this.mcpManager, this.localTools});
 
   @override
   String get name => 'mcp_call_tool';
 
   @override
   String get description =>
-      'Invoke an MCP tool by name using the parameters discovered from mcp_list_tools.';
+      'Invoke an MCP or local tool by name using the parameters discovered from mcp_list_tools.';
 
   @override
   ToolRiskLevel get riskLevel => ToolRiskLevel.network;
@@ -101,6 +148,18 @@ class McpCallToolTool extends McpLocalTool {
 
     if (toolName.trim().isEmpty) {
       return MCPToolResult.error('tool_name parameter is required.');
+    }
+
+    // Check local tools first if provided
+    if (localTools != null) {
+      final localMatch = localTools!.where((t) => t.name == toolName).toList();
+      if (localMatch.isNotEmpty) {
+        try {
+          return await localMatch.first.execute(toolArgs);
+        } catch (e) {
+          return MCPToolResult.error('Failed to execute local tool "$toolName": $e');
+        }
+      }
     }
 
     try {

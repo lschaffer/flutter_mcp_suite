@@ -42,7 +42,6 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
   // Track loading model into the LlamaEngine (app memory)
   String? _appLoadingFilename; // filename being loaded into app
   double _appLoadProgress = 0.0; // 0.0–1.0
-  String? _nativeLoadedFilename; // native on-device model (.bin / .task) loaded in memory
 
   // Per-model GPU layers setting (filename → gpuLayers)
   final Map<String, int> _gpuLayersMap = {};
@@ -75,19 +74,6 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
       final customs = await EmbeddedModelManager.instance.loadCustomModels();
       final downloaded = await EmbeddedModelManager.instance
           .listDownloadedFilenames();
-
-      // On Android, if native scanner discovered on-device models (e.g. model.bin), include them
-      if (!kIsWeb &&
-          defaultTargetPlatform == TargetPlatform.android &&
-          EmbeddedLlmAdapter.instance.nativeModelsScanner != null) {
-        try {
-          final scanned = await EmbeddedLlmAdapter.instance.nativeModelsScanner!();
-          for (final s in scanned) {
-            final cleanFilename = s.split(' ').first;
-            downloaded.add(cleanFilename);
-          }
-        } catch (_) {}
-      }
 
       final gpuMap = <String, int>{};
       for (final filename in downloaded) {
@@ -124,7 +110,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
     }
   }
 
-  // All models = custom + any .gguf, .bin, .task files already on disk
+  // All models = custom + any .gguf files already on disk
   List<EmbeddedGgufModel> get _allModels {
     final seen = <String>{};
     final combined = <EmbeddedGgufModel>[];
@@ -133,9 +119,8 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
     }
     for (final filename in _downloadedFilenames) {
       if (seen.add(filename)) {
-        final ext = filename.split('.').last.toLowerCase();
         final name = filename
-            .replaceAll(RegExp(r'\.(gguf|bin|task)$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\.gguf$', caseSensitive: false), '')
             .replaceAll(RegExp(r'[-_]'), ' ');
         // If it maps to a custom model, keep the url/display info
         final custom = _customModels.firstWhere(
@@ -156,11 +141,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
             url: custom.id.isNotEmpty ? custom.url : filename,
             description: custom.id.isNotEmpty
                 ? custom.description
-                : (ext == 'bin'
-                    ? 'On-device NPU/GPU accelerated model (MediaPipe / LiteRT).'
-                    : (ext == 'task'
-                        ? 'On-device Apple Neural Engine / CoreML model.'
-                        : 'On-device llama.cpp model.')),
+                : 'On-device llama.cpp model.',
           ),
         );
       }
@@ -349,16 +330,9 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
   Future<void> _openAddFromDisk() async {
     try {
-      final allowedExtensions = defaultTargetPlatform == TargetPlatform.android
-          ? ['bin', 'gguf', 'task']
-          : (defaultTargetPlatform == TargetPlatform.iOS ||
-                  defaultTargetPlatform == TargetPlatform.macOS)
-              ? ['task', 'bin', 'gguf']
-              : ['gguf', 'bin', 'task'];
-
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: allowedExtensions,
+        allowedExtensions: const ['gguf'],
       );
       if (files.isEmpty) return;
       final file = files.first;
@@ -384,19 +358,14 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
         finalUrl = await copyToModelsDir(path, filename, modelsDirPath);
       }
 
-      final ext = filename.split('.').last.toLowerCase();
       final model = EmbeddedGgufModel(
         id: 'disk_${DateTime.now().millisecondsSinceEpoch}',
         displayName: filename
-            .replaceAll(RegExp(r'\.(gguf|bin|task)$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\.gguf$', caseSensitive: false), '')
             .replaceAll(RegExp(r'[-_]'), ' '),
         filename: filename,
         url: finalUrl,
-        description: ext == 'bin'
-            ? 'On-device NPU/GPU model (MediaPipe / LiteRT).'
-            : (ext == 'task'
-                ? 'On-device Apple Neural Engine / CoreML model.'
-                : 'Local model added from disk.'),
+        description: 'Local GGUF model added from disk.',
         sizeBytes: fileLengthSync(path),
       );
 
@@ -449,51 +418,12 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
   Future<void> _loadModelIntoApp(EmbeddedGgufModel model) async {
     if (_appLoadingFilename != null) return;
 
-    final ext = model.filename.split('.').last.toLowerCase();
-    final isBinOrTask = ext == 'bin' || ext == 'task';
-
     setState(() {
       _appLoadingFilename = model.filename;
       _appLoadProgress = 0.0;
     });
 
     try {
-      if (isBinOrTask) {
-        final String fullPath;
-        if (kIsWeb) {
-          fullPath = model.url;
-        } else {
-          fullPath = fileExists(model.url)
-              ? model.url
-              : await EmbeddedModelManager.instance.fullPathForFilename(
-                  model.filename,
-                );
-        }
-        if (EmbeddedLlmAdapter.instance.nativeModelLoader != null) {
-          final success = await EmbeddedLlmAdapter.instance.nativeModelLoader!(fullPath);
-          if (!success) {
-            throw Exception('Failed to load on-device model: ${model.filename}');
-          }
-        }
-        if (mounted) {
-          setState(() {
-            _nativeLoadedFilename = model.filename;
-            _selectedFilename = model.filename;
-          });
-          widget.onFilenameSelected(model.filename);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'On-device model "${model.displayName}" loaded successfully into memory.',
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
       final bool cpuOnly = (_gpuLayersMap[model.filename] ?? 0) == 0;
       if (!kIsWeb &&
           defaultTargetPlatform == TargetPlatform.android &&
@@ -624,7 +554,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
           ],
         ),
         const SizedBox(height: 8),
-        // Hardware performance tip banner informing user about .bin / .task / .gguf
+        // Hardware performance tip banner informing user about llama.cpp engine
         _buildHardwarePerformanceTip(context),
         const SizedBox(height: 12),
         if (models.isEmpty)
@@ -654,7 +584,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Use "Discover popular" to browse HuggingFace repos, "Add Model URL" to paste a link, or "Add from Disk" to select a local on-device file (.bin, .task, or .gguf).',
+                    'Use "Discover popular" to browse HuggingFace repos, "Add Model URL" to paste a link, or "Add from Disk" to select a local .gguf file.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -669,12 +599,8 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
             final isDownloaded =
                 _downloadedFilenames.contains(model.filename) ||
                 (!kIsWeb && fileExists(model.url));
-            final ext = model.filename.split('.').last.toLowerCase();
-            final isBinOrTask = ext == 'bin' || ext == 'task';
-            final isAppLoaded = isBinOrTask
-                ? (_nativeLoadedFilename == model.filename)
-                : (EmbeddedLlmAdapter.instance.isLoaded &&
-                    (appLoadedPath?.endsWith(model.filename) ?? false));
+            final isAppLoaded = EmbeddedLlmAdapter.instance.isLoaded &&
+                (appLoadedPath?.endsWith(model.filename) ?? false);
             final isAppLoading = _appLoadingFilename == model.filename;
             final isCustom = _customModels.any((m) => m.id == model.id);
             return _ModelTile(
@@ -727,26 +653,12 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
             OutlinedButton.icon(
               onPressed: _openAddGguf,
               icon: const Icon(Icons.add_link, size: 18),
-              label: Text(
-                defaultTargetPlatform == TargetPlatform.android
-                    ? 'Add Model URL (.bin / .gguf)'
-                    : (defaultTargetPlatform == TargetPlatform.iOS ||
-                            defaultTargetPlatform == TargetPlatform.macOS
-                        ? 'Add Model URL (.task / .gguf)'
-                        : l10n.get('addGgufUrl')),
-              ),
+              label: const Text('Add Model URL'),
             ),
             OutlinedButton.icon(
               onPressed: _openAddFromDisk,
               icon: const Icon(Icons.drive_folder_upload, size: 18),
-              label: Text(
-                defaultTargetPlatform == TargetPlatform.android
-                    ? 'Add from Disk (.bin / .gguf)'
-                    : (defaultTargetPlatform == TargetPlatform.iOS ||
-                            defaultTargetPlatform == TargetPlatform.macOS
-                        ? 'Add from Disk (.task / .gguf)'
-                        : l10n.get('addGgufDisk')),
-              ),
+              label: const Text('Add from Disk'),
             ),
             if (_downloadedFilenames.isNotEmpty)
               OutlinedButton.icon(
@@ -808,42 +720,29 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
   Widget _buildHardwarePerformanceTip(BuildContext context) {
     final theme = Theme.of(context);
-    final String title;
-    final String desc;
-    final IconData icon;
-    final Color badgeColor;
-
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      title = 'Hardware NPU Acceleration Recommended';
-      desc =
-          '.bin models run via native NPU/GPU acceleration (Google MediaPipe / LiteRT / Snapdragon NPU). '
-          '.gguf models run via llama.cpp (CPU/OpenCL). '
-          '.bin models deliver significantly faster token/s generation speed and lower battery usage on Android.';
-      icon = Icons.bolt_rounded;
-      badgeColor = Colors.green;
-    } else if (!kIsWeb &&
+    final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+    final isApple = !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
-            defaultTargetPlatform == TargetPlatform.macOS)) {
-      title = 'Apple Neural Engine (ANE) Acceleration';
+            defaultTargetPlatform == TargetPlatform.macOS);
+
+    final String title = 'llama.cpp Cross-Platform Engine (.gguf)';
+    final String desc;
+    final IconData icon = Icons.memory_rounded;
+    final Color badgeColor = theme.colorScheme.primary;
+
+    if (isApple) {
       desc =
-          '.task & CoreML models run accelerated by the Apple Neural Engine. '
-          '.gguf models run via llama.cpp with Apple Metal GPU acceleration.';
-      icon = Icons.speed_rounded;
-      badgeColor = Colors.deepPurple;
-    } else if (!kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux)) {
-      title = 'On-Device Desktop Inference';
+          '.gguf models run in-process using llama.cpp with Apple Metal GPU acceleration. '
+          'Broad community catalog of open-weights models.';
+    } else if (isAndroid) {
       desc =
-          'Embedded models run in-process on-device using llama.cpp. '
-          'For Windows AI Foundry, Ollama, or LM Studio daemons, select "Windows AI Foundry / Local Server" in the Provider dropdown above.';
-      icon = Icons.memory_rounded;
-      badgeColor = theme.colorScheme.primary;
-    } else {
-      title = 'On-Device Browser Inference';
+          '.gguf models run in-process via llama.cpp (optimized with ARM NEON). '
+          'Provides reliable, crash-safe on-device inference for open-weights models.';
+    } else if (kIsWeb) {
       desc = 'Embedded models run via WebGPU in the browser.';
-      icon = Icons.public;
-      badgeColor = theme.colorScheme.primary;
+    } else {
+      desc =
+          'Embedded models run in-process on-device using llama.cpp with CPU/GPU shaders.';
     }
 
     return Container(
@@ -1000,24 +899,11 @@ class _ModelTile extends StatelessWidget {
                           spacing: 6,
                           runSpacing: 4,
                           children: [
-                            if (model.filename.toLowerCase().endsWith('.bin'))
-                              const _Chip(
-                                label: 'NPU Accelerated (.bin)',
-                                icon: Icons.bolt,
-                                color: Colors.green,
-                              ),
-                            if (model.filename.toLowerCase().endsWith('.task'))
-                              const _Chip(
-                                label: 'Neural Engine (.task)',
-                                icon: Icons.speed,
-                                color: Colors.deepPurple,
-                              ),
-                            if (model.filename.toLowerCase().endsWith('.gguf'))
-                              const _Chip(
-                                label: 'llama.cpp (.gguf)',
-                                icon: Icons.terminal,
-                                color: Colors.blue,
-                              ),
+                            const _Chip(
+                              label: 'llama.cpp (.gguf)',
+                              icon: Icons.memory_rounded,
+                              color: Colors.blue,
+                            ),
                             if (model.sizeLabel.isNotEmpty)
                               _Chip(
                                 label: model.sizeLabel,

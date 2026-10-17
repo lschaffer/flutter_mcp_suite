@@ -699,7 +699,7 @@ void main() {
 
       const config = LlmConfig(
         provider: LlmProvider.embedded,
-        model: 'model.bin',
+        model: 'model.gguf',
         apiKey: '',
       );
       expect(config.isConfigured, true);
@@ -717,7 +717,7 @@ void main() {
 
       const config = LlmConfig(
         provider: LlmProvider.embedded,
-        model: 'model.bin',
+        model: 'model.gguf',
         apiKey: '',
       );
 
@@ -729,6 +729,55 @@ void main() {
 
       expect(response.text, 'Response from Embedded / On-Device Model');
       LLMService.embeddedHandler = null;
+    });
+  });
+
+  group('Progressive MCP Tools (McpListToolsTool & McpCallToolTool)', () {
+    test('McpListToolsTool lists localTools and respects query filter', () async {
+      final manager = MultiMCPManager();
+      final localTool = _TestLocalTool();
+      final listTool = McpListToolsTool(
+        mcpManager: manager,
+        localTools: [localTool],
+      );
+
+      // Execute without filter
+      final resAll = await listTool.execute({});
+      expect(resAll.content.first.text, contains('test_tool'));
+      expect(resAll.content.first.text, contains('A test tool'));
+      expect(resAll.content.first.text, contains('Parameters: input'));
+
+      // Filter matching
+      final resFiltered = await listTool.execute({'query': 'test'});
+      expect(resFiltered.content.first.text, contains('test_tool'));
+
+      // Filter non-matching
+      final resEmpty = await listTool.execute({'query': 'nonexistent'});
+      expect(resEmpty.content.first.text, contains('No tools matched query'));
+    });
+
+    test('McpCallToolTool invokes local tool and validates parameters', () async {
+      final manager = MultiMCPManager();
+      final localTool = _TestLocalTool();
+      final callTool = McpCallToolTool(
+        mcpManager: manager,
+        localTools: [localTool],
+      );
+
+      // Missing tool_name
+      final resError = await callTool.execute({'tool_name': ''});
+      expect(resError.isError, true);
+
+      // Successful local tool call
+      final resSuccess = await callTool.execute({
+        'tool_name': 'test_tool',
+        'arguments': {'input': 'progressive discovery works'},
+      });
+      expect(resSuccess.isError, false);
+      expect(
+        resSuccess.content.first.text,
+        'Executed: progressive discovery works',
+      );
     });
   });
 }

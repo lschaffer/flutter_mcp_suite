@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_ui_mcp/flutter_ui_mcp.dart';
 import 'env_loader.dart';
 import 'example_local_tools.dart';
+import 'progressive_discovery_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -121,6 +122,19 @@ class McpPlaygroundScreen extends StatelessWidget {
         'get_hourly_forecast',
         'get_daily_forecast',
         'geocode_weather_city',
+      ],
+      customAppBarActions: [
+        IconButton(
+          icon: const Icon(Icons.auto_awesome),
+          tooltip: 'Progressive MCP Tool Discovery Demo',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ProgressiveDiscoveryExampleScreen(),
+              ),
+            );
+          },
+        ),
       ],
       messageContentBuilder: (context, message) {
         if (message == null) return null;

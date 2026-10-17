@@ -68,7 +68,7 @@ Future<void> main() async {
   print('🚀 Testing New dart_mcp_core Features');
   print('================================================================\n');
 
-  // 1. Setup On-Device Embedded model delegate (e.g. .bin, .task, or .gguf)
+  // 1. Setup On-Device Embedded model delegate (.gguf via llamadart)
   // No API key required!
   LLMService.embeddedHandler = ({
     required LlmConfig config,
@@ -116,7 +116,7 @@ Future<void> main() async {
   // 2. Configure Embedded On-Device Provider
   const localConfig = LlmConfig(
     provider: LlmProvider.embedded,
-    model: 'model.bin',
+    model: 'model.gguf',
     apiKey: '', // Zero API key required on-device
   );
   print('• Configured provider: ${localConfig.provider.displayName}');

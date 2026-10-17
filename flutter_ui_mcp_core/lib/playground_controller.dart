@@ -384,6 +384,19 @@ class PlaygroundController extends ChangeNotifier {
   /// The root directory where skill ZIPs are stored (desktop/mobile only).
   String? get skillsRootPath => _skillsRootPath;
 
+  bool _progressiveMcpDiscovery = false;
+
+  /// Whether to use on-demand progressive tool discovery ([McpListToolsTool] & [McpCallToolTool])
+  /// instead of sending all MCP tool schemas in the initial prompt context.
+  bool get progressiveMcpDiscovery => _progressiveMcpDiscovery;
+  set progressiveMcpDiscovery(bool val) {
+    _progressiveMcpDiscovery = val;
+    notifyListeners();
+  }
+
+  /// Direct access to the internal [MultiMCPManager].
+  MultiMCPManager get mcpManager => _mcpManager;
+
   /// Creates a new [PlaygroundController] instance.
   PlaygroundController({
     LlmConfig? initialLlmConfig,
@@ -391,9 +404,12 @@ class PlaygroundController extends ChangeNotifier {
     List<McpLocalTool>? customLocalTools,
     McpPlaygroundStorageDelegate? storageDelegate,
     this.enableLogging = false,
+    bool progressiveMcpDiscovery = false,
   }) : _llmConfig =
            initialLlmConfig ??
            const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
+       // ignore: prefer_initializing_formals
+       _progressiveMcpDiscovery = progressiveMcpDiscovery,
        _storage = storageDelegate ?? SharedPreferencesStorageDelegate() {
     if (initialServers != null) {
       _servers.addAll(initialServers);
@@ -1153,12 +1169,23 @@ class PlaygroundController extends ChangeNotifier {
 
         // Inject active tool descriptions into system prompt
         final List<MCPTool> allAvailableTools = [];
-        allAvailableTools.addAll(_localTools.map((t) => t.toMCPTool()));
-        allAvailableTools.addAll(_mcpManager.availableTools);
+
+        if (_progressiveMcpDiscovery) {
+          final listTool = McpListToolsTool(mcpManager: _mcpManager, localTools: _localTools);
+          final callTool = McpCallToolTool(mcpManager: _mcpManager, localTools: _localTools);
+          allAvailableTools.add(listTool.toMCPTool());
+          allAvailableTools.add(callTool.toMCPTool());
+        } else {
+          allAvailableTools.addAll(_localTools.map((t) => t.toMCPTool()));
+          allAvailableTools.addAll(_mcpManager.availableTools);
+        }
 
         final List<MCPTool> activeStepTools = allAvailableTools.where((t) {
           if (stepEnabled != null) {
             return stepEnabled.contains(t.name);
+          }
+          if (_progressiveMcpDiscovery && (t.name == 'mcp_list_tools' || t.name == 'mcp_call_tool')) {
+            return true;
           }
           return _enabledToolNames.contains(t.name);
         }).toList();
@@ -1416,7 +1443,11 @@ class PlaygroundController extends ChangeNotifier {
                 .where((t) => t.name == call.name)
                 .toList();
 
-            if (localMatch.isNotEmpty) {
+            if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
+              result = await McpListToolsTool(mcpManager: _mcpManager, localTools: _localTools).execute(call.arguments);
+            } else if (_progressiveMcpDiscovery && call.name == 'mcp_call_tool') {
+              result = await McpCallToolTool(mcpManager: _mcpManager, localTools: _localTools).execute(call.arguments);
+            } else if (localMatch.isNotEmpty) {
               result = await localMatch.first.execute(call.arguments);
             } else {
               result = await _mcpManager.callTool(call.name, call.arguments);

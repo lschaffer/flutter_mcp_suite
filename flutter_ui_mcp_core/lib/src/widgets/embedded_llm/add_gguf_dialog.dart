@@ -2,13 +2,21 @@ import 'package:material_ui/material_ui.dart';
 import '../../services/embedded_llm/embedded_model.dart';
 import '../../services/embedded_llm/embedded_model_manager.dart';
 
-/// Dialog for manually adding a GGUF model by entering its direct download URL.
+/// Dialog for manually adding an on-device model by entering its direct download URL.
 class AddGgufDialog extends StatefulWidget {
-  const AddGgufDialog({super.key});
+  final String initialFormat;
+
+  const AddGgufDialog({super.key, this.initialFormat = 'all'});
 
   /// Show the dialog and return the newly added [EmbeddedGgufModel], or null if cancelled.
-  static Future<EmbeddedGgufModel?> show(BuildContext context) {
-    return showDialog<EmbeddedGgufModel>(context: context, builder: (_) => const AddGgufDialog());
+  static Future<EmbeddedGgufModel?> show(
+    BuildContext context, {
+    String initialFormat = 'all',
+  }) {
+    return showDialog<EmbeddedGgufModel>(
+      context: context,
+      builder: (_) => AddGgufDialog(initialFormat: initialFormat),
+    );
   }
 
   @override
@@ -99,8 +107,8 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Enter the direct download URL of a .bin, .task, or .gguf file. '
-                    'You can find models on HuggingFace, MediaPipe, or LiteRT repositories.',
+                    'Enter the direct download URL of a .gguf file. '
+                    'You can find GGUF models on HuggingFace.',
                     style: TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 16),
@@ -119,7 +127,7 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                     controller: _urlCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Model download URL *',
-                      hintText: 'https://huggingface.co/.../model.bin or model.gguf',
+                      hintText: 'https://huggingface.co/.../model.gguf',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.link),
                       isDense: true,
@@ -129,12 +137,9 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                       final uri = Uri.tryParse(v.trim());
                       if (uri == null || !uri.hasScheme) return 'Enter a valid URL';
                       final clean = v.trim().toLowerCase();
-                      final isValid = clean.contains('.gguf') ||
-                          clean.contains('.bin') ||
-                          clean.contains('.task') ||
-                          clean.contains('?');
+                      final isValid = clean.contains('.gguf') || clean.contains('?');
                       if (!isValid) {
-                        return 'URL should point to a .bin, .task, or .gguf model file';
+                        return 'URL should point to a .gguf model file';
                       }
                       return null;
                     },

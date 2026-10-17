@@ -38,6 +38,7 @@ We provide several runnable example applications across Flutter, GenUI, and head
 * **[Meeting Notes & Action Items Assistant](examples/flutter/example_audio_notes)**: Transcript processor with interactive action item checklist cards and markdown export.
 * **[GitHub Issue Triage & PR Review Copilot](examples/flutter/example_github_triage)**: GitHub issue triage assistant with auto-labeling and inline PR code reviews.
 * **[Embedded LLM Showcase](examples/flutter/example_embedded)**: A Flutter application pre-configured to run with a local on-device embedded LLM (`llamadart`) with zero external network dependencies.
+* **[Progressive Tool Discovery Copilot](examples/flutter/example_progressive_tools)**: Demonstrates on-demand progressive tool discovery with `McpListToolsTool` & `McpCallToolTool` to handle vast catalogs of tools with ~93% prompt token savings.
 
 ### 💻 Dart (Headless) Examples
 * **[Git Staged Diff Reviewer & PR Generator](examples/dart/git_review_skill)**: Automated git inspection workflow analyzing staged diffs with `dart analyze` and exporting `PR_REVIEW.md`.
@@ -69,6 +70,7 @@ Quick prompts to copy-paste and test the interactive tools and widgets in the ne
 | **[Device Diagnostics Copilot](examples/flutter/example_device_diagnostics)** | Flutter MCP | `"Inspect my device telemetry, CPU cores, and memory allocation."`<br>`"Ping 1.1.1.1 and 8.8.8.8 to benchmark my network latency."`<br>`"Perform a complete system audit and export a diagnostic summary report."` |
 | **[Audio & Meeting Notes](examples/flutter/example_audio_notes)** | Flutter MCP | `"Load the latest team sync transcript and summarize key discussion points."`<br>`"Extract all action items from the meeting with owners, priorities, and deadlines."`<br>`"Compile executive meeting minutes and export the notes to markdown."` |
 | **[GitHub Issue Triage](examples/flutter/example_github_triage)** | Flutter MCP | `"Fetch and list open repository issues currently awaiting triage."`<br>`"Triage issue #42: classify severity, suggest labels, and assign a priority level."`<br>`"Draft a structured pull request code review with inline suggestions."` |
+| **[Progressive Tool Discovery](examples/flutter/example_progressive_tools)** | Flutter MCP | `"Check cloud cluster telemetry for prod-us-east-1 and notify #devops-alerts on Slack."`<br>`"Inspect the cache store and calculate compute costs for 12 instances."`<br>`"Query the users database table for recent records and benchmark API latency."` |
 
 > 💡 **Tip after running (`flutter run -d windows` / `-d chrome`)**:
 > Each example project folder includes a pre-configured `skill.md` (AgentSkills.io standard) defining its workflow, system prompt, and tools. After launching the app, you can simply click **Skills** &rarr; **Import Skill** and select `skill.md` to automatically load the tailored system prompt and enable the required tools — or manually verify that the custom tools are checked in the **Tools** drawer / panel and paste the example prompts below.

@@ -550,7 +550,9 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           EmbeddedModelPickerWidget(
             selectedFilename: widget.modelCtrl.text,
             onFilenameSelected: (val) {
-              widget.modelCtrl.text = val;
+              setState(() {
+                widget.modelCtrl.text = val;
+              });
             },
           ),
         ],

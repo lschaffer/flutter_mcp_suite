@@ -1,0 +1,37 @@
+name: example_progressive_tools
+description: "Flutter MCP Playground example demonstrating progressive tool discovery with McpListToolsTool and McpCallToolTool."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_ui_mcp:
+    path: ../../../flutter_ui_mcp
+  flutter_ui_mcp_core:
+    path: ../../../flutter_ui_mcp_core
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
+  http: ^1.6.0
+
+dependency_overrides:
+  dart_mcp_core:
+    path: ../../../dart_mcp_core
+  flutter_ui_mcp_core:
+    path: ../../../flutter_ui_mcp_core
+  flutter_ui_mcp:
+    path: ../../../flutter_ui_mcp
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - ../../../.env

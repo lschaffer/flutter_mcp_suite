@@ -1080,69 +1080,25 @@ class GenuiWeatherScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final configuredProvider = EnvLoader.getProvider();
-    final isAndroid = Theme.of(context).platform == TargetPlatform.android;
-
-    // Auto-select on-device Gemini Nano (Samsung Galaxy S25 / Android AICore)
-    // if no cloud provider is specified in .env.
-    final effectiveProvider = configuredProvider != LlmProvider.none
-        ? configuredProvider
-        : (isAndroid ? LlmProvider.embedded : LlmProvider.none);
-
-    final initialModel = EnvLoader.get(
-      'LLM_MODEL',
-      defaultValue: effectiveProvider == LlmProvider.embedded
-          ? 'model.bin'
-          : 'gpt-4o',
-    );
+    final initialModel = EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o');
 
     final initialLlm = LlmConfig(
-      provider: effectiveProvider,
+      provider: configuredProvider,
       model: initialModel,
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );
 
     return Scaffold(
-      body: Column(
-        children: [
-          if (effectiveProvider == LlmProvider.embedded)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.bolt,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Running with On-Device AI (Gemini Nano on Android AICore / Galaxy S25) - Zero cloud keys required.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: GenuiMcpPlayground(
-              initialLlmConfig: initialLlm.provider != LlmProvider.none
-                  ? initialLlm
-                  : null,
-              customLocalTools: [WeatherForecastTool()],
-              initialEnabledTools: const ['get_weather_forecast'],
-              initialSystemPrompt: weatherGenuiSystemPrompt,
-              genuiCatalog: buildWeatherGenuiCatalog(),
-              showAgentInspector: true,
-            ),
-          ),
-        ],
+      body: GenuiMcpPlayground(
+        initialLlmConfig: initialLlm.provider != LlmProvider.none
+            ? initialLlm
+            : null,
+        customLocalTools: [WeatherForecastTool()],
+        initialEnabledTools: const ['get_weather_forecast'],
+        initialSystemPrompt: weatherGenuiSystemPrompt,
+        genuiCatalog: buildWeatherGenuiCatalog(),
+        showAgentInspector: true,
       ),
     );
   }

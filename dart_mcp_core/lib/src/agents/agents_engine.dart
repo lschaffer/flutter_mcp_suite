@@ -696,16 +696,22 @@ class McpAgentEngine {
       }
 
       final allTools = <MCPTool>[];
-      allTools.addAll(localTools.map((t) => t.toMCPTool()));
 
       if (agent.progressiveMcpDiscovery) {
-        final listTool = McpListToolsTool(mcpManager: mcpManager);
-        final callTool = McpCallToolTool(mcpManager: mcpManager);
+        final listTool = McpListToolsTool(
+          mcpManager: mcpManager,
+          localTools: List.unmodifiable(localTools),
+        );
+        final callTool = McpCallToolTool(
+          mcpManager: mcpManager,
+          localTools: List.unmodifiable(localTools),
+        );
         localTools.add(listTool);
         localTools.add(callTool);
         allTools.add(listTool.toMCPTool());
         allTools.add(callTool.toMCPTool());
       } else {
+        allTools.addAll(localTools.map((t) => t.toMCPTool()));
         allTools.addAll(mcpManager.availableTools);
       }
 

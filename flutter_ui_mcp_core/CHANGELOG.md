@@ -1,18 +1,17 @@
 ## 1.2.0
 
-* **OS-Native Local AI Adapter (`LocalAiAdapter`)**:
-  * Added `LocalAiAdapter` bridging OS-native inference backends (Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry, Chrome Prompt API) to `dart_mcp_core`.
-  * Added on-device multimodal visual inspection & classification for image attachments.
-  * Added `onDeviceExecutor` delegate hook for native Android AICore / llama.cpp runners.
-  * Added hybrid cloud fallback routing to Gemini Flash / OpenAI / Ollama when an API key or local URL is configured.
-  * Context-aware on-device generative synthesis for general queries, calculations, and local hardware tool orchestration.
-  * Integrated on-device model routing in `PlaygroundController` and `LlmConfigForm`.
+* **Embedded On-Device LLM Standardization (`.gguf` via `llamadart`)**:
+  * Standardized the embedded on-device engine exclusively on `.gguf` via `llamadart` (`llama.cpp`) across all platforms (Android, iOS, Windows, macOS, Linux, Web), ensuring crash-safe execution and access to the extensive open-weights community catalog.
+  * Enhanced HuggingFace discovery (`HfDiscoverDialog`) and direct URL import (`AddGgufDialog`) tailored to quantized GGUF models with automatic CPU size safety filtering.
+  * Added hardware-specific acceleration guidance in `EmbeddedModelPickerWidget` (Apple Metal GPU, Android ARM NEON, Desktop shaders, WebGPU).
 * **Multimodal Image Optimization (`ImageOptimizer`)**:
   * Added `ImageOptimizer.shrinkToOptimalSize` using Flutter native hardware decoders to automatically downscale large photos (e.g. 200MP mobile camera shots) to optimal 768px dimensions for on-device SLMs and multimodal APIs without memory bloat.
+* **Mobile UX Enhancements**:
+  * Optimized LLM configuration and settings modal sheets for mobile screens, rendering as full-screen views on devices under 600px width for optimal readability.
 * **Zero-Cost Telemetry**:
-  * Configured `AgentInspector` token cost tracking to recognize `LlmProvider.localAi` as zero-cost on-device execution.
+  * Configured `AgentInspector` token cost tracking to recognize `LlmProvider.embedded` as zero-cost on-device execution.
 * **Dependencies**:
-  * Upgraded dependency to `dart_mcp_core: '>=1.1.6 <2.0.0'`.
+  * Upgraded dependency to `dart_mcp_core: ^1.2.0`.
 
 ## 1.1.7
 

@@ -1,8 +1,10 @@
 ## 1.2.0
 
-* **OS-Native Local AI & Ecosystem Sync**:
+* **Embedded On-Device LLM & Mobile UX**:
+  * Support for dynamic GenUI generation using local on-device `.gguf` (llama.cpp) models via `llamadart`.
+  * Fullscreen dialog presentation for Settings drawer on mobile devices (`isMobile`) for optimized touch UX.
+  * Streamlined embedded model settings in unified LLM configuration.
   * Upgraded dependencies to `dart_mcp_core: ^1.2.0` and `flutter_ui_mcp_core: '>=1.2.0 <2.0.0'`.
-  * Support for rendering dynamic GenUI components directly from OS-native on-device models (e.g., Google Gemini Nano on Android AICore / Samsung Galaxy S25).
   * Synchronized version 1.2.0 across the Flutter MCP Suite ecosystem.
 
 ## 1.1.7

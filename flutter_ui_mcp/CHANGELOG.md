@@ -1,8 +1,10 @@
 ## 1.2.0
 
-* **OS-Native Local AI & Ecosystem Sync**:
-  * Upgraded dependencies to `dart_mcp_core: '>=1.1.6 <2.0.0'` and `flutter_ui_mcp_core: '>=1.2.0 <2.0.0'`.
-  * Integrated on-device OS-native model execution (Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry) with zero cloud keys.
+* **Embedded On-Device LLM & Mobile UX**:
+  * Standardized local on-device execution on `.gguf` models via `llamadart` (`llama.cpp`) for reliable, crash-safe cross-platform performance.
+  * Fullscreen settings modal presentation on mobile devices for improved readability and configuration ergonomics.
+  * Streamlined embedded model settings within the unified LLM config panel.
+  * Upgraded dependencies to `dart_mcp_core: ^1.2.0` and `flutter_ui_mcp_core: '>=1.2.0 <2.0.0'`.
   * Synchronized version 1.2.0 across the Flutter MCP Suite ecosystem.
 * **Automatic Multimodal Image Downscaling**:
   * Integrated `ImageOptimizer.shrinkToOptimalSize` directly into `_pickAttachments` to automatically downscale uploaded photos (e.g. 200MP mobile camera shots) to optimal 768px bounds for on-device SLMs and multimodal APIs without memory bloat.

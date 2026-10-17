@@ -9,14 +9,13 @@ Ideal for building pure Dart CLI applications, background workers, backend servi
 ## ✨ Features
 
 - **Multi-LLM Provider Support** — Unified SDK wrappers for:
-  - **OS-Native Local AI** (`LlmProvider.localAi` for Android AICore / Gemini Nano, Apple FoundationModels, Windows AI Foundry)
+  - **Embedded GGUF Models** (on-device execution via `llamadart`)
   - **OpenAI** (`openai_dart`)
   - **Anthropic Claude** (`anthropic_sdk_dart`)
   - **Google Gemini** (`googleai_dart`)
   - **Ollama** (Local models via `ollama_dart`)
   - **Mistral AI** (OpenAI-compatible client with tool call/assistant formatting patches)
   - **OpenAI-Compatible** (vLLM, LiteLLM, or custom local endpoints)
-  - **Embedded GGUF Models** (on-device execution via `llamadart`)
 - **Context Window Auto-Compression (`ContextCompressor`)** — Pure Dart token monitoring and automatic LLM-powered summarization of older conversation turns for SLMs and long-running sessions.
 - **Structured Agent Planning (`PlanState`, `PlanStep`, `WriteTodosTool`)** — Native task checklist planning and live progress tracking with reactive `AgentPlanEvent` streams.
 - **Agent Lifecycle Hooks (`AgentHook`)** — Security interceptors (`beforeToolCall`, `afterToolCall`, `beforeModelCall`, `afterModelCall`) with `ToolCallDecision` (`proceed`, `deny`, `modify`).

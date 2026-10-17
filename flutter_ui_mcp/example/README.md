@@ -75,3 +75,42 @@ Here is how the playground and its configuration interfaces look:
 - **Host Requirements for Local Subprocesses**:
   - **Node.js** (for filesystem npx actions)
   - **Python 3** & **`uv`** (for git uvx actions)
+
+---
+
+## 🔍 Progressive MCP Tool Discovery (`McpListToolsTool` & `McpCallToolTool`)
+
+When connected to multiple MCP servers with 50+ tools, loading every tool's schema into the LLM prompt upfront can consume 10,000+ tokens on every turn. 
+
+Progressive Tool Discovery solves this by providing only two meta-tools:
+- **`mcp_list_tools`** (`McpListToolsTool`): Lists available tools across connected servers on-demand.
+- **`mcp_call_tool`** (`McpCallToolTool`): Dynamically calls any discovered tool by name with arguments.
+
+### Quick Usage with `McpPlayground`:
+```dart
+McpPlayground(
+  progressiveMcpDiscovery: true, // Only injects mcp_list_tools and mcp_call_tool
+  customLocalTools: [
+    GetCurrentWeatherTool(),
+    GetHourlyForecastTool(),
+  ],
+)
+```
+
+### Manual / Programmatic Usage:
+```dart
+final mcpManager = MultiMCPManager();
+await mcpManager.connectSse('https://remote.mcp.server/sse');
+
+// Wrap connected servers with discovery meta-tools:
+final listToolsTool = McpListToolsTool(mcpManager: mcpManager);
+final callToolTool = McpCallToolTool(mcpManager: mcpManager);
+
+// Pass to McpPlayground or Agent:
+McpPlayground(
+  customLocalTools: [listToolsTool, callToolTool],
+)
+```
+
+A dedicated runnable example screen is available in [`lib/progressive_discovery_example.dart`](lib/progressive_discovery_example.dart) and can be opened directly from the AppBar icon in the example app.
+

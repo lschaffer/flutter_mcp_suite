@@ -562,22 +562,33 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   }
 
   void _showSettingsDialog() {
+    final isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: SizedBox(
-          width: 820,
-          height: 720,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SettingsDrawer(
-              controller: _controller,
+      builder: (ctx) {
+        final screenWidth = MediaQuery.of(ctx).size.width;
+        if (isMobile || screenWidth < 700) {
+          return Dialog.fullscreen(
+            child: SettingsPanel(controller: _controller),
+          );
+        }
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: SizedBox(
+            width: 820,
+            height: 720,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SettingsPanel(
+                controller: _controller,
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

@@ -66,7 +66,7 @@ enum LlmProvider {
       case LlmProvider.mistral:
         return 'Mistral AI';
       case LlmProvider.embedded:
-        return 'Embedded / On-Device (.bin, .task, .gguf)';
+        return 'Embedded / Local GGUF (.gguf)';
     }
   }
 }

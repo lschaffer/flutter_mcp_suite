@@ -121,7 +121,7 @@ class EmbeddedModelManager {
     String sort = 'downloads',
     int limit = 20,
   }) async {
-    final queryParams = {
+    final queryParams = <String, String>{
       'filter': 'gguf',
       'sort': sort,
       'limit': '$limit',
@@ -153,10 +153,7 @@ class EmbeddedModelManager {
             final name =
                 (s as Map<String, dynamic>)['rfilename'] as String? ?? '';
             final lower = name.toLowerCase();
-            return (lower.endsWith('.gguf') ||
-                    lower.endsWith('.bin') ||
-                    lower.endsWith('.task')) &&
-                !lower.contains('mmproj');
+            return lower.endsWith('.gguf') && !lower.contains('mmproj');
           })
           .map((s) {
             final sMap = s as Map<String, dynamic>;
