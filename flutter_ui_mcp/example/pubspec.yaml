@@ -12,8 +12,8 @@ dependencies:
     sdk: flutter
   flutter_ui_mcp:
     path: ../
-  dart_mcp_core: ^1.0.2
-  flutter_ui_mcp_core: ^1.0.2
+  dart_mcp_core: ^1.2.0
+  flutter_ui_mcp_core: ^1.2.0
   mcp_playground_shared_tools:
     path: shared_tools
   http: ^1.6.0

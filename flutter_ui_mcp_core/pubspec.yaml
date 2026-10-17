@@ -20,7 +20,7 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.6.0
-  dart_mcp_core: '>=1.1.6 <2.0.0'
+  dart_mcp_core: ^1.2.0
   http: ^1.6.0
   uuid: ^4.6.0
   shared_preferences: ^2.5.5
