@@ -16,7 +16,11 @@ Ideal for building pure Dart CLI applications, background workers, backend servi
   - **Ollama** (Local models via `ollama_dart`)
   - **Mistral AI** (OpenAI-compatible client with tool call/assistant formatting patches)
   - **OpenAI-Compatible** (vLLM, LiteLLM, or custom local endpoints)
-- **Context Window Auto-Compression (`ContextCompressor`)** — Pure Dart token monitoring and automatic LLM-powered summarization of older conversation turns for SLMs and long-running sessions.
+- **Typed Multimodal Messages (`ChatContentPart`)** — First-class support for `TextPart`, `ImagePart` (bytes, base64, URL), `DocumentPart`, and `AudioPart` natively mapped to OpenAI, Gemini, Claude, and Ollama formats.
+- **Context Window Auto-Compression & Episodic Memory Recall** — Automatically summarizes older conversation turns when token thresholds are exceeded, preserving raw turns in an indexed `EpisodicMemoryStore`. Injects `retrieve_memory` tool so the model can inspect exact historical code snippets, hashes, and tool outputs on demand.
+- **Autonomous Sub-Agent Delegation (`DelegateTaskTool`)** — Primary agents can delegate focused tasks to specialized sub-agents or clean agent clones (`assignee: 'clone'`) with isolated context windows and multi-level recursion guards (`isSubAgent`, `delegationDepth`).
+- **Dynamic Runtime Skill Activation (`SkillDefinition`)** — Group system prompts and tools into modular skill units. Non-active skills only publish concise one-line descriptions in the system prompt until the model activates them via `activate_skills` and `deactivate_skills`, keeping token footprints minimal.
+- **Agent Evaluation Harness (`evals`)** — Anthropic-aligned evaluation suite with `EvalTask`, `EvalGrader` (`ExactMatchGrader`, `RegexGrader`, `ToolCallGrader`), `EvalRunner`, and `TrajectoryRecorder` for regression testing, pass@k metrics, and offline trajectory replay.
 - **Structured Agent Planning (`PlanState`, `PlanStep`, `WriteTodosTool`)** — Native task checklist planning and live progress tracking with reactive `AgentPlanEvent` streams.
 - **Agent Lifecycle Hooks (`AgentHook`)** — Security interceptors (`beforeToolCall`, `afterToolCall`, `beforeModelCall`, `afterModelCall`) with `ToolCallDecision` (`proceed`, `deny`, `modify`).
 - **Progressive MCP Tool Discovery (`McpListToolsTool`, `McpCallToolTool`)** — On-demand schema loading to support hundreds of tools without exhausting context windows.
@@ -51,7 +55,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dart_mcp_core: ^1.0.2
+  dart_mcp_core: ^1.3.0
 ```
 
 ### Basic Example (Pure Dart CLI)
@@ -116,32 +120,153 @@ Future<void> main() async {
 
 ---
 
-## 🛠️ Creating Custom Tools
+## 🖼️ Multimodal Content Parts (`ChatContentPart`)
 
-To create custom tools, inherit from `McpLocalTool`:
+`dart_mcp_core` supports structured multimodal messages across OpenAI, Anthropic Claude, Google Gemini, and Ollama.
 
 ```dart
-class GetCurrentTimeTool extends McpLocalTool {
-  @override
-  String get name => 'get_current_time';
+final userMessage = ChatMessage.user(
+  'Analyze this architecture diagram and explain the data flow:',
+  parts: [
+    const TextPart('Analyze this architecture diagram and explain the data flow:'),
+    ImagePart.fromUrl('https://example.com/architecture.png'),
+    // Or from local bytes:
+    // ImagePart.fromBytes(imageBytes, mimeType: 'image/png'),
+  ],
+);
+```
 
-  @override
-  String get description => 'Returns the current local time.';
+---
 
-  @override
-  Map<String, dynamic> get inputSchema => {
-    'type': 'object',
-    'properties': {},
-  };
+## 🧠 Context Window Auto-Compression with Episodic Recall
 
-  @override
-  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final now = DateTime.now().toLocal().toString();
-    return MCPToolResult(
-      content: [MCPContent(type: 'text', text: 'Current time is $now')],
-    );
+Standard LLM summarization often permanently discards exact parameters, hashes, or code snippets from older turns. `dart_mcp_core` pairs `ContextCompressor` with an `EpisodicMemoryStore`:
+
+1. When tokens exceed `tokenThreshold`, older turns are summarized into a compact overview.
+2. The verbatim turns are saved into `EpisodicMemoryStore` with an archive ID (e.g. `mem_7f99efd7`).
+3. The engine automatically injects the `retrieve_memory` tool so the model can recall past raw turns whenever needed.
+
+```dart
+final memoryStore = EpisodicMemoryStore();
+
+final compressor = ContextCompressor(
+  tokenThreshold: 4000,
+  preserveRecentCount: 4,
+  memoryStore: memoryStore,
+);
+
+final agent = Agent(
+  key: 'researcher',
+  name: 'Research Assistant',
+  llmConfig: llmConfig,
+  contextCompressor: compressor,
+);
+
+// Listen to recall events
+engine.agentEvents.listen((event) {
+  if (event is AgentMemoryRetrievedEvent) {
+    print('🧠 Model recalled ${event.recalledTurnCount} turns from archive ${event.archiveId}');
   }
-}
+});
+```
+
+---
+
+## 🤖 Sub-Agent Delegation (`delegate_task` & `clone`)
+
+Avoid context pollution by delegating specialized work to isolated child agents.
+
+- **`assignee: 'clone'`** creates a child worker agent with identical tools and LLM configuration, but with a fresh, clean context window.
+- **`assignee: '<key>'`** invokes another registered sub-agent by key.
+- Built-in `isSubAgent` and `delegationDepth` guards prevent infinite recursive delegation.
+
+```dart
+final agent = Agent(
+  key: 'manager',
+  name: 'Project Manager',
+  llmConfig: llmConfig,
+  enableDelegation: true,
+  subAgentKeys: ['researcher', 'coder'],
+);
+
+// Listen to sub-agent lifecycle in real-time
+engine.agentEvents.listen((event) {
+  if (event is AgentSubAgentStartedEvent) {
+    print('🚀 [Sub-Agent Started] Assignee: ${event.subAgentKey} - Task: ${event.task}');
+  } else if (event is AgentSubAgentCompletedEvent) {
+    print('✅ [Sub-Agent Finished] Output: ${event.result}');
+  }
+});
+```
+
+---
+
+## ⚡ Dynamic Runtime Skill Activation (`SkillDefinition`)
+
+Instead of registering 50+ tool schemas and bloating prompt context windows upfront, package related capabilities into modular `SkillDefinition`s.
+
+- Non-active skills only publish a single-line summary in the system prompt.
+- The model activates skills on-demand using `activate_skills` when relevant, and unloads them with `deactivate_skills` when finished.
+
+```dart
+final gitSkill = SkillDefinition(
+  name: 'git_reviewer',
+  description: 'Inspects git diffs, commits, and performs automated pull request code reviews.',
+  systemPrompt: 'You are an expert code reviewer checking for logic errors and security vulnerabilities.',
+  tools: [GitDiffTool(), GitLogTool()],
+  isAlwaysOn: false, // Inactive by default; activated on demand by the agent
+);
+
+final agent = Agent(
+  key: 'lead_dev',
+  name: 'Lead Developer',
+  llmConfig: llmConfig,
+  skills: [gitSkill],
+);
+
+// Listen for dynamic skill transitions
+engine.agentEvents.listen((event) {
+  if (event is AgentSkillsChangedEvent) {
+    print('⚡ Active Skills: ${event.activeSkills.join(', ')}');
+  }
+});
+```
+
+---
+
+## 🎯 Agent Evaluation & Trajectory Replay Harness (`evals`)
+
+Benchmark agent reliability and run deterministic regression tests without live API calls.
+
+```dart
+// 1. Define an evaluation task
+final task = EvalTask(
+  id: 'weather_tokyo',
+  name: 'Tokyo Weather Inquiry',
+  prompt: 'What is the current temperature in Tokyo?',
+  expectedTools: ['get_weather'],
+  expectedOutput: 'Tokyo',
+);
+
+// 2. Select graders
+final runner = EvalRunner(
+  defaultGrader: ExactMatchGrader(),
+);
+
+// 3. Run the evaluation suite
+final report = await runner.runSuite(
+  suiteName: 'Weather Capabilities Verification',
+  tasks: [task],
+  engine: engine,
+  agentKey: 'weather_agent',
+);
+
+print('Pass Rate: ${(report.passRate * 100).toStringAsFixed(1)}%');
+print('Passed: ${report.passedTasks} / ${report.totalTasks}');
+print('Total Tokens Used: ${report.totalTokens}');
+
+// 4. Save trajectories for offline test replay
+final jsonTranscript = TrajectoryRecorder.exportToJson(report.results.first.trajectory);
 ```
 
 ---
@@ -176,4 +301,3 @@ class GetCurrentTimeTool extends McpLocalTool {
 
 For a complete production CLI application utilizing `dart_mcp_core` for autonomous coding agent workflows, multi-LLM configuration switching, session persistence (JSON/Markdown), and MCP server management, check out:
 - [**TealKit CLI (`tealkit_cli`)**](https://github.com/lschaffer/tealkit/tree/master/cli)
-

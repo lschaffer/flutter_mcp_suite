@@ -1,3 +1,26 @@
+## 1.3.0
+
+- **Typed Multimodal Parts (`ChatContentPart`)**:
+  - Introduced `ChatContentPart` hierarchy (`TextPart`, `ImagePart`, `DocumentPart`, `AudioPart`) for rich multimodal message representations.
+  - Native base64/URL/bytes image payload forwarding across OpenAI (`ContentPart.imageUrl`), Anthropic Claude (`InputContentBlock.image`), Google Gemini (`Part.inlineData`), and Ollama (`images`).
+  - Added ergonomic factories: `ChatMessage.user()`, `ChatMessage.assistant()`, and `ChatMessage.system()`.
+- **Episodic Memory Store & Recall (`EpisodicMemoryStore`, `RetrieveMemoryTool`)**:
+  - Prevents permanent information loss during context window auto-compression by stashing raw turn history in an indexed episodic archive before summarization.
+  - Injects `retrieve_memory` tool so the model can inspect exact past code snippets, hashes, and tool outputs on demand.
+  - Emits `AgentMemoryRetrievedEvent` when the model recalls archived turns.
+- **Sub-Agent Delegation (`DelegateTaskTool`)**:
+  - Native task delegation enabling primary agents to delegate focused sub-tasks to specialized sub-agents or clean agent clones (`assignee: 'clone'`).
+  - Multi-level recursion guards (`isSubAgent`, `delegationDepth`) preventing infinite delegation loops.
+  - Real-time delegation event lifecycle: `AgentSubAgentStartedEvent`, `AgentSubAgentProgressEvent`, and `AgentSubAgentCompletedEvent`.
+- **Dynamic Runtime Skill Activation (`SkillDefinition`, `ActivateSkillsTool`, `DeactivateSkillsTool`)**:
+  - Allows grouping system prompts and tools into modular `SkillDefinition` units.
+  - Non-active skills only publish concise one-line descriptions in the system prompt, keeping token footprints minimal.
+  - Injects `activate_skills` and `deactivate_skills` tools for the model to toggle toolsets on-the-fly. Emits `AgentSkillsChangedEvent`.
+- **Agent Evaluation Harness (`EvalTask`, `EvalGrader`, `EvalRunner`, `TrajectoryRecorder`)**:
+  - Added end-to-end evaluation framework for agent accuracy, regression testing, and model benchmarking.
+  - Included standard evaluators: `ExactMatchGrader`, `RegexGrader`, and `ToolCallGrader`.
+  - Added `TrajectoryRecorder` to serialize full multi-turn conversation trajectories to and from JSON.
+
 ## 1.2.0
 
 - **Agent Lifecycle Hooks (`AgentHook`)**:

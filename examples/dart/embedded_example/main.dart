@@ -435,12 +435,13 @@ Future<void> main() async {
   print(
     'Loading embedded GGUF model into memory (this can take a few seconds)...',
   );
-  LlamaEngine.configureLogging(level: LlamaLogLevel.warn);
+  LlamaLogging.configure(level: LlamaLogLevel.warn);
   final backend = LlamaBackend();
-  final engine = LlamaEngine(backend);
+  late final LlamaEngine engine;
 
   try {
-    await engine.loadModel(
+    engine = await LlamaEngine.load(
+      backend,
       fullModelPath,
       modelParams: ModelParams(
         contextSize: 4096,

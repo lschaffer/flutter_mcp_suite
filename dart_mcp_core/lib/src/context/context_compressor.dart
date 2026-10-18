@@ -19,17 +19,106 @@ class CompressionResult {
   /// The number of conversation turns that were compressed into the summary.
   final int compressedTurnCount;
 
+  /// Optional archive ID referencing the stashed raw messages in [EpisodicMemoryStore].
+  final String? archiveId;
+
   const CompressionResult({
     required this.compressedMessages,
     required this.originalTokens,
     required this.compressedTokens,
     required this.summary,
     required this.compressedTurnCount,
+    this.archiveId,
   });
 
   /// Ratio of compressed tokens to original tokens (e.g. 0.35 means 65% reduction).
   double get compressionRatio =>
       originalTokens > 0 ? compressedTokens / originalTokens : 1.0;
+}
+
+/// Represents a stashed chunk of raw conversation turns in episodic memory.
+class EpisodicMemoryEntry {
+  final String archiveId;
+  final int startTurnIndex;
+  final int endTurnIndex;
+  final DateTime timestamp;
+  final List<ChatMessage> rawMessages;
+  final String summary;
+
+  const EpisodicMemoryEntry({
+    required this.archiveId,
+    required this.startTurnIndex,
+    required this.endTurnIndex,
+    required this.timestamp,
+    required this.rawMessages,
+    required this.summary,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'archiveId': archiveId,
+        'startTurnIndex': startTurnIndex,
+        'endTurnIndex': endTurnIndex,
+        'timestamp': timestamp.toIso8601String(),
+        'rawMessages': rawMessages.map((m) => m.toJson()).toList(),
+        'summary': summary,
+      };
+
+  factory EpisodicMemoryEntry.fromJson(Map<String, dynamic> json) =>
+      EpisodicMemoryEntry(
+        archiveId: json['archiveId'] as String,
+        startTurnIndex: json['startTurnIndex'] as int? ?? 0,
+        endTurnIndex: json['endTurnIndex'] as int? ?? 0,
+        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+            DateTime.now(),
+        rawMessages: (json['rawMessages'] as List? ?? [])
+            .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+            .toList(),
+        summary: json['summary'] as String? ?? '',
+      );
+}
+
+/// In-memory and indexable episodic memory store for compressed conversation turns.
+class EpisodicMemoryStore {
+  final List<EpisodicMemoryEntry> _entries = [];
+
+  List<EpisodicMemoryEntry> get entries => List.unmodifiable(_entries);
+
+  void addEntry(EpisodicMemoryEntry entry) {
+    _entries.add(entry);
+  }
+
+  /// Searches archived turns by keyword query across summary, message content, and tool results.
+  List<EpisodicMemoryEntry> search(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return entries;
+    return _entries.where((e) {
+      if (e.summary.toLowerCase().contains(q)) return true;
+      for (final m in e.rawMessages) {
+        if (m.content.toLowerCase().contains(q)) return true;
+        if (m.toolName != null && m.toolName!.toLowerCase().contains(q)) {
+          return true;
+        }
+        if (m.toolResult != null &&
+            m.toolResult!.text.toLowerCase().contains(q)) {
+          return true;
+        }
+      }
+      return false;
+    }).toList();
+  }
+
+  /// Looks up an entry by its archive ID.
+  EpisodicMemoryEntry? getById(String archiveId) {
+    try {
+      return _entries.firstWhere((e) => e.archiveId == archiveId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void clear() {
+    _entries.clear();
+  }
 }
 
 /// Context window auto-compressor for long-running agent workflows and SLMs.
@@ -50,12 +139,16 @@ class ContextCompressor {
   /// Custom prompt instructions for generating the summary.
   final String? customSummaryPrompt;
 
+  /// Optional episodic memory store for stashing raw conversation turns before compression.
+  final EpisodicMemoryStore? memoryStore;
+
   static const Uuid _uuid = Uuid();
 
   const ContextCompressor({
     this.tokenThreshold = 4000,
     this.preserveRecentCount = 4,
     this.customSummaryPrompt,
+    this.memoryStore,
   });
 
   /// Fast pure-Dart estimation of token count (~4 characters per token average).
@@ -161,9 +254,25 @@ class ContextCompressor {
           .join('\n');
     }
 
+    final archiveId = 'mem_${_uuid.v4().substring(0, 8)}';
+    if (memoryStore != null) {
+      final entry = EpisodicMemoryEntry(
+        archiveId: archiveId,
+        startTurnIndex: 0,
+        endTurnIndex: oldMessages.length,
+        timestamp: DateTime.now(),
+        rawMessages: List.unmodifiable(oldMessages),
+        summary: summary,
+      );
+      memoryStore!.addEntry(entry);
+    }
+
     final summaryMessage = ChatMessage(
       id: _uuid.v4(),
-      content: '[Prior Conversation Summary]:\n$summary',
+      content:
+          '[Prior Conversation Summary] (Archive ID: $archiveId):\n$summary\n\n'
+          '(Tip: If verbatim details, code snippets, or parameters from earlier turns are needed, '
+          'use retrieve_memory tool with archiveId: "$archiveId" or a search query.)',
       role: ChatRole.system,
       type: MessageType.log,
       timestamp: DateTime.now(),
@@ -174,7 +283,8 @@ class ContextCompressor {
       ...recentMessages,
     ];
 
-    final compressedTokens = estimateTokens(compressedList, systemPrompt: systemPrompt);
+    final compressedTokens =
+        estimateTokens(compressedList, systemPrompt: systemPrompt);
 
     return CompressionResult(
       compressedMessages: compressedList,
@@ -182,6 +292,7 @@ class ContextCompressor {
       compressedTokens: compressedTokens,
       summary: summary,
       compressedTurnCount: oldMessages.length,
+      archiveId: archiveId,
     );
   }
 }

@@ -241,6 +241,22 @@ Future<void> main(List<String> args) async {
             break;
           case AgentUsageEvent():
             break;
+          case AgentMemoryRetrievedEvent(
+            :final archiveId,
+            :final recalledTurnCount,
+            :final query,
+          ):
+            print(
+              '🧠 Memory recalled from [$archiveId]: $recalledTurnCount turn(s)${query != null ? ' (query: "$query")' : ''}',
+            );
+          case AgentSubAgentStartedEvent(:final subAgentKey, :final task):
+            print('🤖 Sub-agent "$subAgentKey" started: $task');
+          case AgentSubAgentProgressEvent():
+            break;
+          case AgentSubAgentCompletedEvent(:final subAgentKey, :final result):
+            print('✅ Sub-agent "$subAgentKey" finished: $result');
+          case AgentSkillsChangedEvent(:final activeSkills):
+            print('⚡ Skills updated: ${activeSkills.isEmpty ? "None" : activeSkills.join(", ")}');
         }
       });
 

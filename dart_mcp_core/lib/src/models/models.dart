@@ -702,6 +702,136 @@ class MessageAttachment {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Multimodal Content Parts
+// ═══════════════════════════════════════════════════════════════
+
+/// Base class for typed multimodal parts of a [ChatMessage].
+sealed class ChatContentPart {
+  const ChatContentPart();
+
+  Map<String, dynamic> toJson();
+
+  factory ChatContentPart.fromJson(Map<String, dynamic> json) {
+    final type = json['type'] as String?;
+    switch (type) {
+      case 'image':
+        return ImagePart.fromJson(json);
+      case 'document':
+        return DocumentPart.fromJson(json);
+      case 'audio':
+        return AudioPart.fromJson(json);
+      case 'text':
+      default:
+        return TextPart.fromJson(json);
+    }
+  }
+}
+
+class TextPart extends ChatContentPart {
+  final String text;
+
+  const TextPart(this.text);
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'text',
+        'text': text,
+      };
+
+  factory TextPart.fromJson(Map<String, dynamic> json) =>
+      TextPart(json['text'] as String? ?? '');
+}
+
+class ImagePart extends ChatContentPart {
+  final Uint8List? bytes;
+  final String? base64;
+  final String? url;
+  final String mimeType;
+
+  const ImagePart({
+    this.bytes,
+    this.base64,
+    this.url,
+    this.mimeType = 'image/png',
+  });
+
+  factory ImagePart.fromBytes(Uint8List bytes, {String mimeType = 'image/png'}) =>
+      ImagePart(bytes: bytes, mimeType: mimeType);
+
+  factory ImagePart.fromBase64(String base64, {String mimeType = 'image/png'}) =>
+      ImagePart(base64: base64, mimeType: mimeType);
+
+  factory ImagePart.fromUrl(String url, {String mimeType = 'image/png'}) =>
+      ImagePart(url: url, mimeType: mimeType);
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'image',
+        if (base64 != null) 'base64': base64,
+        if (url != null) 'url': url,
+        'mimeType': mimeType,
+      };
+
+  factory ImagePart.fromJson(Map<String, dynamic> json) => ImagePart(
+        base64: json['base64'] as String?,
+        url: json['url'] as String?,
+        mimeType: json['mimeType'] as String? ?? 'image/png',
+      );
+}
+
+class DocumentPart extends ChatContentPart {
+  final Uint8List? bytes;
+  final String fileName;
+  final String mimeType;
+  final String? textContent;
+
+  const DocumentPart({
+    this.bytes,
+    required this.fileName,
+    this.mimeType = 'text/plain',
+    this.textContent,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'document',
+        'fileName': fileName,
+        'mimeType': mimeType,
+        if (textContent != null) 'textContent': textContent,
+      };
+
+  factory DocumentPart.fromJson(Map<String, dynamic> json) => DocumentPart(
+        fileName: json['fileName'] as String? ?? '',
+        mimeType: json['mimeType'] as String? ?? 'text/plain',
+        textContent: json['textContent'] as String?,
+      );
+}
+
+class AudioPart extends ChatContentPart {
+  final Uint8List? bytes;
+  final String? base64;
+  final String mimeType;
+
+  const AudioPart({
+    this.bytes,
+    this.base64,
+    this.mimeType = 'audio/mp3',
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': 'audio',
+        if (base64 != null) 'base64': base64,
+        'mimeType': mimeType,
+      };
+
+  factory AudioPart.fromJson(Map<String, dynamic> json) => AudioPart(
+        base64: json['base64'] as String?,
+        mimeType: json['mimeType'] as String? ?? 'audio/mp3',
+      );
+}
+
 class ChatMessage {
   final String id;
   final String content;
@@ -714,8 +844,9 @@ class ChatMessage {
   final Map<String, dynamic>? toolArguments;
   final MCPToolResult? toolResult;
 
-  // Attachments
+  // Attachments & Multimodal Parts
   final List<MessageAttachment>? attachments;
+  final List<ChatContentPart>? parts;
 
   const ChatMessage({
     required this.id,
@@ -727,7 +858,54 @@ class ChatMessage {
     this.toolArguments,
     this.toolResult,
     this.attachments,
+    this.parts,
   });
+
+  /// Factory helper for creating a user message.
+  factory ChatMessage.user(
+    String content, {
+    String? id,
+    List<ChatContentPart>? parts,
+    List<MessageAttachment>? attachments,
+    DateTime? timestamp,
+  }) {
+    return ChatMessage(
+      id: id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      content: content,
+      role: ChatRole.user,
+      timestamp: timestamp ?? DateTime.now(),
+      parts: parts,
+      attachments: attachments,
+    );
+  }
+
+  /// Factory helper for creating an assistant message.
+  factory ChatMessage.assistant(
+    String content, {
+    String? id,
+    DateTime? timestamp,
+  }) {
+    return ChatMessage(
+      id: id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      content: content,
+      role: ChatRole.assistant,
+      timestamp: timestamp ?? DateTime.now(),
+    );
+  }
+
+  /// Factory helper for creating a system message.
+  factory ChatMessage.system(
+    String content, {
+    String? id,
+    DateTime? timestamp,
+  }) {
+    return ChatMessage(
+      id: id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      content: content,
+      role: ChatRole.system,
+      timestamp: timestamp ?? DateTime.now(),
+    );
+  }
 
   ChatMessage copyWith({
     String? id,
@@ -739,6 +917,7 @@ class ChatMessage {
     Map<String, dynamic>? toolArguments,
     MCPToolResult? toolResult,
     List<MessageAttachment>? attachments,
+    List<ChatContentPart>? parts,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -750,6 +929,7 @@ class ChatMessage {
       toolArguments: toolArguments ?? this.toolArguments,
       toolResult: toolResult ?? this.toolResult,
       attachments: attachments ?? this.attachments,
+      parts: parts ?? this.parts,
     );
   }
 
@@ -764,6 +944,8 @@ class ChatMessage {
     if (toolResult != null) 'toolResult': toolResult!.toJson(),
     if (attachments != null)
       'attachments': attachments!.map((a) => a.toJson()).toList(),
+    if (parts != null)
+      'parts': parts!.map((p) => p.toJson()).toList(),
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -789,6 +971,11 @@ class ChatMessage {
       attachments: json['attachments'] != null
           ? (json['attachments'] as List)
                 .map((a) => MessageAttachment.fromJson(a))
+                .toList()
+          : null,
+      parts: json['parts'] != null
+          ? (json['parts'] as List)
+                .map((p) => ChatContentPart.fromJson(p as Map<String, dynamic>))
                 .toList()
           : null,
     );

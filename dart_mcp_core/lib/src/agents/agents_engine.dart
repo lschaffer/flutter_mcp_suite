@@ -14,7 +14,11 @@ import '../mcp/local_mcp_client_stub.dart'
 import '../skills/skill_importer.dart';
 import 'agent_hook.dart';
 import 'agent_plan.dart';
+import 'delegate_task_tool.dart';
 import '../context/context_compressor.dart';
+import '../context/retrieve_memory_tool.dart';
+import '../skills/skill_definition.dart';
+import '../skills/dynamic_skill_tools.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Agent Status
@@ -71,6 +75,10 @@ class AgentErrorEvent extends AgentEvent {
 class AgentFinalResultEvent extends AgentEvent {
   final String response;
   final List<ChatMessage> messages;
+
+  /// Returns the full turn trajectory of messages.
+  List<ChatMessage> get trajectory => messages;
+
   AgentFinalResultEvent(this.response, {this.messages = const []});
 }
 
@@ -111,6 +119,69 @@ class AgentContextCompressedEvent extends AgentEvent {
     required this.compressedTokens,
     required this.summary,
     required this.compressedTurnCount,
+  });
+}
+
+/// Event emitted when the agent recalls past conversation turns from episodic memory.
+class AgentMemoryRetrievedEvent extends AgentEvent {
+  final String archiveId;
+  final int recalledTurnCount;
+  final String? query;
+
+  AgentMemoryRetrievedEvent({
+    required this.archiveId,
+    required this.recalledTurnCount,
+    this.query,
+  });
+}
+
+/// Event emitted when an agent delegates a task to a sub-agent.
+class AgentSubAgentStartedEvent extends AgentEvent {
+  final String parentAgentKey;
+  final String subAgentKey;
+  final String task;
+
+  AgentSubAgentStartedEvent({
+    required this.parentAgentKey,
+    required this.subAgentKey,
+    required this.task,
+  });
+}
+
+/// Event emitted when a sub-agent produces an intermediate event.
+class AgentSubAgentProgressEvent extends AgentEvent {
+  final String parentAgentKey;
+  final String subAgentKey;
+  final AgentEvent innerEvent;
+
+  AgentSubAgentProgressEvent({
+    required this.parentAgentKey,
+    required this.subAgentKey,
+    required this.innerEvent,
+  });
+}
+
+/// Event emitted when a sub-agent completes its delegated task.
+class AgentSubAgentCompletedEvent extends AgentEvent {
+  final String parentAgentKey;
+  final String subAgentKey;
+  final String result;
+
+  AgentSubAgentCompletedEvent({
+    required this.parentAgentKey,
+    required this.subAgentKey,
+    required this.result,
+  });
+}
+
+/// Event emitted when active skills are changed dynamically at runtime.
+class AgentSkillsChangedEvent extends AgentEvent {
+  final List<String> activeSkills;
+  final List<String> deactivatedSkills;
+
+  AgentSkillsChangedEvent({
+    required this.activeSkills,
+    required this.deactivatedSkills,
   });
 }
 
@@ -163,6 +234,21 @@ class Agent {
   /// Optional context window auto-compressor for long sessions or SLMs.
   final ContextCompressor? contextCompressor;
 
+  /// Whether this agent is executing as a child sub-agent. Suppresses nested delegation.
+  final bool isSubAgent;
+
+  /// Current nesting depth of sub-agent delegation.
+  final int delegationDepth;
+
+  /// Whether sub-agent task delegation ([DelegateTaskTool]) is enabled.
+  final bool enableDelegation;
+
+  /// Optional list of other registered agent keys that can be delegated to.
+  final List<String> subAgentKeys;
+
+  /// Modular dynamic skills that can be activated/deactivated on demand.
+  final List<SkillDefinition> skills;
+
   /// Creates a new [Agent] instance with the specified configurations and tools.
   const Agent({
     required this.key,
@@ -179,6 +265,11 @@ class Agent {
     this.enablePlanning = false,
     this.progressiveMcpDiscovery = false,
     this.contextCompressor,
+    this.isSubAgent = false,
+    this.delegationDepth = 0,
+    this.enableDelegation = false,
+    this.subAgentKeys = const [],
+    this.skills = const [],
   });
 
   /// Serialize to JSON for external storage.
@@ -194,6 +285,11 @@ class Agent {
     if (maxToolIterations != null) 'maxToolIterations': maxToolIterations,
     if (enablePlanning) 'enablePlanning': true,
     if (progressiveMcpDiscovery) 'progressiveMcpDiscovery': true,
+    if (isSubAgent) 'isSubAgent': true,
+    if (delegationDepth > 0) 'delegationDepth': delegationDepth,
+    if (enableDelegation) 'enableDelegation': true,
+    if (subAgentKeys.isNotEmpty) 'subAgentKeys': subAgentKeys,
+    if (skills.isNotEmpty) 'skills': skills.map((s) => s.toJson()).toList(),
   };
 
   /// Returns a copy of this [Agent] with updated fields.
@@ -212,6 +308,11 @@ class Agent {
     bool? enablePlanning,
     bool? progressiveMcpDiscovery,
     ContextCompressor? contextCompressor,
+    bool? isSubAgent,
+    int? delegationDepth,
+    bool? enableDelegation,
+    List<String>? subAgentKeys,
+    List<SkillDefinition>? skills,
   }) {
     return Agent(
       key: key ?? this.key,
@@ -229,6 +330,11 @@ class Agent {
       progressiveMcpDiscovery:
           progressiveMcpDiscovery ?? this.progressiveMcpDiscovery,
       contextCompressor: contextCompressor ?? this.contextCompressor,
+      isSubAgent: isSubAgent ?? this.isSubAgent,
+      delegationDepth: delegationDepth ?? this.delegationDepth,
+      enableDelegation: enableDelegation ?? this.enableDelegation,
+      subAgentKeys: subAgentKeys ?? this.subAgentKeys,
+      skills: skills ?? this.skills,
     );
   }
 
@@ -238,6 +344,7 @@ class Agent {
     List<McpLocalTool> dartTools = const [],
     List<AgentHook> hooks = const [],
     ContextCompressor? contextCompressor,
+    List<SkillDefinition> skills = const [],
   }) {
     return Agent(
       key: json['key'] as String,
@@ -272,6 +379,11 @@ class Agent {
               .toList() ??
           [],
       contextCompressor: contextCompressor,
+      isSubAgent: json['isSubAgent'] as bool? ?? false,
+      delegationDepth: json['delegationDepth'] as int? ?? 0,
+      enableDelegation: json['enableDelegation'] as bool? ?? false,
+      subAgentKeys: (json['subAgentKeys'] as List?)?.cast<String>() ?? const [],
+      skills: skills,
     );
   }
 }
@@ -487,6 +599,9 @@ class McpAgentEngine {
   /// Retrieve all currently registered agents.
   List<Agent> getAgents() => List.unmodifiable(_agents.values);
 
+  /// Retrieve a registered agent by key, or null if not found.
+  Agent? getAgent(String key) => _agents[key];
+
   /// Get status of a specific agent.
   AgentStatus? statusOf(String agentKey) => _statuses[agentKey];
 
@@ -695,7 +810,170 @@ class McpAgentEngine {
         localTools.add(planTool);
       }
 
+      // 1. Episodic Memory Tool Injection
+      final compressor = agent.contextCompressor ?? contextCompressor;
+      if (compressor != null && compressor.memoryStore != null) {
+        final memTool = RetrieveMemoryTool(
+          memoryStore: compressor.memoryStore!,
+          onMemoryRetrieved: (archiveId, count, query) {
+            emit(AgentMemoryRetrievedEvent(
+              archiveId: archiveId,
+              recalledTurnCount: count,
+              query: query,
+            ));
+          },
+        );
+        localTools.add(memTool);
+      }
+
+      // 2. Sub-Agent Delegation Tool Injection
+      if (agent.enableDelegation && !agent.isSubAgent && agent.delegationDepth < 2) {
+        final delegateTool = DelegateTaskTool(
+          availableAssignees: ['clone', ...agent.subAgentKeys],
+          runner: ({
+            required String assignee,
+            required String task,
+            List<String>? enabledTools,
+          }) async {
+            emit(AgentSubAgentStartedEvent(
+              parentAgentKey: agentKey,
+              subAgentKey: assignee,
+              task: task,
+            ));
+            final Agent childAgent;
+            if (assignee == 'clone') {
+              childAgent = agent.copyWith(
+                key: '${agent.key}_sub_${_uuid.v4().substring(0, 6)}',
+                name: '${agent.name} (Sub-Agent)',
+                initialMessages: [],
+                prompts: [
+                  SubPromptStep(text: task, enabledToolNames: enabledTools),
+                ],
+                isSubAgent: true,
+                delegationDepth: agent.delegationDepth + 1,
+              );
+            } else {
+              final target = _agents[assignee];
+              if (target == null) {
+                throw ArgumentError('Sub-agent with key "$assignee" not found.');
+              }
+              childAgent = target.copyWith(
+                key: '${target.key}_sub_${_uuid.v4().substring(0, 6)}',
+                initialMessages: [],
+                prompts: [
+                  SubPromptStep(text: task, enabledToolNames: enabledTools),
+                ],
+                isSubAgent: true,
+                delegationDepth: agent.delegationDepth + 1,
+              );
+            }
+
+            _agents[childAgent.key] = childAgent;
+            String childResult = '';
+            try {
+              final childStream = runAsync(childAgent.key);
+              await for (final childEvent in childStream) {
+                emit(AgentSubAgentProgressEvent(
+                  parentAgentKey: agentKey,
+                  subAgentKey: childAgent.key,
+                  innerEvent: childEvent,
+                ));
+                if (childEvent is AgentFinalResultEvent) {
+                  childResult = childEvent.response;
+                }
+              }
+            } finally {
+              _agents.remove(childAgent.key);
+            }
+            emit(AgentSubAgentCompletedEvent(
+              parentAgentKey: agentKey,
+              subAgentKey: childAgent.key,
+              result: childResult,
+            ));
+            return childResult;
+          },
+        );
+        localTools.add(delegateTool);
+      }
+
+      // 3. Dynamic Skills Tool Injection
+      final activeSkillNames = <String>{};
+      final dynamicSkillsMap = <String, SkillDefinition>{};
+
+      for (final skill in agent.skills) {
+        if (skill.isAlwaysOn) {
+          activeSkillNames.add(skill.name);
+          localTools.addAll(skill.tools);
+        } else {
+          dynamicSkillsMap[skill.name] = skill;
+        }
+      }
+
       final allTools = <MCPTool>[];
+
+      if (dynamicSkillsMap.isNotEmpty) {
+        final activateTool = ActivateSkillsTool(
+          availableSkills: dynamicSkillsMap.keys.toList(),
+          onActivate: (skillNames) async {
+            final activated = <String>[];
+            for (final name in skillNames) {
+              final s = dynamicSkillsMap[name];
+              if (s != null && !activeSkillNames.contains(name)) {
+                activeSkillNames.add(name);
+                activated.add(name);
+                for (final tool in s.tools) {
+                  if (!localTools.any((t) => t.name == tool.name)) {
+                    localTools.add(tool);
+                    allTools.add(tool.toMCPTool());
+                  }
+                }
+              }
+            }
+            if (activated.isNotEmpty) {
+              emit(AgentSkillsChangedEvent(
+                activeSkills: activeSkillNames.toList(),
+                deactivatedSkills: const [],
+              ));
+              return 'Skills successfully activated: ${activated.join(", ")}. Tools are now available.';
+            } else {
+              return 'No new skills were activated.';
+            }
+          },
+        );
+
+        final deactivateTool = DeactivateSkillsTool(
+          onDeactivate: (skillNames) async {
+            final deactivated = <String>[];
+            for (final name in skillNames) {
+              if (activeSkillNames.contains(name)) {
+                activeSkillNames.remove(name);
+                deactivated.add(name);
+                final s = dynamicSkillsMap[name];
+                if (s != null) {
+                  localTools.removeWhere(
+                    (t) => s.tools.any((st) => st.name == t.name),
+                  );
+                  allTools.removeWhere(
+                    (t) => s.tools.any((st) => st.name == t.name),
+                  );
+                }
+              }
+            }
+            if (deactivated.isNotEmpty) {
+              emit(AgentSkillsChangedEvent(
+                activeSkills: activeSkillNames.toList(),
+                deactivatedSkills: deactivated,
+              ));
+              return 'Skills deactivated: ${deactivated.join(", ")}.';
+            } else {
+              return 'No active skills were deactivated.';
+            }
+          },
+        );
+
+        localTools.add(activateTool);
+        localTools.add(deactivateTool);
+      }
 
       if (agent.progressiveMcpDiscovery) {
         final listTool = McpListToolsTool(
@@ -736,6 +1014,22 @@ class McpAgentEngine {
           '- Once a tool has been successfully executed (tool_executed is true), '
           'you must NEVER call that tool with the same "id" or parameters again.\n'
           '- Instead, formulate your final response to the user using the result provided in tool_result.';
+
+      for (final skill in agent.skills) {
+        if (skill.isAlwaysOn &&
+            skill.systemPrompt != null &&
+            skill.systemPrompt!.isNotEmpty) {
+          effectiveSystem +=
+              '\n\n[Active Skill: ${skill.name}]\n${skill.systemPrompt}';
+        }
+      }
+      if (dynamicSkillsMap.isNotEmpty) {
+        effectiveSystem +=
+            '\n\nAvailable Dynamic Skills (activate on demand via activate_skills):\n';
+        for (final skill in dynamicSkillsMap.values) {
+          effectiveSystem += '- ${skill.name}: ${skill.description}\n';
+        }
+      }
 
       // Inject tool descriptions into system prompt for non-native tool calling
       if (allTools.isNotEmpty && !agent.llmConfig.useNativeToolCall) {

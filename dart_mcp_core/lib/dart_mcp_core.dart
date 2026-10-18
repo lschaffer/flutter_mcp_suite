@@ -22,14 +22,24 @@ export 'src/mcp/local_mcp_client_stub.dart'
 export 'src/agents/agents_engine.dart';
 export 'src/agents/agent_hook.dart';
 export 'src/agents/agent_plan.dart';
+export 'src/agents/delegate_task_tool.dart';
 export 'src/context/context_compressor.dart';
+export 'src/context/retrieve_memory_tool.dart';
 export 'src/utils/change_notifier.dart';
 
 // Skills
 export 'src/skills/skill_storage_adapter.dart';
 export 'src/skills/skill_exporter.dart';
 export 'src/skills/skill_importer.dart';
+export 'src/skills/skill_definition.dart';
+export 'src/skills/dynamic_skill_tools.dart';
 
 // Coding Tools
 export 'src/tools/coding_tools_stub.dart'
     if (dart.library.io) 'src/tools/coding_tools.dart';
+
+// Evaluation Harness
+export 'src/eval/eval_task.dart';
+export 'src/eval/eval_grader.dart';
+export 'src/eval/eval_runner.dart';
+export 'src/eval/trajectory_recorder.dart';

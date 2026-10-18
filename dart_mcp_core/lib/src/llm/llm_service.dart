@@ -151,9 +151,29 @@ class LLMService {
         }
         i++;
       } else if (msg.role == ChatRole.user) {
+        final parts = <openai.ContentPart>[];
+        if (msg.parts != null && msg.parts!.isNotEmpty) {
+          for (final part in msg.parts!) {
+            if (part is TextPart && part.text.isNotEmpty) {
+              parts.add(openai.ContentPart.text(part.text));
+            } else if (part is ImagePart) {
+              if (part.url != null) {
+                parts.add(openai.ContentPart.imageUrl(part.url!));
+              } else if (part.bytes != null) {
+                final base64Str = base64Encode(part.bytes!);
+                parts.add(openai.ContentPart.imageUrl('data:${part.mimeType};base64,$base64Str'));
+              } else if (part.base64 != null) {
+                parts.add(openai.ContentPart.imageUrl('data:${part.mimeType};base64,${part.base64!}'));
+              }
+            } else if (part is DocumentPart) {
+              if (part.textContent != null && part.textContent!.isNotEmpty) {
+                parts.add(openai.ContentPart.text('[Document: ${part.fileName}]\n${part.textContent}'));
+              }
+            }
+          }
+        }
         if (msg.attachments != null && msg.attachments!.isNotEmpty) {
-          final parts = <openai.ContentPart>[];
-          if (msg.content.isNotEmpty) {
+          if (parts.isEmpty && msg.content.isNotEmpty) {
             parts.add(openai.ContentPart.text(msg.content));
           }
           for (final att in msg.attachments!) {
@@ -163,11 +183,9 @@ class LLMService {
               parts.add(openai.ContentPart.imageUrl(dataUri));
             }
           }
-          if (parts.isNotEmpty) {
-            openAiMsgs.add(openai.ChatMessage.user(parts));
-          } else {
-            openAiMsgs.add(openai.ChatMessage.user(msg.content));
-          }
+        }
+        if (parts.isNotEmpty) {
+          openAiMsgs.add(openai.ChatMessage.user(parts));
         } else {
           openAiMsgs.add(openai.ChatMessage.user(msg.content));
         }
@@ -1167,10 +1185,30 @@ class LLMService {
         }
         i++;
       } else if (msg.role == ChatRole.user) {
+        final List<String> images = [];
+        if (msg.parts != null) {
+          for (final part in msg.parts!) {
+            if (part is ImagePart) {
+              if (part.bytes != null) {
+                images.add(base64Encode(part.bytes!));
+              } else if (part.base64 != null) {
+                images.add(part.base64!);
+              }
+            }
+          }
+        }
+        if (msg.attachments != null) {
+          for (final att in msg.attachments!) {
+            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+              images.add(base64Encode(att.bytes!));
+            }
+          }
+        }
         ollamaMsgs.add(
           ollama.ChatMessage(
             role: ollama.MessageRole.user,
             content: msg.content,
+            images: images.isNotEmpty ? images : null,
           ),
         );
         i++;
