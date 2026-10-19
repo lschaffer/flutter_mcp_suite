@@ -22,8 +22,13 @@ class SettingsDrawer extends StatelessWidget {
 
 class SettingsPanel extends StatefulWidget {
   final PlaygroundController controller;
+  final int initialTabIndex;
 
-  const SettingsPanel({super.key, required this.controller});
+  const SettingsPanel({
+    super.key,
+    required this.controller,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<SettingsPanel> createState() => _SettingsPanelState();
@@ -35,6 +40,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
   final _modelCtrl = TextEditingController();
   final _apiKeyCtrl = TextEditingController();
   final _baseUrlCtrl = TextEditingController();
+  late final TextEditingController _systemPromptCtrl;
+  late bool _chatMode;
 
   // Per-provider field cache — preserves model/apiKey/baseUrl when switching providers
   final Map<LlmProvider, _ProviderFieldCache> _providerCache = {};
@@ -57,6 +64,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
   @override
   void initState() {
     super.initState();
+    _systemPromptCtrl = TextEditingController(text: widget.controller.systemPrompt);
+    _chatMode = widget.controller.chatMode;
     widget.controller.addListener(_onControllerChange);
     _loadLlmValues();
   }
@@ -125,11 +134,17 @@ class _SettingsPanelState extends State<SettingsPanel> {
     _useNativeToolCall = config.useNativeToolCall;
     _useSafeToolCall = config.useSafeToolCall;
     _useStreaming = config.useStreaming;
+
+    if (_systemPromptCtrl.text != widget.controller.systemPrompt) {
+      _systemPromptCtrl.text = widget.controller.systemPrompt;
+    }
+    _chatMode = widget.controller.chatMode;
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChange);
+    _systemPromptCtrl.dispose();
     _modelCtrl.dispose();
     _apiKeyCtrl.dispose();
     _baseUrlCtrl.dispose();
@@ -351,8 +366,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
         (defaultTargetPlatform == TargetPlatform.windows ||
             defaultTargetPlatform == TargetPlatform.linux ||
             defaultTargetPlatform == TargetPlatform.macOS);
+    final tabCount = isDesktop ? 4 : 3;
     return DefaultTabController(
-      length: isDesktop ? 3 : 2,
+      initialIndex: widget.initialTabIndex.clamp(0, tabCount - 1),
+      length: tabCount,
       child: Scaffold(
         body: SafeArea(
           child: Column(
@@ -377,7 +394,13 @@ class _SettingsPanelState extends State<SettingsPanel> {
                 labelColor: theme.colorScheme.primary,
                 unselectedLabelColor: Colors.grey,
                 indicatorSize: TabBarIndicatorSize.tab,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 tabs: [
+                  const Tab(
+                    icon: Icon(Icons.smart_toy_outlined),
+                    text: 'Agent & Tools',
+                  ),
                   const Tab(
                     icon: Icon(Icons.psychology_outlined),
                     text: 'LLM Settings',
@@ -397,6 +420,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
               Expanded(
                 child: TabBarView(
                   children: [
+                    // Tab 0: Agent & Tools
+                    _buildAgentAndToolsTab(theme),
                     // Tab 1: LLM Settings
                     Form(
                       key: _formKey,
@@ -636,6 +661,398 @@ class _SettingsPanelState extends State<SettingsPanel> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAgentAndToolsTab(ThemeData theme) {
+    final localTools = widget.controller.localTools;
+    final mcpTools = widget.controller.mcpManager.availableTools;
+    final enabledCount = widget.controller.enabledToolNames.length;
+    final totalTools = localTools.length + mcpTools.length;
+
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        // Mode Selector Card
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _chatMode ? Icons.chat_bubble_outline : Icons.smart_toy_outlined,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Operation Mode',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          setState(() {
+                            _chatMode = false;
+                            widget.controller.chatMode = false;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: !_chatMode
+                                ? theme.colorScheme.primaryContainer
+                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: !_chatMode
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                              width: !_chatMode ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.smart_toy_outlined,
+                                size: 18,
+                                color: !_chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Agent Mode',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: !_chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          setState(() {
+                            _chatMode = true;
+                            widget.controller.chatMode = true;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: _chatMode
+                                ? theme.colorScheme.primaryContainer
+                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _chatMode
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                              width: _chatMode ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                size: 18,
+                                color: _chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Direct Chat',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _chatMode
+                      ? 'Direct LLM conversation without tools or system prompt (fastest for simple queries).'
+                      : 'Equipped with autonomous tools, memory, and persona guidelines.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // System Prompt Card
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.edit_note, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'System Prompt / Persona',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    if (_systemPromptCtrl.text.isNotEmpty)
+                      TextButton.icon(
+                        icon: const Icon(Icons.clear, size: 14),
+                        label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                        onPressed: () {
+                          setState(() {
+                            _systemPromptCtrl.clear();
+                            widget.controller.systemPrompt = '';
+                          });
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _systemPromptCtrl,
+                  maxLines: 5,
+                  minLines: 3,
+                  onChanged: (val) {
+                    widget.controller.systemPrompt = val;
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Enter instructions, persona details, or operational guidelines for the agent...',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Quick Persona Templates:',
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.code, size: 14),
+                      label: const Text('Coding Expert', style: TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        const p =
+                            'You are an expert senior software engineer. Write clean, idiomatic, well-tested code. Use available tools to inspect files and execute commands precisely.';
+                        setState(() {
+                          _systemPromptCtrl.text = p;
+                          widget.controller.systemPrompt = p;
+                        });
+                      },
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.remove_red_eye_outlined, size: 14),
+                      label: const Text('Vision Analyst', style: TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        const p =
+                            'You are a meticulous visual inspection assistant. Analyze screenshots, diagrams, and images thoroughly, highlighting details, bugs, and visual hierarchy.';
+                        setState(() {
+                          _systemPromptCtrl.text = p;
+                          widget.controller.systemPrompt = p;
+                        });
+                      },
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.storage_outlined, size: 14),
+                      label: const Text('Data & Tools Agent', style: TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        const p =
+                            'You are an autonomous data agent equipped with database, API, and tool access. Inspect schemas, query databases, and summarize findings clearly.';
+                        setState(() {
+                          _systemPromptCtrl.text = p;
+                          widget.controller.systemPrompt = p;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Tools Selection Card
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.handyman_outlined, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tools ($enabledCount / $totalTools Active)',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    if (totalTools > 0) ...[
+                      TextButton(
+                        onPressed: () {
+                          final allNames = <String>{
+                            ...localTools.map((t) => t.name),
+                            ...mcpTools.map((t) => t.name),
+                          };
+                          setState(() {
+                            widget.controller.updateEnabledTools(allNames);
+                          });
+                        },
+                        child: const Text('Enable All', style: TextStyle(fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            widget.controller.updateEnabledTools({});
+                          });
+                        },
+                        child: const Text('Disable All', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ],
+                ),
+                if (_chatMode) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Text(
+                      'Tools are bypassed while Direct Chat Mode is active.',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                if (totalTools == 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(
+                      child: Text(
+                        'No tools registered yet. Connect remote MCP servers in the MCP Servers tab to equip the agent.',
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                else ...[
+                  if (localTools.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+                      child: Text(
+                        'Local Tools (${localTools.length})',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    for (final tool in localTools)
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          tool.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          tool.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        value: widget.controller.enabledToolNames.contains(tool.name),
+                        onChanged: (val) {
+                          setState(() {
+                            widget.controller.toggleToolEnabled(tool.name, val ?? false);
+                          });
+                        },
+                      ),
+                  ],
+                  if (mcpTools.isNotEmpty) ...[
+                    const Divider(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
+                      child: Text(
+                        'MCP Server Tools (${mcpTools.length})',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ),
+                    for (final tool in mcpTools)
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          tool.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        subtitle: tool.description != null
+                            ? Text(
+                                tool.description!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11),
+                              )
+                            : null,
+                        value: widget.controller.enabledToolNames.contains(tool.name),
+                        onChanged: (val) {
+                          setState(() {
+                            widget.controller.toggleToolEnabled(tool.name, val ?? false);
+                          });
+                        },
+                      ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () {
+            widget.controller.systemPrompt = _systemPromptCtrl.text.trim();
+            widget.controller.chatMode = _chatMode;
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Agent settings applied.')),
+            );
+          },
+          icon: const Icon(Icons.check),
+          label: const Text('Save & Apply Agent Settings'),
+        ),
+      ],
     );
   }
 }

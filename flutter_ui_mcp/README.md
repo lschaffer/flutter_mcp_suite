@@ -9,6 +9,11 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 
 ## ✨ Features
 
+- **Episodic Memory Archive & Retrieval** – Integrated memory store navigation with instant counter badges in app bars, deep search, full interaction history, and background compression.
+- **Autonomous Sub-Agent Delegation UI** – Live hierarchical visualization of delegated sub-agent tasks spawned via `DelegateTaskTool` with status indicators, execution logs, and nested results.
+- **Dynamic Skill Dock** – Interactive chip bar above the chat input allowing instant activation/deactivation of specialized agent skills at runtime.
+- **Multimodal Chat & Lightbox Preview** – Typed `ChatContentPart` attachments (`ImagePart`, `DocumentPart`, `AudioPart`) with inline preview chips and high-resolution fullscreen image lightboxes.
+- **In-App Evaluation Benchmark Runner** – Run automated LLM and MCP agent benchmark test suites with real-time pass/fail rates, latency metrics, and grading rationales.
 - **Multi-LLM support** – OpenAI, Anthropic Claude, Google Gemini, Ollama (local), Mistral AI, and any OpenAI-compatible endpoint.
 - **Embedded on-device models** – Run local GGUF models via `llamadart` without external network dependencies.
 - **HTTP MCP Server registry** – Browse [PulseMCP](https://pulsemcp.com) and [Smithery](https://smithery.ai) catalogs or add custom remote MCP servers.
@@ -16,7 +21,9 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 - **Dart-native local tools** – Extend with custom Dart-native tools (e.g., Weather, SSH, Chart-generation tools; see the [example](example) implementation).
 - **Agentic tool loop** – Automatic iterative tool calling with duplicate-call detection, iteration limits, and safety guards.
 - **Save/Load configurations** – Persist LLM settings, tool selections, system prompts, and server lists via `SharedPreferences` or a custom `McpPlaygroundStorageDelegate`.
-- **Agent Inspector** – Side-by-side conversation + internal state inspector for debugging agent behavior (can be toggled or disabled via `showAgentInspector`).
+- **Dynamic Model Pricing & Context Limits** – Real-time token rate resolution ($/€) and context window limits directly in model dropdowns and banners without hardcoded static tables.
+- **Agent Inspector & Top-Bar Toggle** – Side-by-side conversation + internal state inspector for live debugging of tool executions, raw JSON payloads, and token consumption (toggleable via the top action bar or `showAgentInspector`).
+- **Autonomous Sub-Agent Orchestration** – Multi-turn autonomous tool execution loops for child sub-agents spawned via `DelegateTaskTool`.
 - **Cross-platform** – Works on Android, iOS, Web, macOS, Windows, and Linux.
 
 > [!NOTE]
@@ -44,6 +51,11 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 | **[Audio & Meeting Notes Assistant](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_audio_notes)** | Cross-platform | **Ministral 3B** / **Qwen 2.5 3B** | Ministral 8B / GPT-4o-mini |
 | **[GitHub Issue Triage & PR Review](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_github_triage)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Mistral Small 24B / Claude 3.5 Sonnet |
 | **[Primary Multi-Tool Showcase](example)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Gemini 2.5 Flash / GPT-4o |
+| **[Sub-Agent Orchestrator](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_subagents_orchestrator)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | GPT-4o / Claude 3.7 Sonnet |
+| **[Episodic Memory Archive](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_episodic_memory)** | Cross-platform | **Qwen 2.5 3B** / **Ministral 3B** | GPT-4o / Claude 3.5 Sonnet |
+| **[Dynamic Skills Dock](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_dynamic_skills)** | Cross-platform | **Qwen 2.5 3B** / **Ministral 3B** | GPT-4o / Gemini 2.5 Flash |
+| **[Multimodal Media Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_multimodal_vision)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | GPT-4o / Gemini 2.5 Flash |
+| **[Agent Benchmark Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_agent_eval)** | Cross-platform | **Gemma 2 2B** / **Qwen 2.5 3B** | GPT-4o / Claude 3.7 Sonnet |
 
 ---
 
@@ -61,7 +73,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp: ^1.0.2
+  flutter_ui_mcp: ^1.3.0
 ```
 
 Then import:

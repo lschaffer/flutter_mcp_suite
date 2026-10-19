@@ -1,3 +1,47 @@
+## 1.3.0
+
+* **Simplified UI & Direct-to-Chat Architecture**:
+  * Default direct-to-chat flow with streamlined welcome empty state and interactive model & tool badges.
+  * Consolidated "Agent & Tools" configuration tab inside the settings dialog.
+* **App Embedding Support & Visibility Controls**:
+  * Added top bar and UI component visibility parameters to `FlutterUiMcp` / `McpPlayground`:
+    * `showAppBar`: Toggle entire AppBar and drawer for embedding into parent apps.
+    * `showStatusBadges`: Toggle model and active tools status badges.
+    * `showNewChatAction`: Toggle New Chat action.
+    * `showSettingsAction`: Toggle Settings button.
+    * `showSkillsControls`: Toggle Skills Manager actions.
+    * `showAssistantStatistics`: Toggle Assistant Evals and Benchmark actions.
+    * `showMemoryArchive`: Toggle Episodic Memory Archive action.
+    * `showToolsCatalog`: Toggle Tools Catalog viewer action.
+    * `showWorkflowActions`: Toggle workflow save/load actions.
+* **Episodic Memory Archive & Navigation**:
+  * Added Memory Archive action button in desktop and mobile app bars with live counter badges.
+  * Allows users to browse, search, and inspect compressed episodic memories and full interaction histories.
+* **Autonomous Sub-Agent Delegation UI**:
+  * Real-time visibility into nested sub-agent executions triggered by the agent via `DelegateTaskTool`.
+  * Renders specialized sub-agent execution cards with task summary, nesting level, and live execution status.
+* **Dynamic Skill Dock**:
+  * Integrated `DynamicSkillDock` immediately above the chat input composer for one-tap toggling of dynamic skills.
+  * Synchronized with dynamic skill activation tools (`ActivateSkillsTool`/`DeactivateSkillsTool`).
+* **Multimodal Attachments Staging & Rendering**:
+  * Enhanced attachment picker to stage typed `ChatContentPart`s (`ImagePart`, `DocumentPart`, `AudioPart`) into `pendingParts`.
+  * Support for lightbox full-resolution image view, document badges, and audio preview.
+* **Evaluation Benchmark Runner**:
+  * Added Benchmark action button in app bars opening `EvalBenchmarkDialog`.
+  * Enables benchmarking LLM and MCP agent performance directly in-app against assertion suites with latency and pass-rate telemetry.
+* **Agent Inspector Visibility Toggle**:
+  * Added direct toggle button in the top action bar to expand or collapse the side-by-side Agent Inspector panel on desktop and tablet views (`showAgentInspector`).
+* **Dynamic Model Pricing & Context Limits**:
+  * Integrated `ModelPricingService` into `LlmConfigForm`: live prices, context sizes, and multimodal capability icons directly inside the model dropdown suggestions.
+  * Real-time pricing banner beneath the model name input displaying live token rates, USD ($) and EUR (€) conversions, and context window limits.
+* **Autonomous Multi-Turn Sub-Agent Execution**:
+  * Child sub-agents delegated via `DelegateTaskTool` now execute a full autonomous tool loop (up to 5 iterations) against local/MCP tools, streaming real-time progress events before returning final synthesized audit reports.
+* **Direct Chat Status & Attachment Resilience**:
+  * Context-aware status indicator displaying "Generating response..." during Direct Chat mode when tools are disabled.
+  * Resilient multi-encoding UTF-8 decoding for text attachments protecting against malformed character crashes.
+* **Dependencies**:
+  * Upgraded dependencies to `dart_mcp_core: ^1.3.0` and `flutter_ui_mcp_core: '>=1.3.0 <2.0.0'`.
+
 ## 1.2.0
 
 * **Embedded On-Device LLM & Mobile UX**:

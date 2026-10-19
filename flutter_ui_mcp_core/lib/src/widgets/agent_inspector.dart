@@ -1,363 +1,18 @@
 import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
-import 'package:http/http.dart' as http;
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../../playground_controller.dart';
-
-class ModelTokenPrice {
-  final double inputPer1MUsd;
-  final double outputPer1MUsd;
-
-  const ModelTokenPrice({
-    required this.inputPer1MUsd,
-    required this.outputPer1MUsd,
-  });
-}
-
-const Map<String, Map<String, ModelTokenPrice>> _modelPricingByProvider = {
-  'gemini': {
-    'gemini-2.5-flash': ModelTokenPrice(
-      inputPer1MUsd: 0.15,
-      outputPer1MUsd: 0.60,
-    ),
-    'gemini-1.5-flash': ModelTokenPrice(
-      inputPer1MUsd: 0.075,
-      outputPer1MUsd: 0.30,
-    ),
-    'gemini-1.5-pro': ModelTokenPrice(
-      inputPer1MUsd: 1.25,
-      outputPer1MUsd: 5.00,
-    ),
-    'gemini-2.0-flash-exp': ModelTokenPrice(
-      inputPer1MUsd: 0.15,
-      outputPer1MUsd: 0.60,
-    ),
-    'gemini-2.0-flash-thinking-exp': ModelTokenPrice(
-      inputPer1MUsd: 0.15,
-      outputPer1MUsd: 0.60,
-    ),
-  },
-  'mistral': {
-    'mistral-large-latest': ModelTokenPrice(
-      inputPer1MUsd: 0.50,
-      outputPer1MUsd: 1.50,
-    ),
-    'mistral-large': ModelTokenPrice(inputPer1MUsd: 0.50, outputPer1MUsd: 1.50),
-    'mistral-medium-latest': ModelTokenPrice(
-      inputPer1MUsd: 0.40,
-      outputPer1MUsd: 2.00,
-    ),
-    'mistral-medium': ModelTokenPrice(
-      inputPer1MUsd: 0.40,
-      outputPer1MUsd: 2.00,
-    ),
-    'mistral-small-latest': ModelTokenPrice(
-      inputPer1MUsd: 0.10,
-      outputPer1MUsd: 0.30,
-    ),
-    'mistral-small': ModelTokenPrice(inputPer1MUsd: 0.10, outputPer1MUsd: 0.30),
-  },
-  'openai': {
-    'gpt-4o': ModelTokenPrice(inputPer1MUsd: 2.50, outputPer1MUsd: 10.00),
-    'gpt-4o-mini': ModelTokenPrice(inputPer1MUsd: 0.150, outputPer1MUsd: 0.600),
-    'gpt-4-turbo': ModelTokenPrice(inputPer1MUsd: 10.00, outputPer1MUsd: 30.00),
-    'gpt-3.5-turbo': ModelTokenPrice(inputPer1MUsd: 0.50, outputPer1MUsd: 1.50),
-  },
-  'claude': {
-    'claude-3-5-sonnet-latest': ModelTokenPrice(
-      inputPer1MUsd: 3.00,
-      outputPer1MUsd: 15.00,
-    ),
-    'claude-3-5-sonnet': ModelTokenPrice(
-      inputPer1MUsd: 3.00,
-      outputPer1MUsd: 15.00,
-    ),
-    'claude-3-5-haiku-latest': ModelTokenPrice(
-      inputPer1MUsd: 0.80,
-      outputPer1MUsd: 4.00,
-    ),
-    'claude-3-5-haiku': ModelTokenPrice(
-      inputPer1MUsd: 0.80,
-      outputPer1MUsd: 4.00,
-    ),
-    'claude-3-opus-latest': ModelTokenPrice(
-      inputPer1MUsd: 15.00,
-      outputPer1MUsd: 75.00,
-    ),
-  },
-};
-
-// ── Live-price cache (session-scoped) ─────────────────────────────────────────
-
-class _CachedModelPrice {
-  final ModelTokenPrice price;
-  final DateTime fetchedAt;
-  final bool isLive; // true = fetched from OpenRouter, false = static fallback
-  const _CachedModelPrice({
-    required this.price,
-    required this.fetchedAt,
-    this.isLive = false,
-  });
-}
-
-const Duration _livePriceTtl = Duration(hours: 12);
-const Duration _openRouterModelsTtl = Duration(minutes: 30);
-final Map<String, _CachedModelPrice> _liveModelPricingCache = {};
-List<dynamic>? _openRouterModelsCache;
-DateTime? _openRouterModelsFetchedAt;
-
-String _normModel(String m) => m.trim().toLowerCase();
-String _priceCacheKey(String providerKey, String model) =>
-    '${providerKey.trim().toLowerCase()}:${_normModel(model)}';
-
-_CachedModelPrice? _getCachedLivePrice(String providerKey, String model) {
-  final key = _priceCacheKey(providerKey, model);
-  final cached = _liveModelPricingCache[key];
-  if (cached == null) return null;
-  if (DateTime.now().difference(cached.fetchedAt) > _livePriceTtl) return null;
-  return cached;
-}
-
-void _cacheLivePrice(
-  String providerKey,
-  String model,
-  ModelTokenPrice price, {
-  bool isLive = false,
-}) {
-  final now = DateTime.now();
-  final key = _priceCacheKey(providerKey, model);
-  final entry = _CachedModelPrice(price: price, fetchedAt: now, isLive: isLive);
-  _liveModelPricingCache[key] = entry;
-  // Also cache with/without -latest alias
-  final nm = _normModel(model);
-  if (nm.endsWith('-latest')) {
-    _liveModelPricingCache[_priceCacheKey(
-          providerKey,
-          nm.substring(0, nm.length - 7),
-        )] =
-        entry;
-  } else {
-    _liveModelPricingCache[_priceCacheKey(providerKey, '$nm-latest')] = entry;
-  }
-}
-
-Future<List<dynamic>?> _loadOpenRouterModels() async {
-  if (_openRouterModelsCache != null &&
-      _openRouterModelsFetchedAt != null &&
-      DateTime.now().difference(_openRouterModelsFetchedAt!) <=
-          _openRouterModelsTtl) {
-    return _openRouterModelsCache;
-  }
-  try {
-    final response = await http
-        .get(Uri.parse('https://openrouter.ai/api/v1/models'))
-        .timeout(const Duration(seconds: 12));
-    if (response.statusCode != 200) return null;
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) return null;
-    final data = decoded['data'];
-    if (data is! List<dynamic>) return null;
-    _openRouterModelsCache = data;
-    _openRouterModelsFetchedAt = DateTime.now();
-    return data;
-  } catch (_) {
-    return null;
-  }
-}
-
-bool _matchesProviderForModel({
-  required String providerKey,
-  required String idLower,
-  required String nameLower,
-}) {
-  switch (providerKey) {
-    case 'openai':
-      return idLower.startsWith('openai/') ||
-          idLower.contains('gpt') ||
-          nameLower.contains('openai');
-    case 'claude':
-      return idLower.startsWith('anthropic/') ||
-          idLower.contains('claude') ||
-          nameLower.contains('claude');
-    case 'mistral':
-      return idLower.startsWith('mistral-ai/') ||
-          idLower.startsWith('mistralai/') ||
-          idLower.contains('mistral');
-    case 'gemini':
-      return idLower.startsWith('google/') ||
-          idLower.contains('gemini') ||
-          nameLower.contains('gemini');
-    default:
-      return true;
-  }
-}
-
-double? _parseDouble(dynamic value) {
-  if (value == null) return null;
-  if (value is num) return value.toDouble();
-  return double.tryParse(value.toString());
-}
-
-double _toPer1M(double value) => value <= 0.01 ? value * 1000000.0 : value;
-
-Future<ModelTokenPrice?> _fetchOpenRouterLivePrice({
-  required String providerKey,
-  required String normalizedModel,
-}) async {
-  final models = await _loadOpenRouterModels();
-  if (models == null || models.isEmpty) return null;
-
-  final baseModel = normalizedModel.endsWith('-latest')
-      ? normalizedModel.substring(0, normalizedModel.length - 7)
-      : normalizedModel;
-
-  ModelTokenPrice? bestPrice;
-  var bestScore = -1;
-
-  for (final raw in models) {
-    if (raw is! Map<String, dynamic>) continue;
-    final idLower = (raw['id'] ?? '').toString().trim().toLowerCase();
-    final nameLower = (raw['name'] ?? '').toString().trim().toLowerCase();
-    if (idLower.isEmpty) {
-      continue;
-    }
-    if (!_matchesProviderForModel(
-      providerKey: providerKey,
-      idLower: idLower,
-      nameLower: nameLower,
-    )) {
-      continue;
-    }
-
-    final shortModel = idLower.contains('/')
-        ? idLower.split('/').last
-        : idLower;
-    var score = 0;
-    if (shortModel == normalizedModel) {
-      score += 120;
-    } else if (shortModel == baseModel) {
-      score += 110;
-    } else if (shortModel.startsWith('$baseModel-') ||
-        shortModel.contains(baseModel)) {
-      score += 80;
-    } else if (nameLower.contains(baseModel)) {
-      score += 60;
-    } else {
-      continue;
-    }
-    if (idLower.startsWith('$providerKey/')) {
-      score += 30;
-    }
-
-    final pricing = raw['pricing'];
-    if (pricing is! Map<String, dynamic>) {
-      continue;
-    }
-    final promptRaw = _parseDouble(pricing['prompt'] ?? pricing['input']);
-    final completionRaw = _parseDouble(
-      pricing['completion'] ?? pricing['output'],
-    );
-    if (promptRaw == null || completionRaw == null) {
-      continue;
-    }
-
-    final candidate = ModelTokenPrice(
-      inputPer1MUsd: _toPer1M(promptRaw),
-      outputPer1MUsd: _toPer1M(completionRaw),
-    );
-    if (score > bestScore) {
-      bestScore = score;
-      bestPrice = candidate;
-    }
-  }
-  return bestPrice;
-}
-
-Future<ModelTokenPrice?> refreshModelTokenPrice({
-  required String providerKey,
-  required String model,
-}) async {
-  final np = providerKey.trim().toLowerCase();
-  final nm = _normModel(model);
-  if (np.isEmpty || nm.isEmpty) return null;
-  if (np == 'ollama' ||
-      np == 'openai_compatible' ||
-      np == 'embedded' ||
-      np == 'none') {
-    return null;
-  }
-  try {
-    final fetched = await _fetchOpenRouterLivePrice(
-      providerKey: np,
-      normalizedModel: nm,
-    );
-    if (fetched != null) {
-      _cacheLivePrice(np, nm, fetched, isLive: true);
-      return fetched;
-    }
-  } catch (_) {}
-  return _getModelTokenPrice2(np, nm);
-}
-
-ModelTokenPrice? _getModelTokenPrice2(
-  String providerKey,
-  String normalizedModel,
-) {
-  final cached = _getCachedLivePrice(providerKey, normalizedModel);
-  if (cached != null) return cached.price;
-  final providerModels = _modelPricingByProvider[providerKey];
-  if (providerModels == null) return null;
-  if (providerModels.containsKey(normalizedModel)) {
-    return providerModels[normalizedModel];
-  }
-  for (final entry in providerModels.entries) {
-    if (normalizedModel.startsWith(entry.key) ||
-        entry.key.startsWith(normalizedModel)) {
-      return entry.value;
-    }
-  }
-  return null;
-}
-
-ModelTokenPrice? _getModelTokenPrice(LlmProvider provider, String model) {
-  final normalizedModel = model.trim().toLowerCase();
-  String providerKey = '';
-  switch (provider) {
-    case LlmProvider.gemini:
-      providerKey = 'gemini';
-      break;
-    case LlmProvider.mistral:
-      providerKey = 'mistral';
-      break;
-    case LlmProvider.openai:
-      providerKey = 'openai';
-      break;
-    case LlmProvider.claude:
-      providerKey = 'claude';
-      break;
-    case LlmProvider.openaiCompatible:
-      if (normalizedModel.contains('mistral')) {
-        providerKey = 'mistral';
-      } else {
-        providerKey = 'openai';
-      }
-      break;
-    case LlmProvider.embedded:
-    case LlmProvider.ollama:
-    case LlmProvider.none:
-      return null;
-  }
-
-  // Check live cache first, then fall back to static map
-  final cached = _getCachedLivePrice(providerKey, normalizedModel);
-  if (cached != null) return cached.price;
-  return _getModelTokenPrice2(providerKey, normalizedModel);
-}
+import '../services/model_pricing_service.dart';
 
 class AgentInspector extends StatefulWidget {
   final PlaygroundController controller;
+  final VoidCallback? onClose;
 
-  const AgentInspector({super.key, required this.controller});
+  const AgentInspector({
+    super.key,
+    required this.controller,
+    this.onClose,
+  });
 
   @override
   State<AgentInspector> createState() => _AgentInspectorState();
@@ -366,44 +21,38 @@ class AgentInspector extends StatefulWidget {
 class _AgentInspectorState extends State<AgentInspector> {
   bool _logsAscending = true;
   DateTime? _logsClearedAt;
-  bool _priceIsLive = false;
 
   @override
   void initState() {
     super.initState();
-    _refreshPriceAsync();
+    widget.controller.addListener(_onControllerChanged);
+    if (widget.controller.activeModelPrice == null &&
+        !widget.controller.isLoadingPrice) {
+      widget.controller.fetchActiveModelPrice();
+    }
   }
 
   @override
   void didUpdateWidget(AgentInspector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final oldConfig = oldWidget.controller.activeLlmConfig;
-    final newConfig = widget.controller.activeLlmConfig;
-    if (oldConfig.provider != newConfig.provider ||
-        oldConfig.model != newConfig.model) {
-      _refreshPriceAsync();
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+      if (widget.controller.activeModelPrice == null &&
+          !widget.controller.isLoadingPrice) {
+        widget.controller.fetchActiveModelPrice();
+      }
     }
   }
 
-  void _refreshPriceAsync() {
-    final config = widget.controller.activeLlmConfig;
-    final providerKey = switch (config.provider) {
-      LlmProvider.gemini => 'gemini',
-      LlmProvider.mistral => 'mistral',
-      LlmProvider.openai => 'openai',
-      LlmProvider.claude => 'claude',
-      LlmProvider.openaiCompatible =>
-        config.model.toLowerCase().contains('mistral') ? 'mistral' : 'openai',
-      _ => '',
-    };
-    if (providerKey.isEmpty || config.model.isEmpty) return;
-    refreshModelTokenPrice(providerKey: providerKey, model: config.model).then((
-      price,
-    ) {
-      if (!mounted) return;
-      final cached = _getCachedLivePrice(providerKey, _normModel(config.model));
-      setState(() => _priceIsLive = cached?.isLive ?? false);
-    });
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
 
   String _formatTimestamp(DateTime dt) {
@@ -420,6 +69,9 @@ class _AgentInspectorState extends State<AgentInspector> {
 
     final config = widget.controller.activeLlmConfig;
     final messages = widget.controller.messages;
+    final priceInfo = widget.controller.activeModelPrice;
+    final isLoadingPrice = widget.controller.isLoadingPrice;
+    final isLocal = ModelPricingService.isLocalOrFree(config);
 
     // Calculate stats
     int toolCallsCount = 0;
@@ -436,6 +88,12 @@ class _AgentInspectorState extends State<AgentInspector> {
       }
       if (m.role == ChatRole.user) {
         sentCharsCount += m.content.length;
+        if (m.attachments != null) {
+          for (final a in m.attachments!) {
+            final aSize = a.size ?? a.bytes?.length ?? 0;
+            sentCharsCount += aSize;
+          }
+        }
       } else if (m.role == ChatRole.tool) {
         sentCharsCount += m.content.length;
       } else if (m.role == ChatRole.assistant) {
@@ -448,7 +106,22 @@ class _AgentInspectorState extends State<AgentInspector> {
     final estInputTokens = (sentCharsCount / 3.8).round();
     final estOutputTokens = (receivedCharsCount / 3.8).round();
     final estTotalTokens = estInputTokens + estOutputTokens;
-    final tokenProgress = (estTotalTokens / 100000.0).clamp(0.0, 1.0);
+    final maxContext = (priceInfo?.contextWindow != null &&
+            priceInfo!.contextWindow! > 0)
+        ? priceInfo.contextWindow!
+        : (isLocal ? 131072 : 1048576);
+    final tokenProgress =
+        (estTotalTokens / maxContext.toDouble()).clamp(0.0, 1.0);
+    final isWarning = tokenProgress > 0.85;
+
+    double estCost = 0.0;
+    if (!isLocal &&
+        priceInfo != null &&
+        priceInfo.hasPricing &&
+        !priceInfo.isFree) {
+      estCost = (estInputTokens / 1000000.0) * priceInfo.inputPer1MUsd +
+          (estOutputTokens / 1000000.0) * priceInfo.outputPer1MUsd;
+    }
 
     // Build log entries
     final entries = <_LogEntry>[];
@@ -554,18 +227,21 @@ class _AgentInspectorState extends State<AgentInspector> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               children: [
-                const Icon(Icons.analytics_outlined, color: Color(0xFF7C3AED)),
+                const Icon(Icons.bar_chart_rounded, color: Color(0xFFF97316)),
                 const SizedBox(width: 8),
-                Text(
-                  'Agent Inspector',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'Agent Inspector',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   width: 8,
                   height: 8,
@@ -583,6 +259,22 @@ class _AgentInspectorState extends State<AgentInspector> {
                     color: Colors.grey,
                   ),
                 ),
+                if (widget.onClose != null || Navigator.of(context).canPop()) ...[
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    tooltip: 'Close',
+                    onPressed: () {
+                      if (widget.onClose != null) {
+                        widget.onClose!();
+                      } else {
+                        Navigator.of(context).maybePop();
+                      }
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -595,6 +287,13 @@ class _AgentInspectorState extends State<AgentInspector> {
                 children: [
                   // Active Model Card
                   Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
@@ -604,6 +303,7 @@ class _AgentInspectorState extends State<AgentInspector> {
                             'Active Model',
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: Colors.grey,
+                              fontSize: 11,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -612,13 +312,18 @@ class _AgentInspectorState extends State<AgentInspector> {
                                 ? config.model
                                 : 'No Model selected',
                             style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
                             'Provider: ${config.provider.displayName}',
-                            style: theme.textTheme.bodySmall,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.7),
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -627,125 +332,211 @@ class _AgentInspectorState extends State<AgentInspector> {
                   const SizedBox(height: 12),
 
                   // Token Usage Card
-                  () {
-                    final price = _getModelTokenPrice(
-                      config.provider,
-                      config.model,
-                    );
-                    final showCost =
-                        price != null &&
-                        config.provider != LlmProvider.ollama &&
-                        config.provider != LlmProvider.none;
-                    double estCost = 0.0;
-                    if (showCost) {
-                      estCost =
-                          (estInputTokens / 1000000.0) * price.inputPer1MUsd +
-                          (estOutputTokens / 1000000.0) * price.outputPer1MUsd;
-                    }
-
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Est. Token Usage',
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: Colors.grey,
-                                  ),
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Token Usage',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: Colors.grey,
+                                  fontSize: 11,
                                 ),
-                                Text(
-                                  '$estTotalTokens / 100000',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            LinearProgressIndicator(
-                              value: tokenProgress,
-                              color: const Color(0xFF7C3AED),
-                              backgroundColor: Colors.grey.withValues(
-                                alpha: 0.2,
                               ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            if (showCost) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            'Price/1M: \$${price.inputPer1MUsd.toStringAsFixed(2)} in / \$${price.outputPer1MUsd.toStringAsFixed(2)} out',
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onSurfaceVariant
-                                                      .withValues(alpha: 0.7),
-                                                  fontSize: 11,
-                                                ),
-                                          ),
-                                        ),
-                                        if (_priceIsLive) ...[
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 1,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.green.withValues(
-                                                alpha: 0.15,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: Colors.green.withValues(
-                                                  alpha: 0.4,
-                                                ),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              'live',
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                color: Colors.green,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Est. Cost: \$${estCost.toStringAsFixed(5)}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF7C3AED),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                '$estTotalTokens / $maxContext',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                ),
                               ),
                             ],
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: tokenProgress,
+                              color: isWarning
+                                  ? Colors.redAccent
+                                  : const Color(0xFFF97316),
+                              backgroundColor: theme.colorScheme.outlineVariant
+                                  .withValues(alpha: 0.2),
+                              minHeight: 4,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isLoadingPrice) ...[
+                                      Flexible(
+                                        child: Text(
+                                          'Resolving price...',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontStyle: FontStyle.italic,
+                                            color: theme.colorScheme
+                                                .onSurfaceVariant
+                                                .withValues(alpha: 0.7),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ] else if (isLocal) ...[
+                                      Text(
+                                        '0 (Local / Ollama)',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.green.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          '0',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ] else if (priceInfo != null &&
+                                        priceInfo.hasPricing) ...[
+                                      Flexible(
+                                        child: Text(
+                                          'Price/1M: \$${priceInfo.inputPer1MUsd.toStringAsFixed(2)} in / \$${priceInfo.outputPer1MUsd.toStringAsFixed(2)} out',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: theme.colorScheme
+                                                    .onSurfaceVariant
+                                                    .withValues(alpha: 0.7),
+                                                fontSize: 11,
+                                              ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.green.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'live',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      Flexible(
+                                        child: Text(
+                                          'Price: Unknown',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: theme.colorScheme
+                                                    .onSurfaceVariant
+                                                    .withValues(alpha: 0.7),
+                                                fontSize: 11,
+                                              ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme
+                                              .outlineVariant
+                                              .withValues(alpha: 0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: theme.colorScheme
+                                                .outlineVariant
+                                                .withValues(alpha: 0.4),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'unknown',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Cost: \$${estCost.toStringAsFixed(4)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFF97316),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  }(),
+                    ),
+                  ),
                   const SizedBox(height: 12),
 
                   // Stats row
@@ -809,13 +600,15 @@ class _AgentInspectorState extends State<AgentInspector> {
                   // Live Execution Logs
                   Row(
                     children: [
-                      Text(
-                        'Live Execution Logs',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          'Live Execution Logs',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
                       IconButton(
                         icon: Icon(
                           _logsAscending

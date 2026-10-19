@@ -1,6 +1,6 @@
 name: flutter_ui_mcp_core
 description: "Shared UI components, dialogs, drawers, controllers, and services for the Flutter MCP Suite ecosystem."
-version: 1.2.0
+version: 1.3.0
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/flutter_ui_mcp_core
 
@@ -20,7 +20,7 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.6.0
-  dart_mcp_core: ^1.2.0
+  dart_mcp_core: ^1.3.0
   http: ^1.6.0
   uuid: ^4.6.0
   shared_preferences: ^2.5.5
@@ -43,6 +43,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
-  #dart_mcp_core:
-  #  path: ../dart_mcp_core
+  dart_mcp_core:
+    path: ../dart_mcp_core
 

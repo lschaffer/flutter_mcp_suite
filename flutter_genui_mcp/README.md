@@ -13,7 +13,8 @@ An interactive, dynamic **GenUI & Agentic MCP Widget** for Flutter.
 - **Multi-LLM Support** – OpenAI, Anthropic Claude, Google Gemini, Ollama (local), Mistral AI, and custom OpenAI-compatible endpoints.
 - **Embedded On-Device LLMs** – Run GGUF models locally with `llamadart` without network dependencies.
 - **MCP & Local Tool Calling** – Connect remote HTTP/SSE MCP servers, local subprocess servers, and Dart-native tools.
-- **Interactive Agent Inspector** – Side-by-side live inspection of system prompts, tool calls, JSON payloads, and execution traces.
+- **App Embedding Support & Visibility Controls** – Fully customizable header controls (`showAppBar`, `showStatusBadges`, `showSkillsControls`, `showAssistantStatistics`, `showMemoryArchive`, `showToolsCatalog`, `showWorkflowActions`) for embedding directly into host applications.
+- **Interactive Agent Inspector & Top-Bar Toggle** – Side-by-side live inspection of system prompts, tool calls, JSON payloads, and execution traces (toggleable via top bar button or `showAgentInspector`).
 - **Cross-Platform** – Android, iOS, macOS, Windows, Linux, and Web.
 
 ---

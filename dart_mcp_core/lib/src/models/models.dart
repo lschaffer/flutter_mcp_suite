@@ -683,6 +683,24 @@ class MessageAttachment {
     this.size,
   });
 
+  MessageAttachment copyWith({
+    String? id,
+    String? name,
+    String? path,
+    Uint8List? bytes,
+    String? mimeType,
+    int? size,
+  }) {
+    return MessageAttachment(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      path: path ?? this.path,
+      bytes: bytes ?? this.bytes,
+      mimeType: mimeType ?? this.mimeType,
+      size: size ?? this.size,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -764,6 +782,20 @@ class ImagePart extends ChatContentPart {
 
   factory ImagePart.fromUrl(String url, {String mimeType = 'image/png'}) =>
       ImagePart(url: url, mimeType: mimeType);
+
+  ImagePart copyWith({
+    Uint8List? bytes,
+    String? base64,
+    String? url,
+    String? mimeType,
+  }) {
+    return ImagePart(
+      bytes: bytes ?? this.bytes,
+      base64: base64 ?? this.base64,
+      url: url ?? this.url,
+      mimeType: mimeType ?? this.mimeType,
+    );
+  }
 
   @override
   Map<String, dynamic> toJson() => {

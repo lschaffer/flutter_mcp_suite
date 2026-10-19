@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+import '../services/clipboard_content_service.dart';
 
 class ToolGroup {
   final String name;
@@ -58,6 +60,8 @@ class SubPromptListEditor extends StatefulWidget {
     this.hintText,
     this.validator,
     this.onToolSelectionChanged,
+    this.onClipboardMedia,
+    this.onClipboardMediaBatch,
     this.leading,
     this.trailing,
   });
@@ -70,6 +74,8 @@ class SubPromptListEditor extends StatefulWidget {
   final String? hintText;
   final String? Function(String?)? validator;
   final VoidCallback? onToolSelectionChanged;
+  final ValueChanged<ClipboardPayload>? onClipboardMedia;
+  final ValueChanged<List<ClipboardPayload>>? onClipboardMediaBatch;
   final Widget? leading;
   final Widget? trailing;
 
@@ -429,8 +435,53 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
       ),
     );
 
+    final wrappedField = (widget.onClipboardMedia != null ||
+            widget.onClipboardMediaBatch != null)
+        ? Actions(
+            actions: <Type, Action<Intent>>{
+              PasteTextIntent: CallbackAction<PasteTextIntent>(
+                onInvoke: (intent) async {
+                  final payloads = await ClipboardContentService.readClipboard();
+                  final media = payloads.where((p) => p.isMedia).toList();
+                  if (media.isNotEmpty) {
+                    if (widget.onClipboardMediaBatch != null) {
+                      widget.onClipboardMediaBatch!(media);
+                    } else if (widget.onClipboardMedia != null) {
+                      for (final m in media) {
+                        widget.onClipboardMedia!(m);
+                      }
+                    }
+                    return null;
+                  }
+                  // Fallback: standard paste into text field
+                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                  if (data?.text != null) {
+                    final current = entry.controller.text;
+                    final sel = entry.controller.selection;
+                    if (sel.isValid) {
+                      final before = current.substring(0, sel.start);
+                      final after = current.substring(sel.end);
+                      final newText = '$before${data!.text}$after';
+                      entry.controller.value = TextEditingValue(
+                        text: newText,
+                        selection: TextSelection.collapsed(
+                          offset: sel.start + data.text!.length,
+                        ),
+                      );
+                    } else {
+                      entry.controller.text = '$current${data!.text}';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            },
+            child: textField,
+          )
+        : textField;
+
     if (widget.leading == null && widget.trailing == null) {
-      return textField;
+      return wrappedField;
     }
 
     return Row(
@@ -440,7 +491,7 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
           widget.leading!,
           const SizedBox(width: 4),
         ],
-        Expanded(child: textField),
+        Expanded(child: wrappedField),
         if (widget.trailing != null) ...[
           const SizedBox(width: 4),
           widget.trailing!,

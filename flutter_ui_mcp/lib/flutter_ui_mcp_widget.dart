@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart'
@@ -59,13 +60,45 @@ class McpPlayground extends StatefulWidget {
   /// Optional custom action widgets to display in the AppBar.
   final List<Widget>? customAppBarActions;
 
+  /// Whether to display the top AppBar. Set to false when embedding within another view/scaffold.
+  final bool showAppBar;
+
+  /// Whether to show interactive status badges (Model, Tools/Mode) in the AppBar title.
+  final bool showStatusBadges;
+
+  /// Whether to show the New Chat button in the AppBar actions.
+  final bool showNewChatAction;
+
+  /// Whether to show the Agent & LLM Settings button in the AppBar actions.
+  final bool showSettingsAction;
+
+  /// Whether to show Skills controls (Skills Manager and Skill Wizard).
+  final bool showSkillsControls;
+
+  /// Whether to show Assistant statistics and Evaluations/Benchmark controls.
+  final bool showAssistantStatistics;
+
+  /// Whether to show Episodic Memory Archive controls.
+  final bool showMemoryArchive;
+
+  /// Whether to show Registered Tools Catalog.
+  final bool showToolsCatalog;
+
+  /// Whether to show Save and Load Workflow actions.
+  final bool showWorkflowActions;
+
   /// Whether to use on-demand progressive tool discovery ([McpListToolsTool] & [McpCallToolTool])
   /// instead of sending all MCP tool schemas in the initial prompt context.
   final bool progressiveMcpDiscovery;
 
+  /// Optional external [PlaygroundController] instance. If provided, the widget
+  /// will use this controller instead of creating its own internal instance.
+  final PlaygroundController? controller;
+
   /// Creates a new [McpPlayground] widget instance.
   const McpPlayground({
     super.key,
+    this.controller,
     this.initialLlmConfig,
     this.initialServers,
     this.initialLocalMcpServers,
@@ -79,6 +112,15 @@ class McpPlayground extends StatefulWidget {
     this.initialSystemPrompt,
     this.initialEnabledTools,
     this.customAppBarActions,
+    this.showAppBar = true,
+    this.showStatusBadges = true,
+    this.showNewChatAction = true,
+    this.showSettingsAction = true,
+    this.showSkillsControls = true,
+    this.showAssistantStatistics = true,
+    this.showMemoryArchive = true,
+    this.showToolsCatalog = true,
+    this.showWorkflowActions = true,
     this.progressiveMcpDiscovery = false,
   });
 
@@ -102,10 +144,11 @@ class _McpPlaygroundState extends State<McpPlayground> {
   final List<MessageAttachment> _attachments = [];
 
   // Two-Site Layout State
-  bool _playgroundStarted = false;
+  bool _playgroundStarted = true;
   String? _loadedSetupId;
   double _chatFraction = 0.7;
-  bool _inspectorVisible = true;
+  bool get _inspectorVisible => _controller.isInspectorVisible;
+  set _inspectorVisible(bool val) => _controller.isInspectorVisible = val;
 
   // Setup form states
   final _systemPromptCtrl = TextEditingController();
@@ -145,14 +188,18 @@ class _McpPlaygroundState extends State<McpPlayground> {
     if (widget.initialSystemPrompt != null) {
       _systemPromptCtrl.text = widget.initialSystemPrompt!;
     }
-    _controller = PlaygroundController(
-      initialLlmConfig: widget.initialLlmConfig,
-      initialServers: widget.initialServers,
-      customLocalTools: widget.customLocalTools,
-      storageDelegate: widget.storageDelegate,
-      enableLogging: widget.enableLogging,
-      progressiveMcpDiscovery: widget.progressiveMcpDiscovery,
-    );
+    if (widget.controller != null) {
+      _controller = widget.controller!;
+    } else {
+      _controller = PlaygroundController(
+        initialLlmConfig: widget.initialLlmConfig,
+        initialServers: widget.initialServers,
+        customLocalTools: widget.customLocalTools,
+        storageDelegate: widget.storageDelegate,
+        enableLogging: widget.enableLogging,
+        progressiveMcpDiscovery: widget.progressiveMcpDiscovery,
+      );
+    }
     _controller.messageContentBuilder = widget.messageContentBuilder;
     _controller.addListener(_onStateChange);
 
@@ -266,7 +313,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
   @override
   void dispose() {
     _controller.removeListener(_onStateChange);
-    _controller.dispose();
+    if (widget.controller == null) {
+      _controller.dispose();
+    }
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     _systemPromptCtrl.dispose();
@@ -288,7 +337,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
   void _handleSend() async {
     FocusManager.instance.primaryFocus?.unfocus();
     final text = _inputCtrl.text.trim();
-    if (text.isEmpty && _attachments.isEmpty) return;
+    if (text.isEmpty && _attachments.isEmpty && _controller.pendingParts.isEmpty) return;
 
     final loaded = await _ensureEmbeddedModelLoaded();
     if (!loaded) return;
@@ -300,6 +349,107 @@ class _McpPlaygroundState extends State<McpPlayground> {
     });
 
     _controller.sendMessage(text, attachments: listToSend);
+  }
+
+  bool _isPasting = false;
+  DateTime? _lastPasteTime;
+
+  void _onGlobalCtrlV() {
+    // If an editable text widget is currently focused, do not handle paste here.
+    // The focused TextField's internal Actions/PasteTextIntent will handle it.
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    final focusedContext = primaryFocus?.context;
+    if (focusedContext != null && focusedContext.widget is EditableText) {
+      return;
+    }
+    _handleClipboardPaste();
+  }
+
+  Future<void> _handleClipboardPaste([dynamic directPayloads]) async {
+    final now = DateTime.now();
+    if (_isPasting ||
+        (_lastPasteTime != null &&
+            now.difference(_lastPasteTime!) < const Duration(milliseconds: 400))) {
+      return;
+    }
+    _isPasting = true;
+    _lastPasteTime = now;
+
+    try {
+      List<ClipboardPayload> payloads;
+      if (directPayloads is List<ClipboardPayload>) {
+        payloads = directPayloads;
+      } else if (directPayloads is ClipboardPayload) {
+        payloads = [directPayloads];
+      } else {
+        payloads = await ClipboardContentService.readClipboard();
+      }
+
+      if (payloads.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Clipboard is empty or contains no supported content.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      int addedCount = 0;
+      for (final payload in payloads) {
+        if (payload.type == ClipboardContentType.image && payload.bytes != null) {
+          final optBytes = await ImageOptimizer.shrinkToOptimalSize(
+            payload.bytes!,
+            maxDimension: 1024,
+          );
+          final att = MessageAttachment(
+            id: const Uuid().v4(),
+            name: payload.name,
+            path: payload.filePath ?? '',
+            bytes: optBytes,
+            mimeType: payload.mimeType,
+            size: optBytes.length,
+          );
+          _attachments.add(att);
+          addedCount++;
+        } else if (payload.type == ClipboardContentType.document) {
+          final bytes = payload.bytes ?? Uint8List(0);
+          final att = MessageAttachment(
+            id: const Uuid().v4(),
+            name: payload.name,
+            path: payload.filePath ?? '',
+            bytes: bytes,
+            mimeType: payload.mimeType,
+            size: bytes.length,
+          );
+          _attachments.add(att);
+          addedCount++;
+        } else if (payload.type == ClipboardContentType.text && payload.text != null) {
+          final cur = _inputCtrl.text;
+          _inputCtrl.text = cur.isEmpty ? payload.text! : '$cur\n${payload.text}';
+        }
+      }
+
+      if (mounted) {
+        setState(() {});
+        if (addedCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                addedCount == 1
+                    ? 'Attached from clipboard: ${payloads.firstWhere((p) => p.isMedia).name}'
+                    : 'Attached $addedCount items from clipboard',
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } finally {
+      _isPasting = false;
+    }
   }
 
   Future<void> _pickAttachments() async {
@@ -314,7 +464,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
           // Automatically downscale large images for optimal on-device/multimodal inference
           if (ImageOptimizer.isImageMime(mime)) {
-            finalBytes = await ImageOptimizer.shrinkToOptimalSize(rawBytes);
+            finalBytes = await ImageOptimizer.shrinkToOptimalSize(
+              rawBytes,
+              maxDimension: 1024,
+            );
           }
 
           final size = finalBytes.length;
@@ -329,10 +482,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
             ),
           );
         }
-        setState(() {});
+        if (mounted) setState(() {});
       }
     } catch (e) {
-      debugPrint('Error picking file: $e');
+      debugPrint('[FlutterUiMcp] Failed to pick files: $e');
     }
   }
 
@@ -813,10 +966,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
   // Reset function
   void _resetPlayground() {
     setState(() {
-      _playgroundStarted = false;
       _controller.clearChat();
       _attachments.clear();
-      _controller.customLlmConfig = _buildNextCustomLlmConfig();
+      _inputCtrl.clear();
     });
   }
 
@@ -924,7 +1076,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
     });
   }
 
-  void _showSettingsDialog() {
+  void _showSettingsDialog({int initialTab = 0}) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -935,16 +1087,22 @@ class _McpPlaygroundState extends State<McpPlayground> {
             screenWidth < 700;
         if (isMobile) {
           return Dialog.fullscreen(
-            child: SettingsPanel(controller: _controller),
+            child: SettingsPanel(
+              controller: _controller,
+              initialTabIndex: initialTab,
+            ),
           );
         }
         return Dialog(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: screenWidth * 0.8,
-              minWidth: 400,
+              maxWidth: screenWidth * 0.85,
+              minWidth: 420,
             ),
-            child: SettingsPanel(controller: _controller),
+            child: SettingsPanel(
+              controller: _controller,
+              initialTabIndex: initialTab,
+            ),
           ),
         );
       },
@@ -1741,78 +1899,41 @@ class _McpPlaygroundState extends State<McpPlayground> {
           child: Row(
             children: [
               ActionChip(
-                avatar: const Icon(Icons.edit_note, size: 16),
-                label: const Text('System Prompt (tap to edit)'),
-                onPressed: () {
-                  final promptCtrl = TextEditingController(
-                    text: _controller.systemPrompt,
-                  );
-                  final isMobile = MediaQuery.sizeOf(context).width < 600;
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      insetPadding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 8 : 24,
-                        vertical: isMobile ? 12 : 24,
-                      ),
-                      contentPadding: EdgeInsets.fromLTRB(
-                        isMobile ? 12 : 24,
-                        16,
-                        isMobile ? 12 : 24,
-                        12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      title: const Row(
-                        children: [
-                          Icon(Icons.edit_note, color: Color(0xFF0067C0)),
-                          SizedBox(width: 8),
-                          Text('Edit System Prompt'),
-                        ],
-                      ),
-                      content: SizedBox(
-                        width: isMobile ? double.maxFinite : 700,
-                        child: TextFormField(
-                          controller: promptCtrl,
-                          maxLines: isMobile ? 10 : 12,
-                          minLines: 6,
-                          decoration: InputDecoration(
-                            hintText:
-                                'Enter instructions, persona details, or system guidelines...',
-                            border: const OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: isMobile ? 10 : 14,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          onPressed: () {
-                            setState(() {
-                              _controller.systemPrompt = promptCtrl.text;
-                              _systemPromptCtrl.text = promptCtrl.text;
-                            });
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                avatar: Icon(
+                  _controller.systemPrompt.trim().isNotEmpty
+                      ? Icons.auto_awesome
+                      : Icons.edit_note,
+                  size: 16,
+                  color: _controller.systemPrompt.trim().isNotEmpty
+                      ? theme.colorScheme.primary
+                      : null,
+                ),
+                label: Text(
+                  _controller.systemPrompt.trim().isNotEmpty
+                      ? 'Persona Active'
+                      : 'System Prompt (tap to edit)',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () => _showSettingsDialog(initialTab: 0),
               ),
               const SizedBox(width: 8),
               ActionChip(
-                avatar: const Icon(Icons.build_circle_outlined, size: 16),
-                label: Text('$enabledToolsCount tools selected'),
-                onPressed: _showSelectedToolsDialog,
+                avatar: Icon(
+                  _controller.chatMode
+                      ? Icons.chat_bubble_outline
+                      : Icons.build_circle_outlined,
+                  size: 16,
+                  color: _controller.chatMode
+                      ? Colors.orange
+                      : theme.colorScheme.primary,
+                ),
+                label: Text(
+                  _controller.chatMode
+                      ? 'Direct Chat Mode'
+                      : '$enabledToolsCount tools active',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () => _showSettingsDialog(initialTab: 0),
               ),
             ],
           ),
@@ -1849,7 +1970,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Agent is thinking and processing tool calls...',
+                  _controller.chatMode
+                      ? 'Generating response...'
+                      : 'Agent is thinking and processing tool calls...',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: Colors.grey,
                   ),
@@ -1876,38 +1999,253 @@ class _McpPlaygroundState extends State<McpPlayground> {
   }
 
   Widget _buildAttachmentPreviews() {
-    if (_attachments.isEmpty) return const SizedBox.shrink();
+    final pendingParts = _controller.pendingParts;
+    if (_attachments.isEmpty && pendingParts.isEmpty) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final totalCount = _attachments.length + pendingParts.length;
+
     return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLowest,
-        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _attachments.length,
-        itemBuilder: (ctx, idx) {
-          final att = _attachments[idx];
-          final isImage = att.mimeType.startsWith('image/');
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: InputChip(
-              label: Text(att.name, style: const TextStyle(fontSize: 11)),
-              avatar: Icon(
-                isImage
-                    ? Icons.image_outlined
-                    : Icons.insert_drive_file_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.attach_file,
                 size: 14,
+                color: theme.colorScheme.primary,
               ),
-              onDeleted: () {
+              const SizedBox(width: 4),
+              Text(
+                'Attachments ($totalCount)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                borderRadius: BorderRadius.circular(4),
+                onTap: () {
+                  setState(() {
+                    _attachments.clear();
+                    _controller.clearPendingParts();
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text(
+                    'Clear all',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 72,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (int idx = 0; idx < _attachments.length; idx++)
+                  _buildAttachmentCard(idx, _attachments[idx], theme),
+                for (int idx = 0; idx < pendingParts.length; idx++)
+                  _buildPendingPartCard(idx, pendingParts[idx], theme),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentCard(int idx, MessageAttachment att, ThemeData theme) {
+    final isImage = att.mimeType.toLowerCase().startsWith('image/');
+    return Container(
+      width: 72,
+      height: 72,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: isImage && att.bytes != null
+                ? Image.memory(
+                    att.bytes!,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) =>
+                        _buildFallbackAttachmentContent(att, theme),
+                  )
+                : _buildFallbackAttachmentContent(att, theme),
+          ),
+          Positioned(
+            top: 3,
+            right: 3,
+            child: GestureDetector(
+              onTap: () {
                 setState(() {
                   _attachments.removeAt(idx);
                 });
               },
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.7),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white70, width: 1),
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 12),
+              ),
             ),
-          );
-        },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFallbackAttachmentContent(MessageAttachment att, ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.insert_drive_file_outlined,
+              size: 24,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              att.name,
+              style: const TextStyle(fontSize: 9),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingPartCard(int idx, ChatContentPart part, ThemeData theme) {
+    Widget content;
+    if (part is ImagePart && part.bytes != null) {
+      content = Image.memory(
+        part.bytes!,
+        width: 72,
+        height: 72,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, stack) => const Center(
+          child: Icon(Icons.broken_image, size: 24),
+        ),
+      );
+    } else if (part is ImagePart && part.url != null) {
+      content = Image.network(
+        part.url!,
+        width: 72,
+        height: 72,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, stack) => const Center(
+          child: Icon(Icons.broken_image, size: 24),
+        ),
+      );
+    } else {
+      IconData icon = Icons.extension_outlined;
+      String label = 'Part ${idx + 1}';
+      if (part is DocumentPart) {
+        icon = Icons.description_outlined;
+        label = part.fileName.isNotEmpty ? part.fileName : 'Document';
+      } else if (part is AudioPart) {
+        icon = Icons.mic_outlined;
+        label = 'Audio Note';
+      }
+      content = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 24, color: theme.colorScheme.secondary),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 9),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 72,
+      height: 72,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(borderRadius: BorderRadius.circular(8), child: content),
+          Positioned(
+            top: 3,
+            right: 3,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _controller.removePendingPart(idx);
+                });
+              },
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.7),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white70, width: 1),
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 12),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1915,7 +2253,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
   Widget _buildInputBar(ThemeData theme) {
     final isGen = _controller.isGenerating;
     final showButton =
-        _inputCtrl.text.isNotEmpty || _attachments.isNotEmpty || !isGen;
+        _inputCtrl.text.isNotEmpty ||
+        _attachments.isNotEmpty ||
+        _controller.pendingParts.isNotEmpty ||
+        !isGen;
     final isMobile = MediaQuery.sizeOf(context).width < 600;
     return Container(
       decoration: BoxDecoration(
@@ -1936,10 +2277,16 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 controller: _controller,
                 padding: const EdgeInsets.only(bottom: 4.0),
               ),
+              DynamicSkillDock(
+                controller: _controller,
+                padding: const EdgeInsets.only(bottom: 4.0),
+              ),
               _buildAttachmentPreviews(),
               SubPromptListEditor(
                 controller: _inputCtrl,
                 chatMode: _chatMode,
+                onClipboardMediaBatch: (mediaList) =>
+                    _handleClipboardPaste(mediaList),
                 availableToolGroups: _getToolsetGroups()
                     .where((g) => _isToolsetEnabled(g))
                     .map(
@@ -1953,11 +2300,21 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 maxLines: 6,
                 hintText: isGen
                     ? 'Agent is working...'
-                    : 'Type a message or ask a tool to run...',
-                leading: IconButton(
-                  icon: const Icon(Icons.attach_file_outlined),
-                  tooltip: 'Attach Files / Images',
-                  onPressed: isGen ? null : _pickAttachments,
+                    : 'Type a message, paste image/doc (Ctrl+V), or ask a tool...',
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.attach_file_outlined),
+                      tooltip: 'Attach Files / Images',
+                      onPressed: isGen ? null : _pickAttachments,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.content_paste_go_outlined),
+                      tooltip: 'Paste from Clipboard (Ctrl+V)',
+                      onPressed: isGen ? null : () => _handleClipboardPaste(),
+                    ),
+                  ],
                 ),
                 trailing: isGen
                     ? const Padding(
@@ -1991,32 +2348,103 @@ class _McpPlaygroundState extends State<McpPlayground> {
   }
 
   Widget _buildWelcomeWidget(ThemeData theme) {
+    final hasLlm = _controller.activeLlmConfig.isConfigured;
+    final modelName = _controller.activeLlmConfig.model.isNotEmpty
+        ? _controller.activeLlmConfig.model
+        : _controller.activeLlmConfig.provider.displayName;
+    final enabledCount = _controller.enabledToolNames.length;
+    final chatMode = _controller.chatMode;
+
     return Center(
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.smart_toy_outlined,
-                size: 72,
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Agent Active',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: (hasLlm ? theme.colorScheme.primary : Colors.orange)
+                        .withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    hasLlm
+                        ? (chatMode
+                            ? Icons.chat_bubble_outline
+                            : Icons.smart_toy_outlined)
+                        : Icons.tune_outlined,
+                    size: 56,
+                    color: hasLlm ? theme.colorScheme.primary : Colors.orange,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your system prompt, enabled tools, and configurations have been successfully initialized. Start the chat below.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Text(
+                  hasLlm ? 'How can I help you today?' : 'Welcome to Assistant',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  hasLlm
+                      ? 'Type a message below to start your conversation. You can attach images or paste content from clipboard.'
+                      : 'To get started, configure your LLM provider (Gemini, Claude, OpenAI, Ollama, etc.) and model.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (!hasLlm)
+                  FilledButton.icon(
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Configure Model & Provider'),
+                    onPressed: () => _showSettingsDialog(initialTab: 1),
+                  )
+                else ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.bolt, size: 16),
+                        label: Text(modelName),
+                        onPressed: () => _showSettingsDialog(initialTab: 1),
+                        tooltip: 'Change LLM Provider or Model',
+                      ),
+                      ActionChip(
+                        avatar: Icon(
+                          chatMode
+                              ? Icons.chat_bubble_outline
+                              : Icons.build_circle_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          chatMode
+                              ? 'Direct Chat'
+                              : '$enabledCount Tools Active',
+                        ),
+                        onPressed: () => _showSettingsDialog(initialTab: 0),
+                        tooltip:
+                            'Configure Agent Mode, Tools & System Prompt',
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.tune_outlined, size: 16),
+                        label: const Text('Agent Settings'),
+                        onPressed: () => _showSettingsDialog(initialTab: 0),
+                        tooltip: 'Open Agent & Tools Settings',
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2090,232 +2518,173 @@ class _McpPlaygroundState extends State<McpPlayground> {
     );
   }
 
-  void _showSelectedToolsDialog() {
-    final groups = _getToolsetGroups();
-    final enabled = _controller.enabledToolNames;
-    final enabledTools = groups
-        .expand((g) => g.tools)
-        .where((t) => enabled.contains(t.name))
-        .toList();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Selected Tools'),
-        content: SizedBox(
-          width: 320,
-          child: enabledTools.isEmpty
-              ? const Text('No tools selected.')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: enabledTools.length,
-                  itemBuilder: (context, index) {
-                    final tool = enabledTools[index];
-                    return ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.build, size: 16),
-                      title: Text(
-                        tool.name,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle:
-                          tool.description != null &&
-                              tool.description!.isNotEmpty
-                          ? Text(
-                              tool.description!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 
   List<Widget> _buildAppBarActions(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 600;
     final l10n = _l10n;
 
-    if (isWide) {
-      return [
-        if (widget.customAppBarActions != null) ...widget.customAppBarActions!,
-        IconButton(
-          icon: const Icon(Icons.restart_alt),
-          tooltip: l10n.get('resetTooltip'),
-          onPressed: _resetPlayground,
-        ),
-        if (!_playgroundStarted) ...[
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: l10n.get('clearTooltip'),
-            onPressed: _clearSetupInputs,
-          ),
-          IconButton(
-            icon: const Icon(Icons.alt_route),
-            tooltip: 'Load Workflow',
-            onPressed: _showLoadWorkflowDialog,
-          ),
-        ],
-        IconButton(
-          icon: const Icon(Icons.save_outlined),
-          tooltip: 'Save Workflow',
-          onPressed: _showSaveWorkflowDialog,
-        ),
-        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
-        IconButton(
-          icon: const Icon(Icons.bookmarks_outlined),
-          tooltip: 'Skills Manager',
-          onPressed: _showSkillsManagerDialog,
-        ),
-        IconButton(
-          icon: const Icon(Icons.auto_awesome),
-          tooltip: 'Skill Wizard',
-          onPressed: _showSkillWizardDialog,
-        ),
-        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
-        IconButton(
-          icon: const Icon(Icons.list_alt),
-          tooltip: l10n.get('catalogTooltip'),
-          onPressed: () => RegisteredToolsDialog.show(context, _controller),
-        ),
-        if (widget.showAgentInspector)
-          IconButton(
-            icon: Icon(
-              _inspectorVisible ? Icons.analytics : Icons.analytics_outlined,
-            ),
-            tooltip: l10n.get('agentInspector'),
-            onPressed: () {
-              if (isWide && _playgroundStarted) {
-                setState(() {
-                  _inspectorVisible = !_inspectorVisible;
-                });
-              } else {
-                _showAgentInspectorDialog();
-              }
-            },
-          ),
-      ];
-    }
+    final hasOverflowItems = (widget.showAgentInspector && !isWide) ||
+        widget.showMemoryArchive ||
+        widget.showAssistantStatistics ||
+        widget.showToolsCatalog ||
+        widget.showSkillsControls ||
+        widget.showWorkflowActions;
 
-    // Mobile / Narrow: Pinned buttons + Overflow
     return [
       if (widget.customAppBarActions != null) ...widget.customAppBarActions!,
-      IconButton(
-        icon: const Icon(Icons.restart_alt),
-        tooltip: l10n.get('resetTooltip'),
-        onPressed: _resetPlayground,
-      ),
-      PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert),
-        tooltip: l10n.get('moreActions'),
-        onSelected: (val) {
-          if (val == 'clear') {
-            _clearSetupInputs();
-          } else if (val == 'saveWorkflow') {
-            _showSaveWorkflowDialog();
-          } else if (val == 'loadWorkflow') {
-            _showLoadWorkflowDialog();
-          } else if (val == 'skillsManager') {
-            _showSkillsManagerDialog();
-          } else if (val == 'skillWizard') {
-            _showSkillWizardDialog();
-          } else if (val == 'catalog') {
-            RegisteredToolsDialog.show(context, _controller);
-          } else if (val == 'inspector') {
-            _showAgentInspectorDialog();
-          }
-        },
-        itemBuilder: (ctx) => [
-          if (!_playgroundStarted) ...[
-            PopupMenuItem(
-              value: 'clear',
-              child: Row(
-                children: [
-                  const Icon(Icons.delete_sweep_outlined, size: 20),
-                  const SizedBox(width: 12),
-                  Text(l10n.get('clearTooltip')),
-                ],
+      if (widget.showNewChatAction)
+        IconButton(
+          icon: const Icon(Icons.delete_sweep_outlined),
+          tooltip: l10n.get('newChat'),
+          onPressed: _resetPlayground,
+        ),
+      if (widget.showSettingsAction && !widget.disableConfigDialog)
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          tooltip: 'Agent & LLM Settings',
+          onPressed: () => _showSettingsDialog(initialTab: 0),
+        ),
+      if (widget.showAgentInspector)
+        IconButton(
+          icon: Icon(
+            _inspectorVisible ? Icons.bar_chart_rounded : Icons.bar_chart_outlined,
+            color: _inspectorVisible ? const Color(0xFFF97316) : null,
+          ),
+          tooltip: _inspectorVisible
+              ? '${l10n.get('agentInspector')} (Hide)'
+              : '${l10n.get('agentInspector')} (Show)',
+          onPressed: () {
+            if (isWide) {
+              setState(() {
+                _inspectorVisible = !_inspectorVisible;
+              });
+            } else {
+              _showAgentInspectorDialog();
+            }
+          },
+        ),
+      if (hasOverflowItems)
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          tooltip: l10n.get('moreActions'),
+          onSelected: (val) {
+            if (val == 'saveWorkflow') {
+              _showSaveWorkflowDialog();
+            } else if (val == 'loadWorkflow') {
+              _showLoadWorkflowDialog();
+            } else if (val == 'skillsManager') {
+              _showSkillsManagerDialog();
+            } else if (val == 'skillWizard') {
+              _showSkillWizardDialog();
+            } else if (val == 'catalog') {
+              RegisteredToolsDialog.show(context, _controller);
+            } else if (val == 'memoryArchive') {
+              MemoryArchiveDialog.show(context, _controller);
+            } else if (val == 'evalBenchmark') {
+              EvalBenchmarkDialog.show(context, _controller);
+            } else if (val == 'inspector') {
+              _showAgentInspectorDialog();
+            } else if (val == 'clearSetup') {
+              _clearSetupInputs();
+            }
+          },
+          itemBuilder: (ctx) => [
+            if (widget.showAgentInspector && !isWide)
+              PopupMenuItem(
+                value: 'inspector',
+                child: Row(
+                  children: [
+                    const Icon(Icons.analytics_outlined, size: 20),
+                    const SizedBox(width: 12),
+                    Text(l10n.get('agentInspector')),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'loadWorkflow',
-              child: Row(
-                children: [
-                  Icon(Icons.alt_route, size: 20),
-                  SizedBox(width: 12),
-                  Text('Load Workflow'),
-                ],
+            if (widget.showMemoryArchive)
+              PopupMenuItem(
+                value: 'memoryArchive',
+                child: Row(
+                  children: [
+                    Badge(
+                      isLabelVisible: _controller.memoryArchive.isNotEmpty,
+                      label: Text('${_controller.memoryArchive.length}'),
+                      child: const Icon(Icons.psychology_outlined, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Memory Archive'),
+                  ],
+                ),
               ),
-            ),
+            if (widget.showAssistantStatistics)
+              const PopupMenuItem(
+                value: 'evalBenchmark',
+                child: Row(
+                  children: [
+                    Icon(Icons.speed_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Evals & Benchmark'),
+                  ],
+                ),
+              ),
+            if (widget.showToolsCatalog)
+              PopupMenuItem(
+                value: 'catalog',
+                child: Row(
+                  children: [
+                    const Icon(Icons.list_alt, size: 20),
+                    const SizedBox(width: 12),
+                    Text(l10n.get('catalogTooltip')),
+                  ],
+                ),
+              ),
+            if (widget.showSkillsControls) ...[
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'skillsManager',
+                child: Row(
+                  children: [
+                    Icon(Icons.bookmarks_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Skills Manager'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'skillWizard',
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, size: 20),
+                    SizedBox(width: 12),
+                    Text('Skill Wizard'),
+                  ],
+                ),
+              ),
+            ],
+            if (widget.showWorkflowActions) ...[
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'saveWorkflow',
+                child: Row(
+                  children: [
+                    Icon(Icons.save_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Save Workflow'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'loadWorkflow',
+                child: Row(
+                  children: [
+                    Icon(Icons.alt_route, size: 20),
+                    SizedBox(width: 12),
+                    Text('Load Workflow'),
+                  ],
+                ),
+              ),
+            ],
           ],
-          const PopupMenuItem(
-            value: 'saveWorkflow',
-            child: Row(
-              children: [
-                Icon(Icons.save_outlined, size: 20),
-                SizedBox(width: 12),
-                Text('Save Workflow'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: 'skillsManager',
-            child: Row(
-              children: [
-                Icon(Icons.bookmarks_outlined, size: 20),
-                SizedBox(width: 12),
-                Text('Skills Manager'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'skillWizard',
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome, size: 20),
-                SizedBox(width: 12),
-                Text('Skill Wizard'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'catalog',
-            child: Row(
-              children: [
-                const Icon(Icons.list_alt, size: 20),
-                const SizedBox(width: 12),
-                Text(l10n.get('catalogTooltip')),
-              ],
-            ),
-          ),
-          if (_playgroundStarted && widget.showAgentInspector)
-            PopupMenuItem(
-              value: 'inspector',
-              child: Row(
-                children: [
-                  const Icon(Icons.analytics_outlined, size: 20),
-                  const SizedBox(width: 12),
-                  Text(l10n.get('agentInspector')),
-                ],
-              ),
-            ),
-        ],
-      ),
+        ),
     ];
   }
 
@@ -2343,106 +2712,278 @@ class _McpPlaygroundState extends State<McpPlayground> {
         _inspectorVisible &&
         _playgroundStarted;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          tooltip: l10n.get('menu'),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Text(
-          loadedSetupName != null
-              ? '${l10n.get('playground')} - $loadedSetupName'
-              : l10n.get('playground'),
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: _buildAppBarActions(context),
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: theme.colorScheme.primary),
-              child: Text(
-                l10n.get('agentPlayground'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyV, control: true):
+            _onGlobalCtrlV,
+        const SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+            _onGlobalCtrlV,
+      },
+      child: Focus(
+        autofocus: false,
+        child: Scaffold(
+          key: _scaffoldKey,
+      appBar: widget.showAppBar
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: l10n.get('menu'),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: Text(l10n.get('newChat')),
-              onTap: () {
-                Navigator.pop(context);
-                _resetPlayground();
-              },
-            ),
-            if (!widget.disableConfigDialog)
-              ListTile(
-                leading: const Icon(Icons.settings),
-                title: Text(l10n.get('playgroundSettings')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showSettingsDialog();
-                },
-              ),
-          ],
-        ),
-      ),
-      body: showInspectorPane
-          ? LayoutBuilder(
-              builder: (context, constraints) {
-                final totalWidth = constraints.maxWidth;
-                const minChatWidth = 300.0;
-                const minInspectorWidth = 250.0;
-
-                double chatWidth = totalWidth * _chatFraction;
-                if (chatWidth < minChatWidth) {
-                  chatWidth = minChatWidth;
-                }
-                if (totalWidth - chatWidth - 8 < minInspectorWidth) {
-                  chatWidth = totalWidth - minInspectorWidth - 8;
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: chatWidth, child: bodyContent),
-                    GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onHorizontalDragUpdate: (details) {
-                        setState(() {
-                          _chatFraction =
-                              (chatWidth + details.delta.dx) / totalWidth;
-                          if (_chatFraction < 0.2) _chatFraction = 0.2;
-                          if (_chatFraction > 0.85) _chatFraction = 0.85;
-                        });
-                      },
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: Container(
-                          width: 8,
-                          color: theme.dividerColor.withValues(alpha: 0.1),
-                          child: Center(
-                            child: Container(
-                              width: 1,
-                              color: theme.dividerColor,
-                            ),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      loadedSetupName ?? l10n.get('playground'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (widget.showStatusBadges && isWide) ...[
+                    const SizedBox(width: 12),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _showSettingsDialog(initialTab: 1),
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.bolt,
+                              size: 14,
+                              color: _controller.activeLlmConfig.isConfigured
+                                  ? theme.colorScheme.primary
+                                  : Colors.orange,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _controller.activeLlmConfig.isConfigured
+                                  ? (_controller.activeLlmConfig.model.isNotEmpty
+                                      ? _controller.activeLlmConfig.model
+                                      : _controller
+                                          .activeLlmConfig.provider.displayName)
+                                  : 'No Model',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Expanded(child: AgentInspector(controller: _controller)),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _showSettingsDialog(initialTab: 0),
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _controller.chatMode
+                              ? theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.6)
+                              : theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _controller.chatMode
+                                  ? Icons.chat_bubble_outline
+                                  : Icons.build_circle_outlined,
+                              size: 14,
+                              color: _controller.chatMode
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _controller.chatMode
+                                  ? 'Direct Chat'
+                                  : '${_controller.enabledToolNames.length} Tools',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
-                );
-              },
+                ],
+              ),
+              actions: _buildAppBarActions(context),
             )
-          : bodyContent,
+          : null,
+      drawer: widget.showAppBar
+          ? Drawer(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  DrawerHeader(
+                    decoration: BoxDecoration(color: theme.colorScheme.primary),
+                    child: Text(
+                      l10n.get('agentPlayground'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (widget.showNewChatAction)
+                    ListTile(
+                      leading: const Icon(Icons.chat_bubble_outline),
+                      title: Text(l10n.get('newChat')),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _resetPlayground();
+                      },
+                    ),
+                  if (widget.showSettingsAction && !widget.disableConfigDialog) ...[
+                    ListTile(
+                      leading: const Icon(Icons.smart_toy_outlined),
+                      title: const Text('Agent & Tools Settings'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showSettingsDialog(initialTab: 0);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.bolt),
+                      title: const Text('Model & Provider Settings'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showSettingsDialog(initialTab: 1);
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            )
+          : null,
+      body: Stack(
+        children: [
+          showInspectorPane
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    final totalWidth = constraints.maxWidth;
+                    const minChatWidth = 300.0;
+                    const minInspectorWidth = 250.0;
+
+                    double chatWidth = totalWidth * _chatFraction;
+                    if (chatWidth < minChatWidth) {
+                      chatWidth = minChatWidth;
+                    }
+                    if (totalWidth - chatWidth - 8 < minInspectorWidth) {
+                      chatWidth = totalWidth - minInspectorWidth - 8;
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(width: chatWidth, child: bodyContent),
+                        GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onHorizontalDragUpdate: (details) {
+                            setState(() {
+                              _chatFraction =
+                                  (chatWidth + details.delta.dx) / totalWidth;
+                              if (_chatFraction < 0.2) _chatFraction = 0.2;
+                              if (_chatFraction > 0.85) _chatFraction = 0.85;
+                            });
+                          },
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.resizeLeftRight,
+                            child: Container(
+                              width: 8,
+                              color: theme.dividerColor.withValues(alpha: 0.1),
+                              child: Center(
+                                child: Container(
+                                  width: 1,
+                                  color: theme.dividerColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: AgentInspector(
+                            controller: _controller,
+                            onClose: () => setState(() => _inspectorVisible = false),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                )
+              : bodyContent,
+          if (widget.showAgentInspector && !_inspectorVisible)
+            Positioned(
+              top: 14,
+              right: 0,
+              child: Material(
+                color: theme.colorScheme.surfaceContainerHighest,
+                elevation: 3,
+                shadowColor: Colors.black26,
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(8)),
+                child: InkWell(
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(8)),
+                  onTap: () {
+                    if (isWide) {
+                      setState(() => _inspectorVisible = true);
+                    } else {
+                      _showAgentInspectorDialog();
+                    }
+                  },
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.bar_chart_rounded,
+                          size: 16,
+                          color: Color(0xFFF97316),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Inspector',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+        ),
+      ),
     );
   }
 }

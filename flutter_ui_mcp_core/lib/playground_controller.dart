@@ -11,6 +11,10 @@ import 'src/utils/mime_utils.dart';
 import 'src/services/embedded_llm/embedded_llm_adapter.dart';
 import 'src/skills/file_system_skill_storage_adapter.dart';
 import 'src/skills/web_skill_storage_adapter.dart';
+import 'src/models/sub_agent_execution.dart';
+import 'src/eval/eval_controller.dart';
+import 'src/utils/image_optimizer.dart';
+import 'src/services/model_pricing_service.dart';
 
 /// Abstract delegate for storing and loading LLM configuration, server registry, and saved setups.
 abstract class McpPlaygroundStorageDelegate {
@@ -343,6 +347,9 @@ class PlaygroundController extends ChangeNotifier {
   String _systemPrompt = '';
   bool _chatMode = false;
   LlmConfig? _customLlmConfig;
+  ModelPriceInfo? _activeModelPrice;
+  bool _isLoadingPrice = false;
+  bool _isInspectorVisible = true;
 
   final List<SavedPlaygroundSetup> _savedSetups = [];
   final List<SkillDef> _skills = [];
@@ -351,6 +358,21 @@ class PlaygroundController extends ChangeNotifier {
   String? _loadedWorkflowId;
   final MultiMCPManager _mcpManager = MultiMCPManager();
   final Uuid _uuid = const Uuid();
+
+  // ── v1.3.0 Strategic Primitives ─────────────────────────────────
+  EpisodicMemoryStore? _episodicMemoryStore;
+  bool _enableEpisodicMemory = true;
+
+  bool _enableSubAgents = true;
+  final Map<String, SubAgentExecution> _subAgents = {};
+
+  final List<SkillDefinition> _dynamicSkills = [];
+  final Set<String> _activeSkillNames = {};
+
+  final List<ChatContentPart> _pendingParts = [];
+
+  EvalController? _evalController;
+  // ────────────────────────────────────────────────────────────────
 
   SkillStorageAdapter? _skillStorage;
 
@@ -434,6 +456,12 @@ class PlaygroundController extends ChangeNotifier {
   LlmConfig get llmConfig => _llmConfig;
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
   List<McpLocalTool> get localTools => List.unmodifiable(_localTools);
+
+  /// Dynamically registers an additional local tool at runtime.
+  void registerLocalTool(McpLocalTool tool) {
+    _localTools.add(tool);
+    notifyListeners();
+  }
   bool get isLoading => _loading;
   bool get isGenerating => _generating;
   String? get errorMessage => _errorMessage;
@@ -473,9 +501,49 @@ class PlaygroundController extends ChangeNotifier {
   set customLlmConfig(LlmConfig? val) {
     _customLlmConfig = val;
     notifyListeners();
+    unawaited(fetchActiveModelPrice());
   }
 
   LlmConfig get activeLlmConfig => _customLlmConfig ?? _llmConfig;
+
+  ModelPriceInfo? get activeModelPrice => _activeModelPrice;
+  bool get isLoadingPrice => _isLoadingPrice;
+
+  /// Queries the live token price for the currently active model configuration.
+  Future<void> fetchActiveModelPrice() async {
+    final config = activeLlmConfig;
+    if (config.provider == LlmProvider.none && config.model.trim().isEmpty) {
+      _activeModelPrice = null;
+      _isLoadingPrice = false;
+      notifyListeners();
+      return;
+    }
+    _isLoadingPrice = true;
+    notifyListeners();
+    try {
+      _activeModelPrice = await ModelPricingService.fetchPrice(config);
+    } catch (_) {
+      _activeModelPrice = ModelPriceInfo.unknown;
+    } finally {
+      _isLoadingPrice = false;
+      notifyListeners();
+    }
+  }
+
+  /// Whether the Agent Inspector pane/dialog is visible.
+  bool get isInspectorVisible => _isInspectorVisible;
+  set isInspectorVisible(bool val) {
+    if (_isInspectorVisible != val) {
+      _isInspectorVisible = val;
+      notifyListeners();
+    }
+  }
+
+  /// Toggles visibility of the Agent Inspector pane.
+  void toggleInspector() {
+    _isInspectorVisible = !_isInspectorVisible;
+    notifyListeners();
+  }
 
   Future<void> saveSetup(SavedPlaygroundSetup setup) async {
     final idx = _savedSetups.indexWhere((s) => s.id == setup.id);
@@ -525,6 +593,101 @@ class PlaygroundController extends ChangeNotifier {
     await _storage.saveSkills(_skills);
     notifyListeners();
   }
+
+  // ── v1.3.0 Episodic Memory ──────────────────────────────────────
+  bool get enableEpisodicMemory => _enableEpisodicMemory;
+  set enableEpisodicMemory(bool val) {
+    _enableEpisodicMemory = val;
+    notifyListeners();
+  }
+
+  EpisodicMemoryStore get episodicMemoryStore =>
+      _episodicMemoryStore ??= EpisodicMemoryStore();
+
+  List<EpisodicMemoryEntry> get memoryArchive => episodicMemoryStore.entries;
+
+  void addMemoryEntry(EpisodicMemoryEntry entry) {
+    episodicMemoryStore.addEntry(entry);
+    notifyListeners();
+  }
+
+  void clearMemoryArchive() {
+    episodicMemoryStore.clear();
+    notifyListeners();
+  }
+
+  // ── v1.3.0 Sub-Agent Delegation ─────────────────────────────────
+  bool get enableSubAgents => _enableSubAgents;
+  set enableSubAgents(bool val) {
+    _enableSubAgents = val;
+    notifyListeners();
+  }
+
+  Map<String, SubAgentExecution> get subAgents => Map.unmodifiable(_subAgents);
+
+  List<SubAgentExecution> get subAgentList =>
+      _subAgents.values.toList()..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+
+  // ── v1.3.0 Dynamic Skills ───────────────────────────────────────
+  List<SkillDefinition> get dynamicSkills => List.unmodifiable(_dynamicSkills);
+  Set<String> get activeSkillNames => Set.unmodifiable(_activeSkillNames);
+
+  void registerDynamicSkill(SkillDefinition skill) {
+    _dynamicSkills.removeWhere((s) => s.name == skill.name);
+    _dynamicSkills.add(skill);
+    notifyListeners();
+  }
+
+  void registerDynamicSkills(List<SkillDefinition> skills) {
+    for (final s in skills) {
+      _dynamicSkills.removeWhere((existing) => existing.name == s.name);
+      _dynamicSkills.add(s);
+    }
+    notifyListeners();
+  }
+
+  void toggleDynamicSkill(String name) {
+    if (_activeSkillNames.contains(name)) {
+      _activeSkillNames.remove(name);
+    } else {
+      _activeSkillNames.add(name);
+    }
+    notifyListeners();
+  }
+
+  void activateSkills(List<String> names) {
+    _activeSkillNames.addAll(names);
+    notifyListeners();
+  }
+
+  void deactivateSkills(List<String> names) {
+    _activeSkillNames.removeAll(names);
+    notifyListeners();
+  }
+
+  // ── v1.3.0 Multimodal Content Parts ─────────────────────────────
+  List<ChatContentPart> get pendingParts => List.unmodifiable(_pendingParts);
+
+  void addPendingPart(ChatContentPart part) {
+    _pendingParts.add(part);
+    notifyListeners();
+  }
+
+  void removePendingPart(int index) {
+    if (index >= 0 && index < _pendingParts.length) {
+      _pendingParts.removeAt(index);
+      notifyListeners();
+    }
+  }
+
+  void clearPendingParts() {
+    _pendingParts.clear();
+    notifyListeners();
+  }
+
+  // ── v1.3.0 Evaluations & Benchmarking ───────────────────────────
+  EvalController get evalController => _evalController ??= EvalController();
+
 
   // ── Workflows Management ──
   List<PlaygroundWorkflow> get workflows => List.unmodifiable(_workflows);
@@ -724,6 +887,7 @@ class PlaygroundController extends ChangeNotifier {
       _initializedClientIds.addAll(savedClients);
 
       await _syncMcpServers();
+      unawaited(fetchActiveModelPrice());
     } catch (e) {
       _errorMessage = 'Failed to load configuration: $e';
     } finally {
@@ -736,6 +900,7 @@ class PlaygroundController extends ChangeNotifier {
     _llmConfig = config;
     await _storage.saveLlmConfig(config);
     notifyListeners();
+    unawaited(fetchActiveModelPrice());
   }
 
   Future<void> addServer(
@@ -929,6 +1094,8 @@ class PlaygroundController extends ChangeNotifier {
 
   void clearChat() {
     _messages.clear();
+    _subAgents.clear();
+    _pendingParts.clear();
     _errorMessage = null;
     notifyListeners();
   }
@@ -951,7 +1118,7 @@ class PlaygroundController extends ChangeNotifier {
 
           if (isText && att.bytes != null) {
             try {
-              final content = utf8.decode(att.bytes!);
+              final content = utf8.decode(att.bytes!, allowMalformed: true);
               buffer.writeln('\n\n[Attached File: ${att.name}]');
               buffer.writeln('--- CONTENT START ---');
               buffer.writeln(content);
@@ -961,33 +1128,53 @@ class PlaygroundController extends ChangeNotifier {
             imagesOnly.add(att);
           }
         }
-        processed.add(
-          ChatMessage(
-            id: m.id,
-            role: m.role,
-            content: buffer.toString(),
-            timestamp: m.timestamp,
-            attachments: isMultiModal ? imagesOnly : null,
-          ),
-        );
-      } else if (m.role == ChatRole.tool) {
-        final cleanedContent = _stripBase64AndBinary(m.content);
-        processed.add(
-          ChatMessage(
-            id: m.id,
-            role: m.role,
-            content: cleanedContent,
-            timestamp: m.timestamp,
-            toolName: m.toolName,
-            attachments: m.attachments,
-          ),
-        );
-      } else {
-        processed.add(m);
+            processed.add(
+              ChatMessage(
+                id: m.id,
+                role: m.role,
+                content: buffer.toString(),
+                timestamp: m.timestamp,
+                attachments: isMultiModal ? imagesOnly : null,
+                parts: isMultiModal ? m.parts : null,
+              ),
+            );
+          } else if (m.role == ChatRole.tool) {
+            final cleanedContent = _stripBase64AndBinary(m.content);
+            processed.add(
+              ChatMessage(
+                id: m.id,
+                role: m.role,
+                content: cleanedContent,
+                timestamp: m.timestamp,
+                toolName: m.toolName,
+                attachments: m.attachments,
+                parts: m.parts,
+              ),
+            );
+          } else {
+            processed.add(m);
+          }
+        }
+
+        if (_enableEpisodicMemory && processed.length > 20) {
+          final compressor = ContextCompressor(
+            tokenThreshold: 4000,
+            memoryStore: episodicMemoryStore,
+          );
+          if (compressor.shouldCompress(processed)) {
+            final compressionResult = await compressor.compress(
+              llmConfig: activeLlmConfig,
+              messages: processed,
+            );
+            _log(
+              '[EpisodicMemory] Context auto-compressed. Preserved raw turns in episodic memory store.',
+            );
+            return compressionResult.compressedMessages;
+          }
+        }
+
+        return processed;
       }
-    }
-    return processed;
-  }
 
   String _stripBase64AndBinary(String text) {
     var result = text;
@@ -1063,7 +1250,9 @@ class PlaygroundController extends ChangeNotifier {
     String text, {
     List<MessageAttachment>? attachments,
   }) async {
-    if ((text.trim().isEmpty && (attachments == null || attachments.isEmpty)) ||
+    if ((text.trim().isEmpty &&
+            (attachments == null || attachments.isEmpty) &&
+            _pendingParts.isEmpty) ||
         _generating) {
       return;
     }
@@ -1076,6 +1265,42 @@ class PlaygroundController extends ChangeNotifier {
     _log('User Message: $text');
 
     try {
+      // ── Downscale images to optimal dimension for LLM vision models ─────
+      List<MessageAttachment>? processedAttachments = attachments;
+      if (attachments != null && attachments.isNotEmpty) {
+        final optList = <MessageAttachment>[];
+        for (final att in attachments) {
+          if (att.bytes != null && ImageOptimizer.isImageMime(att.mimeType)) {
+            final optBytes = await ImageOptimizer.shrinkToOptimalSize(
+              att.bytes!,
+              maxDimension: 1024,
+            );
+            optList.add(att.copyWith(bytes: optBytes, size: optBytes.length));
+          } else {
+            optList.add(att);
+          }
+        }
+        processedAttachments = optList;
+      }
+
+      if (_pendingParts.isNotEmpty) {
+        final optParts = <ChatContentPart>[];
+        for (final part in _pendingParts) {
+          if (part is ImagePart && part.bytes != null) {
+            final optBytes = await ImageOptimizer.shrinkToOptimalSize(
+              part.bytes!,
+              maxDimension: 1024,
+            );
+            optParts.add(part.copyWith(bytes: optBytes));
+          } else {
+            optParts.add(part);
+          }
+        }
+        _pendingParts
+          ..clear()
+          ..addAll(optParts);
+      }
+
       final subPrompts = parseSubPromptSteps(text);
       _log('Parsed ${subPrompts.length} sub-prompt steps.');
 
@@ -1129,13 +1354,42 @@ class PlaygroundController extends ChangeNotifier {
         _executedToolCallIds.clear();
 
         // 1. Add User Message (first step uses attachments if any, subsequent steps don't)
+        List<ChatContentPart>? initialParts;
+        if (i == 0 && _pendingParts.isNotEmpty) {
+          final staged = <ChatContentPart>[];
+          if (prompt.trim().isNotEmpty) staged.add(TextPart(prompt));
+
+          final existingAttachmentBytes = processedAttachments
+                  ?.where((a) =>
+                      a.bytes != null && ImageOptimizer.isImageMime(a.mimeType))
+                  .map((a) => a.bytes!.length)
+                  .toSet() ??
+              <int>{};
+
+          for (final part in _pendingParts) {
+            if (part is ImagePart && part.bytes != null) {
+              if (existingAttachmentBytes.contains(part.bytes!.length)) {
+                continue; // Prevent duplicate image across attachments and parts
+              }
+            }
+            staged.add(part);
+          }
+          if (staged.isNotEmpty) {
+            initialParts = staged;
+          }
+        }
+
         final userMsg = ChatMessage(
           id: _uuid.v4(),
           content: prompt,
           role: ChatRole.user,
-          attachments: (i == 0) ? attachments : null,
+          attachments: (i == 0) ? processedAttachments : null,
+          parts: initialParts,
           timestamp: DateTime.now(),
         );
+        if (i == 0) {
+          _pendingParts.clear();
+        }
         _messages.add(userMsg);
         notifyListeners();
 
@@ -1151,6 +1405,22 @@ class PlaygroundController extends ChangeNotifier {
         // Append active skill instructions if present
         if (_activeSkill != null && _activeSkill!.skillDef.trim().isNotEmpty) {
           systemPrompt += '\n\n### Active Skill (${_activeSkill!.name}):\n${_activeSkill!.skillDef.trim()}';
+        }
+
+        // Append active dynamic skill instructions if present
+        for (final skill in _dynamicSkills) {
+          if (_activeSkillNames.contains(skill.name) &&
+              (skill.systemPrompt?.trim().isNotEmpty ?? false)) {
+            systemPrompt +=
+                '\n\n### Active Skill (${skill.name}):\n${skill.systemPrompt!.trim()}';
+          }
+        }
+        if (_dynamicSkills.isNotEmpty) {
+          systemPrompt += '\n\nAvailable Dynamic Skills (call activate_skills to activate):\n';
+          for (final s in _dynamicSkills) {
+            final status = _activeSkillNames.contains(s.name) ? '[Active]' : '[Inactive]';
+            systemPrompt += '- ${s.name} $status: ${s.description}\n';
+          }
         }
 
         // Inject short instructions into the system prompt to guide tool execution and loop prevention
@@ -1180,11 +1450,171 @@ class PlaygroundController extends ChangeNotifier {
           allAvailableTools.addAll(_mcpManager.availableTools);
         }
 
+        // Dynamic Skills Tools
+        final activateTool = _dynamicSkills.isNotEmpty
+            ? ActivateSkillsTool(
+                availableSkills: _dynamicSkills.map((s) => s.name).toList(),
+                onActivate: (skills) async {
+                  _activeSkillNames.addAll(skills);
+                  _log('[Skills] Activated: ${skills.join(", ")}');
+                  notifyListeners();
+                  return 'Activated skills: ${skills.join(", ")}';
+                },
+              )
+            : null;
+        final deactivateTool = _dynamicSkills.isNotEmpty
+            ? DeactivateSkillsTool(
+                onDeactivate: (skills) async {
+                  _activeSkillNames.removeAll(skills);
+                  _log('[Skills] Deactivated: ${skills.join(", ")}');
+                  notifyListeners();
+                  return 'Deactivated skills: ${skills.join(", ")}';
+                },
+              )
+            : null;
+
+        // Episodic Memory Tool
+        final memoryTool = _enableEpisodicMemory
+            ? RetrieveMemoryTool(memoryStore: episodicMemoryStore)
+            : null;
+
+        // Sub-Agent Delegation Tool
+        final delegateTool = _enableSubAgents
+            ? DelegateTaskTool(
+                runner: ({
+                  required String assignee,
+                  required String task,
+                  List<String>? enabledTools,
+                }) async {
+                  final subId = _uuid.v4();
+                  final subExec = SubAgentExecution(
+                    id: subId,
+                    task: task,
+                    depth: 1,
+                    startedAt: DateTime.now(),
+                  );
+                  _subAgents[subId] = subExec;
+                  _log('[SubAgent] Started: $task (assignee: $assignee)');
+                  notifyListeners();
+
+                  try {
+                    final subTools = enabledTools != null
+                        ? allAvailableTools
+                            .where((t) => enabledTools.contains(t.name))
+                            .toList()
+                        : allAvailableTools
+                            .where((t) => t.name != 'delegate_task')
+                            .toList();
+
+                    final subMessages = <ChatMessage>[
+                      ChatMessage.user(task),
+                    ];
+
+                    String resultText = '';
+                    int subIterations = 0;
+                    const maxSubIterations = 5;
+
+                    while (subIterations < maxSubIterations) {
+                      subIterations++;
+                      final subResponse = await LLMService.generate(
+                        config: activeLlmConfig,
+                        messages: subMessages,
+                        tools: subTools,
+                        systemPrompt:
+                            'You are an autonomous specialist sub-agent ($assignee) tasked with: $task\n'
+                            'You have access to specialized tools. You must actively execute the tools to inspect code, query telemetry, or audit dependencies. '
+                            'Do not just state your intent or give conversational preamble. Run the tools immediately, analyze their results, and provide the complete audit report.',
+                      );
+
+                      if (subResponse.toolCalls.isEmpty) {
+                        resultText = subResponse.text;
+                        break;
+                      }
+
+                      // Execute each tool call and feed results back to the sub-agent
+                      for (final call in subResponse.toolCalls) {
+                        subExec.addProgress('Executing tool ${call.name}...');
+                        notifyListeners();
+
+                        final localMatch = _localTools
+                            .where((t) => t.name == call.name)
+                            .toList();
+                        MCPToolResult toolRes;
+                        if (localMatch.isNotEmpty) {
+                          toolRes = await localMatch.first.execute(call.arguments);
+                        } else {
+                          toolRes = await _mcpManager.callTool(call.name, call.arguments);
+                        }
+
+                        final textRes = toolRes.content
+                            .where((c) => c.type == 'text')
+                            .map((c) => c.text ?? '')
+                            .join('\n');
+
+                        subExec.addProgress('Received output from ${call.name}');
+                        notifyListeners();
+
+                        subMessages.add(
+                          ChatMessage(
+                            id: call.id,
+                            content: 'Calling tool: ${call.name}',
+                            role: ChatRole.assistant,
+                            type: MessageType.toolCall,
+                            toolName: call.name,
+                            toolArguments: call.arguments,
+                            timestamp: DateTime.now(),
+                          ),
+                        );
+                        subMessages.add(
+                          ChatMessage(
+                            id: call.id,
+                            role: ChatRole.tool,
+                            type: MessageType.toolResponse,
+                            toolName: call.name,
+                            content: textRes,
+                            timestamp: DateTime.now(),
+                          ),
+                        );
+                      }
+                    }
+
+                    if (resultText.isEmpty && subMessages.isNotEmpty) {
+                      resultText = subMessages.last.content;
+                    }
+                    if (resultText.isEmpty) {
+                      resultText = 'Completed task.';
+                    }
+
+                    subExec.complete(resultText);
+                    _log('[SubAgent] Completed: $task');
+                    notifyListeners();
+                    return resultText;
+                  } catch (e) {
+                    subExec.fail(e.toString());
+                    _log('[SubAgent] Failed: $e');
+                    notifyListeners();
+                    rethrow;
+                  }
+                },
+              )
+            : null;
+
+        if (activateTool != null) allAvailableTools.add(activateTool.toMCPTool());
+        if (deactivateTool != null) allAvailableTools.add(deactivateTool.toMCPTool());
+        if (memoryTool != null) allAvailableTools.add(memoryTool.toMCPTool());
+        if (delegateTool != null) allAvailableTools.add(delegateTool.toMCPTool());
+
         final List<MCPTool> activeStepTools = allAvailableTools.where((t) {
           if (stepEnabled != null) {
             return stepEnabled.contains(t.name);
           }
           if (_progressiveMcpDiscovery && (t.name == 'mcp_list_tools' || t.name == 'mcp_call_tool')) {
+            return true;
+          }
+          if (_enableEpisodicMemory && t.name == 'retrieve_memory') return true;
+          if (_enableSubAgents && t.name == 'delegate_task') return true;
+          if (_dynamicSkills.isNotEmpty &&
+              (t.name == 'activate_skills' || t.name == 'deactivate_skills')) {
             return true;
           }
           return _enabledToolNames.contains(t.name);
@@ -1447,6 +1877,14 @@ class PlaygroundController extends ChangeNotifier {
               result = await McpListToolsTool(mcpManager: _mcpManager, localTools: _localTools).execute(call.arguments);
             } else if (_progressiveMcpDiscovery && call.name == 'mcp_call_tool') {
               result = await McpCallToolTool(mcpManager: _mcpManager, localTools: _localTools).execute(call.arguments);
+            } else if (memoryTool != null && call.name == 'retrieve_memory') {
+              result = await memoryTool.execute(call.arguments);
+            } else if (delegateTool != null && call.name == 'delegate_task') {
+              result = await delegateTool.execute(call.arguments);
+            } else if (activateTool != null && call.name == 'activate_skills') {
+              result = await activateTool.execute(call.arguments);
+            } else if (deactivateTool != null && call.name == 'deactivate_skills') {
+              result = await deactivateTool.execute(call.arguments);
             } else if (localMatch.isNotEmpty) {
               result = await localMatch.first.execute(call.arguments);
             } else {

@@ -6,6 +6,12 @@ Shared UI components, dialogs, drawers, controllers, and services for **Flutter 
 
 ## ✨ Features
 
+- **Episodic Memory Archive & Retrieval (`MemoryArchiveDialog`)** – Inspect, search, and navigate compressed episodic memory summaries and full-turn histories. Includes automatic background compression and built-in `retrieve_memory` tool integration in `PlaygroundController`.
+- **Dynamic Model Pricing & Context Limits (`ModelPricingService`)** – Real-time dynamic token pricing and context window resolution without hardcoded static tables (queries host `/models` catalogs, OpenRouter live API, DeepInfra, and local endpoints). Includes interactive banner with USD ($) and EUR (€) rates.
+- **Autonomous Sub-Agent Delegation (`SubAgentExecution`)** – Full observability and autonomous multi-turn tool execution loop for child sub-agents spawned via `DelegateTaskTool`. Shows task hierarchy, depth, live logs, status, and specialized execution cards inside `ChatBubble`.
+- **Dynamic Skill Activation Dock (`DynamicSkillDock`)** – Interactive chips dock allowing users and agents (`ActivateSkillsTool`/`DeactivateSkillsTool`) to activate/deactivate specialized skills at runtime without restarting the session.
+- **Multimodal Chat & Lightbox Preview** – Native support for typed `ChatContentPart`s (`ImagePart`, `DocumentPart`, `AudioPart`). Provides inline previews, interactive full-screen image lightboxes, document chips, and audio pills.
+- **Evaluation Benchmark Runner (`EvalController`, `EvalBenchmarkDialog`)** – Run automated LLM and agent evaluations directly within Flutter applications. Features pass rate telemetry, latency tracking, custom test suites, and detailed grading rationales.
 - **On-Device & Embedded AI (`EmbeddedLlmAdapter`)** – Runs local on-device `.gguf` models in-process via `llamadart` (`llama.cpp`) across Android, iOS, Windows, macOS, Linux, and Web (WebGPU) with zero cloud latency and zero external keys. Ollama and local LLM servers connect seamlessly via standard OpenAI-compatible endpoints.
 - **Multimodal Image Optimization (`ImageOptimizer`)** – Automatically scales large camera photos down to optimal dimensions (max 768px) with native hardware decoders to prevent mobile NPU memory bottlenecks and out-of-memory errors.
 - **`PlaygroundController`** – Full lifecycle and state manager for agent conversations, tool execution, MCP server synchronization, and inspector tracing.
@@ -33,8 +39,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp_core: ^1.2.0
-  dart_mcp_core: ^1.2.0
+  flutter_ui_mcp_core: ^1.3.0
+  dart_mcp_core: ^1.3.0
 ```
 
 ---

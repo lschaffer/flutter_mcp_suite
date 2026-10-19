@@ -122,6 +122,13 @@ class ChatBubble extends StatelessWidget {
                   if (message.attachments != null &&
                       message.attachments!.isNotEmpty)
                     _buildAttachments(context, message.attachments!, theme),
+                  if (message.parts != null && message.parts!.isNotEmpty)
+                    _buildParts(
+                      context,
+                      message.parts!,
+                      theme,
+                      attachments: message.attachments,
+                    ),
                   if (showTypingIndicator)
                     const Padding(
                       padding: EdgeInsets.symmetric(
@@ -206,24 +213,50 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildToolCallBubble(BuildContext context, ThemeData theme) {
+    final toolName = message.toolName ?? 'Unknown';
+    final isSubAgent = toolName == 'delegate_task';
+    final isMemory = toolName == 'retrieve_memory';
+    final isSkill =
+        toolName == 'activate_skills' || toolName == 'deactivate_skills';
+
+    final Color accentColor = isSubAgent
+        ? Colors.indigo
+        : (isMemory
+            ? Colors.purple
+            : (isSkill ? Colors.teal : Colors.amber));
+
+    final IconData iconData = isSubAgent
+        ? Icons.account_tree_outlined
+        : (isMemory
+            ? Icons.psychology_outlined
+            : (isSkill ? Icons.auto_awesome : Icons.build_outlined));
+
+    final String displayTitle = isSubAgent
+        ? 'Delegating Sub-Agent: ${message.toolArguments?['task'] ?? 'task'}'
+        : (isMemory
+            ? 'Recalling Episodic Memory: "${message.toolArguments?['query'] ?? 'search'}"'
+            : (isSkill
+                ? 'Dynamic Skill Action: $toolName'
+                : 'Tool Execution Call: $toolName'));
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       child: ExpansionTile(
         dense: true,
         leading: CircleAvatar(
-          backgroundColor: Colors.amber.withValues(alpha: 0.15),
+          backgroundColor: accentColor.withValues(alpha: 0.15),
           radius: 14,
-          child: const Icon(
-            Icons.build_outlined,
+          child: Icon(
+            iconData,
             size: 14,
-            color: Colors.amber,
+            color: accentColor,
           ),
         ),
         title: Row(
           children: [
             Expanded(
               child: Text(
-                'Tool Execution Call: ${message.toolName}',
+                displayTitle,
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -357,18 +390,46 @@ class ChatBubble extends StatelessWidget {
       (sum, c) => sum + (c.text?.length ?? 0),
     );
 
+    final toolName = message.toolName ?? '';
+    final isSubAgent = toolName == 'delegate_task';
+    final isMemory = toolName == 'retrieve_memory';
+    final isSkill =
+        toolName == 'activate_skills' || toolName == 'deactivate_skills';
+
+    final Color statusColor = isError
+        ? Colors.red
+        : (isSubAgent
+            ? Colors.indigo
+            : (isMemory
+                ? Colors.purple
+                : (isSkill ? Colors.teal : Colors.green)));
+
+    final IconData iconData = isError
+        ? Icons.error_outline
+        : (isSubAgent
+            ? Icons.account_tree_outlined
+            : (isMemory
+                ? Icons.history_edu_outlined
+                : (isSkill ? Icons.auto_awesome : Icons.check_circle_outline)));
+
+    final String titleText = isError
+        ? 'Tool Error: $toolName'
+        : (isSubAgent
+            ? 'Sub-Agent Delegation Result'
+            : (isMemory
+                ? 'Episodic Memory Recalled'
+                : (isSkill
+                    ? 'Dynamic Skills Updated'
+                    : 'Tool Result: $toolName')));
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
       child: Material(
-        color: isError
-            ? Colors.red.withValues(alpha: 0.1)
-            : Colors.green.withValues(alpha: 0.1),
+        color: statusColor.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-            color: isError
-                ? Colors.red.withValues(alpha: 0.3)
-                : Colors.green.withValues(alpha: 0.3),
+            color: statusColor.withValues(alpha: 0.3),
           ),
         ),
         clipBehavior: Clip.antiAlias,
@@ -381,30 +442,26 @@ class ChatBubble extends StatelessWidget {
             right: 12,
             bottom: 12,
           ),
-          iconColor: isError ? Colors.red[700] : Colors.green[700],
-          collapsedIconColor: isError ? Colors.red[700] : Colors.green[700],
+          iconColor: statusColor,
+          collapsedIconColor: statusColor,
           leading: CircleAvatar(
-            backgroundColor: isError
-                ? Colors.red.withValues(alpha: 0.15)
-                : Colors.green.withValues(alpha: 0.15),
+            backgroundColor: statusColor.withValues(alpha: 0.15),
             radius: 14,
             child: Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
+              iconData,
               size: 14,
-              color: isError ? Colors.red : Colors.green,
+              color: statusColor,
             ),
           ),
           title: Row(
             children: [
               Expanded(
                 child: Text(
-                  isError
-                      ? 'Tool Error: ${message.toolName}'
-                      : 'Tool Result: ${message.toolName}',
+                  titleText,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: isError ? Colors.red[700] : Colors.green[700],
+                    color: statusColor,
                   ),
                 ),
               ),
@@ -1251,13 +1308,15 @@ class ChatBubble extends StatelessWidget {
     ThemeData theme,
   ) {
     final match = _markdownDataUriPattern.firstMatch(content);
+    final isDark = theme.brightness == Brightness.dark;
+    final syntaxHighlighter = McpMarkdownSyntaxHighlighter(isDark: isDark);
+    final styleSheet = markdownStyleSheetFromMaterialUiTheme(theme);
+
     if (match == null) {
       return MarkdownBody(
         data: content,
-        styleSheet: markdownStyleSheetFromMaterialUiTheme(theme).copyWith(
-          p: TextStyle(color: theme.colorScheme.onSurface),
-          code: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-        ),
+        styleSheet: styleSheet,
+        syntaxHighlighter: syntaxHighlighter,
       );
     }
 
@@ -1290,10 +1349,8 @@ class ChatBubble extends StatelessWidget {
         if (beforeText.trim().isNotEmpty)
           MarkdownBody(
             data: beforeText,
-            styleSheet: markdownStyleSheetFromMaterialUiTheme(theme).copyWith(
-              p: TextStyle(color: theme.colorScheme.onSurface),
-              code: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-            ),
+            styleSheet: styleSheet,
+            syntaxHighlighter: syntaxHighlighter,
           ),
         embeddedWidget,
         if (afterText.trim().isNotEmpty)
@@ -1509,6 +1566,192 @@ class ChatBubble extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildParts(
+    BuildContext context,
+    List<ChatContentPart> parts,
+    ThemeData theme, {
+    List<MessageAttachment>? attachments,
+  }) {
+    final attByteLengths = attachments
+            ?.where((a) => a.bytes != null)
+            .map((a) => a.bytes!.length)
+            .toSet() ??
+        <int>{};
+
+    final nonTextParts = parts.where((p) {
+      if (p is TextPart) return false;
+      if (p is ImagePart &&
+          p.bytes != null &&
+          attByteLengths.contains(p.bytes!.length)) {
+        return false;
+      }
+      return true;
+    }).toList();
+    if (nonTextParts.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: nonTextParts.map((part) {
+          if (part is ImagePart) {
+            return _buildImagePartPreview(context, part, theme);
+          } else if (part is DocumentPart) {
+            return _buildDocumentPartChip(context, part, theme);
+          } else if (part is AudioPart) {
+            return _buildAudioPartChip(context, part, theme);
+          }
+          return const SizedBox.shrink();
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildImagePartPreview(
+    BuildContext context,
+    ImagePart part,
+    ThemeData theme,
+  ) {
+    final hasBytes = part.bytes != null && part.bytes!.isNotEmpty;
+    final hasUrl = part.url != null && part.url!.isNotEmpty;
+    if (!hasBytes && !hasUrl) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: () => _showImagePartPreviewDialog(context, part),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 240, maxHeight: 180),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          child: hasBytes
+              ? Image.memory(
+                  part.bytes!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => const Icon(Icons.broken_image, size: 24),
+                )
+              : Image.network(
+                  part.url!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, stack) => const Icon(Icons.broken_image, size: 24),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentPartChip(
+    BuildContext context,
+    DocumentPart part,
+    ThemeData theme,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.description_outlined, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              part.fileName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${((part.bytes?.length ?? 0) / 1024).toStringAsFixed(0)} KB',
+            style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioPartChip(
+    BuildContext context,
+    AudioPart part,
+    ThemeData theme,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.graphic_eq_outlined, size: 16, color: theme.colorScheme.secondary),
+          const SizedBox(width: 6),
+          Text(
+            'Audio (${((part.bytes?.length ?? 0) / 1024).toStringAsFixed(0)} KB)',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImagePartPreviewDialog(BuildContext context, ImagePart part) {
+    final hasBytes = part.bytes != null && part.bytes!.isNotEmpty;
+    final hasUrl = part.url != null && part.url!.isNotEmpty;
+    if (!hasBytes && !hasUrl) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              clipBehavior: Clip.none,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: hasBytes
+                    ? Image.memory(part.bytes!, fit: BoxFit.contain)
+                    : Image.network(part.url!, fit: BoxFit.contain),
+              ),
+            ),
+            IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                radius: 16,
+                child: Icon(Icons.close, color: Colors.white, size: 18),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ export 'src/mcp_localizations.dart';
 export 'src/utils/mime_utils.dart';
 export 'src/utils/image_optimizer.dart';
 export 'src/utils/markdown_style_sheet.dart';
+export 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 export 'src/utils/platform_file/platform_file.dart';
 export 'src/utils/platform_directory/platform_directory.dart';
 export 'src/services/embedded_llm/embedded_model.dart';
@@ -40,7 +41,10 @@ export 'src/widgets/sub_prompt_list_editor.dart';
 export 'src/widgets/embedded_llm/add_gguf_dialog.dart';
 export 'src/widgets/embedded_llm/embedded_model_picker_widget.dart';
 export 'src/widgets/embedded_llm/hf_discover_dialog.dart';
-
-
-
-
+export 'src/models/sub_agent_execution.dart';
+export 'src/eval/eval_controller.dart';
+export 'src/widgets/memory_archive_dialog.dart';
+export 'src/widgets/dynamic_skill_dock.dart';
+export 'src/widgets/eval_benchmark_dialog.dart';
+export 'src/services/clipboard_content_service.dart';
+export 'src/services/model_pricing_service.dart';

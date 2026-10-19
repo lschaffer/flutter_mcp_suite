@@ -437,13 +437,12 @@ Future<void> main() async {
   );
   LlamaLogging.configure(level: LlamaLogLevel.warn);
   final backend = LlamaBackend();
-  late final LlamaEngine engine;
+  final engine = LlamaEngine(backend);
 
   try {
-    engine = await LlamaEngine.load(
-      backend,
-      fullModelPath,
-      modelParams: ModelParams(
+    await engine.setModel(
+      LlamaModel(ModelSource.path(fullModelPath)),
+      params: ModelParams(
         contextSize: 4096,
         gpuLayers: ModelParams.maxGpuLayers,
       ),

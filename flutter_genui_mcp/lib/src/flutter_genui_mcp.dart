@@ -65,6 +65,33 @@ class GenuiMcpPlayground extends StatefulWidget {
   /// Optional custom action widgets to display in the AppBar.
   final List<Widget>? customAppBarActions;
 
+  /// Whether to display the top AppBar. Set to false when embedding within another view/scaffold.
+  final bool showAppBar;
+
+  /// Whether to show interactive status badges (Model, Tools/Mode) in the AppBar title.
+  final bool showStatusBadges;
+
+  /// Whether to show the New Chat button in the AppBar actions.
+  final bool showNewChatAction;
+
+  /// Whether to show the Agent & LLM Settings button in the AppBar actions.
+  final bool showSettingsAction;
+
+  /// Whether to show Skills controls (Skills Manager and Skill Wizard).
+  final bool showSkillsControls;
+
+  /// Whether to show Assistant statistics and Evaluations/Benchmark controls.
+  final bool showAssistantStatistics;
+
+  /// Whether to show Episodic Memory Archive controls.
+  final bool showMemoryArchive;
+
+  /// Whether to show Registered Tools Catalog.
+  final bool showToolsCatalog;
+
+  /// Whether to show Save and Load Workflow actions.
+  final bool showWorkflowActions;
+
   /// Creates a new [GenuiMcpPlayground] widget instance.
   const GenuiMcpPlayground({
     super.key,
@@ -84,6 +111,15 @@ class GenuiMcpPlayground extends StatefulWidget {
     this.initialSystemPrompt,
     this.initialEnabledTools,
     this.customAppBarActions,
+    this.showAppBar = true,
+    this.showStatusBadges = true,
+    this.showNewChatAction = true,
+    this.showSettingsAction = true,
+    this.showSkillsControls = true,
+    this.showAssistantStatistics = true,
+    this.showMemoryArchive = true,
+    this.showToolsCatalog = true,
+    this.showWorkflowActions = true,
   });
 
   @override
@@ -99,9 +135,10 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   late PlaygroundController _controller;
   late McpPlaygroundLocalizations _l10n;
 
-  bool _playgroundStarted = false;
+  bool _playgroundStarted = true;
   double _chatFraction = 0.7;
-  bool _inspectorVisible = true;
+  bool get _inspectorVisible => _controller.isInspectorVisible;
+  set _inspectorVisible(bool val) => _controller.isInspectorVisible = val;
   McpGenuiChatController? _genuiController;
 
   // Setup form states
@@ -148,7 +185,12 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
       storageDelegate: widget.storageDelegate,
       enableLogging: widget.enableLogging,
     );
+    if (widget.initialSystemPrompt != null) {
+      _controller.systemPrompt = widget.initialSystemPrompt!;
+    }
     _controller.addListener(_onStateChange);
+
+    _initGenuiController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.initialEnabledTools != null) {
@@ -465,11 +507,32 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     _controller.updateEnabledTools(updated);
   }
 
+  void _initGenuiController() {
+    _genuiController?.dispose();
+    final activeLlm = _getActiveLlmConfig();
+    _genuiController = McpGenuiChatController(
+      llmConfig: activeLlm,
+      tools: _controller.localTools,
+      systemPrompt: _systemPromptCtrl.text.isNotEmpty
+          ? _systemPromptCtrl.text
+          : (widget.initialSystemPrompt ??
+              (_controller.systemPrompt.isNotEmpty
+                  ? _controller.systemPrompt
+                  : null)),
+      catalog: widget.genuiCatalog,
+      catalogJson: widget.genuiCatalogJson,
+      catalogItems: widget.genuiCatalogItems,
+      clientFunctions: widget.clientFunctions,
+      playgroundController: _controller,
+    );
+    _genuiController!.addListener(_onStateChange);
+  }
+
   Future<void> _startPlayground() async {
     FocusManager.instance.primaryFocus?.unfocus();
     final activeLlm = _getActiveLlmConfig();
     if (!activeLlm.isConfigured && !widget.disableConfigDialog) {
-      _showSettingsDialog();
+      _showSettingsDialog(initialTab: 1);
       return;
     }
 
@@ -478,21 +541,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     setState(() {
       _playgroundStarted = true;
       _controller.systemPrompt = _systemPromptCtrl.text.trim();
-
-      _genuiController?.dispose();
-      _genuiController = McpGenuiChatController(
-        llmConfig: activeLlm,
-        tools: _controller.localTools,
-        systemPrompt: _systemPromptCtrl.text.isNotEmpty
-            ? _systemPromptCtrl.text
-            : null,
-        catalog: widget.genuiCatalog,
-        catalogJson: widget.genuiCatalogJson,
-        catalogItems: widget.genuiCatalogItems,
-        clientFunctions: widget.clientFunctions,
-        playgroundController: _controller,
-      );
-      _genuiController!.addListener(_onStateChange);
+      _initGenuiController();
     });
 
     if (_initialPromptCtrl.text.isNotEmpty) {
@@ -503,12 +552,12 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   }
 
   void _resetPlayground() {
-    _genuiController?.dispose();
-    _genuiController = null;
+    _initGenuiController();
     setState(() {
-      _playgroundStarted = false;
+      _playgroundStarted = true;
       _controller.clearChat();
       _attachments.clear();
+      _inputCtrl.clear();
       _controller.customLlmConfig =
           _useCustomLlm ? _getActiveLlmConfig() : null;
     });
@@ -519,9 +568,14 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
 
-    if (_genuiController == null) {
-      _startPlayground();
+    final activeLlm = _getActiveLlmConfig();
+    if (!activeLlm.isConfigured && !widget.disableConfigDialog) {
+      _showSettingsDialog(initialTab: 1);
       return;
+    }
+
+    if (_genuiController == null) {
+      _initGenuiController();
     }
 
     if (_genuiController!.isGenerating) return;
@@ -561,7 +615,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     }
   }
 
-  void _showSettingsDialog() {
+  void _showSettingsDialog({int initialTab = 0}) {
     final isMobile = !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.android ||
             defaultTargetPlatform == TargetPlatform.iOS);
@@ -571,12 +625,17 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
         final screenWidth = MediaQuery.of(ctx).size.width;
         if (isMobile || screenWidth < 700) {
           return Dialog.fullscreen(
-            child: SettingsPanel(controller: _controller),
+            child: SettingsPanel(
+              controller: _controller,
+              initialTabIndex: initialTab,
+            ),
           );
         }
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           child: SizedBox(
             width: 820,
             height: 720,
@@ -584,6 +643,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
               borderRadius: BorderRadius.circular(16),
               child: SettingsPanel(
                 controller: _controller,
+                initialTabIndex: initialTab,
               ),
             ),
           ),
@@ -816,63 +876,6 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     );
   }
 
-  void _showSelectedToolsDialog() {
-    final groups = _getToolsetGroups();
-    final enabled = _controller.enabledToolNames;
-    final enabledTools = groups
-        .expand((g) => g.tools)
-        .where((t) => enabled.contains(t.name))
-        .toList();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Selected Tools'),
-        content: SizedBox(
-          width: 320,
-          child: enabledTools.isEmpty
-              ? const Text('No tools selected.')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: enabledTools.length,
-                  itemBuilder: (context, index) {
-                    final tool = enabledTools[index];
-                    return Material(
-                      type: MaterialType.transparency,
-                      child: ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.build, size: 16),
-                        title: Text(
-                          tool.name,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: tool.description != null &&
-                                tool.description!.isNotEmpty
-                            ? Text(
-                                tool.description!,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              )
-                            : null,
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _applyLlmDefaults() {
     final def = _controller.llmConfig;
     if (def.provider != LlmProvider.none) {
@@ -985,7 +988,7 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isWide = MediaQuery.sizeOf(context).width >= 600;
+    final isWide = MediaQuery.sizeOf(context).width >= 900;
 
     final Widget bodyContent = _playgroundStarted
         ? _buildGenuiConversationView(theme)
@@ -1004,148 +1007,310 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
         _inspectorVisible &&
         _playgroundStarted;
 
+    final activeLlm = _getActiveLlmConfig();
+
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          tooltip: l10n.get('menu'),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(6),
+      appBar: widget.showAppBar
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: l10n.get('menu'),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
-              child: Text(
-                'GenUI',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              loadedWorkflow != null
-                  ? '${l10n.get('playground')} - ${loadedWorkflow.name}'
-                  : l10n.get('playground'),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        actions: _buildAppBarActions(context),
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: theme.colorScheme.primary),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'GenUI ${l10n.get('agentPlayground')}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'GenUI',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            Material(
-              type: MaterialType.transparency,
-              child: ListTile(
-                leading: const Icon(Icons.chat_bubble_outline),
-                title: Text(l10n.get('newChat')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _resetPlayground();
-                },
-              ),
-            ),
-            if (!widget.disableConfigDialog)
-              Material(
-                type: MaterialType.transparency,
-                child: ListTile(
-                  leading: const Icon(Icons.settings),
-                  title: Text(l10n.get('playgroundSettings')),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showSettingsDialog();
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-      body: showInspectorPane
-          ? LayoutBuilder(
-              builder: (context, constraints) {
-                final totalWidth = constraints.maxWidth;
-                const minChatWidth = 300.0;
-                const minInspectorWidth = 250.0;
-
-                double chatWidth = totalWidth * _chatFraction;
-                if (chatWidth < minChatWidth) {
-                  chatWidth = minChatWidth;
-                }
-                if (totalWidth - chatWidth - 8 < minInspectorWidth) {
-                  chatWidth = totalWidth - minInspectorWidth - 8;
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: chatWidth, child: bodyContent),
-                    GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onHorizontalDragUpdate: (details) {
-                        setState(() {
-                          _chatFraction =
-                              (chatWidth + details.delta.dx) / totalWidth;
-                          if (_chatFraction < 0.2) _chatFraction = 0.2;
-                          if (_chatFraction > 0.85) _chatFraction = 0.85;
-                        });
-                      },
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: Container(
-                          width: 8,
-                          color: theme.dividerColor.withValues(alpha: 0.1),
-                          child: Center(
-                            child: Container(
-                              width: 1,
-                              color: theme.dividerColor,
-                            ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      loadedWorkflow != null
+                          ? loadedWorkflow.name
+                          : l10n.get('playground'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (widget.showStatusBadges && isWide) ...[
+                    const SizedBox(width: 12),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _showSettingsDialog(initialTab: 1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.outline
+                                .withValues(alpha: 0.2),
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.bolt,
+                              size: 14,
+                              color: activeLlm.isConfigured
+                                  ? theme.colorScheme.primary
+                                  : Colors.orange,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              activeLlm.isConfigured
+                                  ? (activeLlm.model.isNotEmpty
+                                      ? activeLlm.model
+                                      : activeLlm.provider.displayName)
+                                  : 'No Model',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Expanded(
-                      child: AgentInspector(
-                        controller: _controller,
+                    const SizedBox(width: 8),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _showSettingsDialog(initialTab: 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _controller.chatMode
+                              ? theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.6)
+                              : theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.outline
+                                .withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _controller.chatMode
+                                  ? Icons.chat_bubble_outline
+                                  : Icons.build_circle_outlined,
+                              size: 14,
+                              color: _controller.chatMode
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _controller.chatMode
+                                  ? 'Direct Chat'
+                                  : '${_controller.enabledToolNames.length} Tools',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
-                );
-              },
+                ],
+              ),
+              actions: _buildAppBarActions(context),
             )
-          : bodyContent,
+          : null,
+      drawer: widget.showAppBar
+          ? Drawer(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  DrawerHeader(
+                    decoration: BoxDecoration(color: theme.colorScheme.primary),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'GenUI ${l10n.get('agentPlayground')}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (widget.showNewChatAction)
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        leading: const Icon(Icons.chat_bubble_outline),
+                        title: Text(l10n.get('newChat')),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _resetPlayground();
+                        },
+                      ),
+                    ),
+                  if (widget.showSettingsAction && !widget.disableConfigDialog) ...[
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        leading: const Icon(Icons.smart_toy_outlined),
+                        title: const Text('Agent & Tools Settings'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showSettingsDialog(initialTab: 0);
+                        },
+                      ),
+                    ),
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        leading: const Icon(Icons.bolt),
+                        title: const Text('Model & Provider Settings'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showSettingsDialog(initialTab: 1);
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            )
+          : null,
+      body: Stack(
+        children: [
+          showInspectorPane
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    final totalWidth = constraints.maxWidth;
+                    const minChatWidth = 300.0;
+                    const minInspectorWidth = 250.0;
+
+                    double chatWidth = totalWidth * _chatFraction;
+                    if (chatWidth < minChatWidth) {
+                      chatWidth = minChatWidth;
+                    }
+                    if (totalWidth - chatWidth - 8 < minInspectorWidth) {
+                      chatWidth = totalWidth - minInspectorWidth - 8;
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(width: chatWidth, child: bodyContent),
+                        GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onHorizontalDragUpdate: (details) {
+                            setState(() {
+                              _chatFraction =
+                                  (chatWidth + details.delta.dx) / totalWidth;
+                              if (_chatFraction < 0.2) _chatFraction = 0.2;
+                              if (_chatFraction > 0.85) _chatFraction = 0.85;
+                            });
+                          },
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.resizeLeftRight,
+                            child: Container(
+                              width: 8,
+                              color: theme.dividerColor.withValues(alpha: 0.1),
+                              child: Center(
+                                child: Container(
+                                  width: 1,
+                                  color: theme.dividerColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: AgentInspector(
+                            controller: _controller,
+                            onClose: () => setState(() => _inspectorVisible = false),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                )
+              : bodyContent,
+          if (widget.showAgentInspector && !_inspectorVisible)
+            Positioned(
+              top: 14,
+              right: 0,
+              child: Material(
+                color: theme.colorScheme.surfaceContainerHighest,
+                elevation: 3,
+                shadowColor: Colors.black26,
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(8)),
+                child: InkWell(
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(8)),
+                  onTap: () {
+                    if (isWide) {
+                      setState(() => _inspectorVisible = true);
+                    } else {
+                      _showAgentInspectorDialog();
+                    }
+                  },
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.bar_chart_rounded,
+                          size: 16,
+                          color: Color(0xFFF97316),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Inspector',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1153,174 +1318,168 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     final l10n = _l10n;
     final isWide = MediaQuery.sizeOf(context).width >= 600;
 
-    if (isWide) {
-      return [
-        if (widget.customAppBarActions != null) ...widget.customAppBarActions!,
-        IconButton(
-          icon: const Icon(Icons.restart_alt),
-          tooltip: l10n.get('resetTooltip'),
-          onPressed: _resetPlayground,
-        ),
-        if (!_playgroundStarted) ...[
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: l10n.get('clearTooltip'),
-            onPressed: _clearSetupInputs,
-          ),
-          IconButton(
-            icon: const Icon(Icons.alt_route),
-            tooltip: 'Load Workflow',
-            onPressed: _showLoadWorkflowDialog,
-          ),
-        ],
-        IconButton(
-          icon: const Icon(Icons.save_outlined),
-          tooltip: 'Save Workflow',
-          onPressed: _showSaveWorkflowDialog,
-        ),
-        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
-        IconButton(
-          icon: const Icon(Icons.bookmarks_outlined),
-          tooltip: 'Skills Manager',
-          onPressed: _showSkillsManagerDialog,
-        ),
-        IconButton(
-          icon: const Icon(Icons.auto_awesome),
-          tooltip: 'Skill Wizard',
-          onPressed: _showSkillWizardDialog,
-        ),
-        const VerticalDivider(width: 16, indent: 12, endIndent: 12),
-        IconButton(
-          icon: const Icon(Icons.list_alt),
-          tooltip: l10n.get('catalogTooltip'),
-          onPressed: () => RegisteredToolsDialog.show(context, _controller),
-        ),
-        if (widget.showAgentInspector)
-          IconButton(
-            icon: Icon(
-              _inspectorVisible
-                  ? Icons.analytics
-                  : Icons.analytics_outlined,
-            ),
-            tooltip: l10n.get('agentInspector'),
-            onPressed: () {
-              if (isWide && _playgroundStarted) {
-                setState(() {
-                  _inspectorVisible = !_inspectorVisible;
-                });
-              } else {
-                _showAgentInspectorDialog();
-              }
-            },
-          ),
-      ];
-    }
+    final hasOverflowItems = (widget.showAgentInspector && !isWide) ||
+        widget.showMemoryArchive ||
+        widget.showAssistantStatistics ||
+        widget.showToolsCatalog ||
+        widget.showSkillsControls ||
+        widget.showWorkflowActions;
 
     return [
       if (widget.customAppBarActions != null) ...widget.customAppBarActions!,
-      IconButton(
-        icon: const Icon(Icons.restart_alt),
-        tooltip: l10n.get('resetTooltip'),
-        onPressed: _resetPlayground,
-      ),
-      PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert),
-        tooltip: l10n.get('moreActions'),
-        onSelected: (val) {
-          if (val == 'clear') {
-            _clearSetupInputs();
-          } else if (val == 'saveWorkflow') {
-            _showSaveWorkflowDialog();
-          } else if (val == 'loadWorkflow') {
-            _showLoadWorkflowDialog();
-          } else if (val == 'skillsManager') {
-            _showSkillsManagerDialog();
-          } else if (val == 'skillWizard') {
-            _showSkillWizardDialog();
-          } else if (val == 'catalog') {
-            RegisteredToolsDialog.show(context, _controller);
-          } else if (val == 'inspector') {
-            _showAgentInspectorDialog();
-          }
-        },
-        itemBuilder: (ctx) => [
-          if (!_playgroundStarted) ...[
-            PopupMenuItem(
-              value: 'clear',
-              child: Row(
-                children: [
-                  const Icon(Icons.delete_sweep_outlined, size: 20),
-                  const SizedBox(width: 12),
-                  Text(l10n.get('clearTooltip')),
-                ],
+      if (widget.showNewChatAction)
+        IconButton(
+          icon: const Icon(Icons.delete_sweep_outlined),
+          tooltip: l10n.get('newChat'),
+          onPressed: _resetPlayground,
+        ),
+      if (widget.showSettingsAction && !widget.disableConfigDialog)
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          tooltip: 'Agent & LLM Settings',
+          onPressed: () => _showSettingsDialog(initialTab: 0),
+        ),
+      if (widget.showAgentInspector)
+        IconButton(
+          icon: Icon(
+            _inspectorVisible ? Icons.bar_chart_rounded : Icons.bar_chart_outlined,
+            color: _inspectorVisible ? const Color(0xFFF97316) : null,
+          ),
+          tooltip: _inspectorVisible
+              ? '${l10n.get('agentInspector')} (Hide)'
+              : '${l10n.get('agentInspector')} (Show)',
+          onPressed: () {
+            if (isWide) {
+              setState(() {
+                _inspectorVisible = !_inspectorVisible;
+              });
+            } else {
+              _showAgentInspectorDialog();
+            }
+          },
+        ),
+      if (hasOverflowItems)
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          tooltip: l10n.get('moreActions'),
+          onSelected: (val) {
+            if (val == 'saveWorkflow') {
+              _showSaveWorkflowDialog();
+            } else if (val == 'loadWorkflow') {
+              _showLoadWorkflowDialog();
+            } else if (val == 'skillsManager') {
+              _showSkillsManagerDialog();
+            } else if (val == 'skillWizard') {
+              _showSkillWizardDialog();
+            } else if (val == 'catalog') {
+              RegisteredToolsDialog.show(context, _controller);
+            } else if (val == 'memoryArchive') {
+              MemoryArchiveDialog.show(context, _controller);
+            } else if (val == 'evalBenchmark') {
+              EvalBenchmarkDialog.show(context, _controller);
+            } else if (val == 'inspector') {
+              _showAgentInspectorDialog();
+            } else if (val == 'clearSetup') {
+              _clearSetupInputs();
+            }
+          },
+          itemBuilder: (ctx) => [
+            if (widget.showAgentInspector && !isWide)
+              PopupMenuItem(
+                value: 'inspector',
+                child: Row(
+                  children: [
+                    const Icon(Icons.analytics_outlined, size: 20),
+                    const SizedBox(width: 12),
+                    Text(l10n.get('agentInspector')),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'loadWorkflow',
-              child: Row(
-                children: [
-                  Icon(Icons.alt_route, size: 20),
-                  SizedBox(width: 12),
-                  Text('Load Workflow'),
-                ],
+            if (widget.showMemoryArchive)
+              PopupMenuItem(
+                value: 'memoryArchive',
+                child: Row(
+                  children: [
+                    Badge(
+                      isLabelVisible: _controller.memoryArchive.isNotEmpty,
+                      label: Text('${_controller.memoryArchive.length}'),
+                      child: const Icon(Icons.psychology_outlined, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Memory Archive'),
+                  ],
+                ),
               ),
-            ),
+            if (widget.showAssistantStatistics)
+              const PopupMenuItem(
+                value: 'evalBenchmark',
+                child: Row(
+                  children: [
+                    Icon(Icons.speed_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Evals & Benchmark'),
+                  ],
+                ),
+              ),
+            if (widget.showToolsCatalog)
+              PopupMenuItem(
+                value: 'catalog',
+                child: Row(
+                  children: [
+                    const Icon(Icons.list_alt, size: 20),
+                    const SizedBox(width: 12),
+                    Text(l10n.get('catalogTooltip')),
+                  ],
+                ),
+              ),
+            if (widget.showSkillsControls) ...[
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'skillsManager',
+                child: Row(
+                  children: [
+                    Icon(Icons.bookmarks_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Skills Manager'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'skillWizard',
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, size: 20),
+                    SizedBox(width: 12),
+                    Text('Skill Wizard'),
+                  ],
+                ),
+              ),
+            ],
+            if (widget.showWorkflowActions) ...[
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'saveWorkflow',
+                child: Row(
+                  children: [
+                    Icon(Icons.save_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Save Workflow'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'loadWorkflow',
+                child: Row(
+                  children: [
+                    Icon(Icons.alt_route, size: 20),
+                    SizedBox(width: 12),
+                    Text('Load Workflow'),
+                  ],
+                ),
+              ),
+            ],
           ],
-          const PopupMenuItem(
-            value: 'saveWorkflow',
-            child: Row(
-              children: [
-                Icon(Icons.save_outlined, size: 20),
-                SizedBox(width: 12),
-                Text('Save Workflow'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: 'skillsManager',
-            child: Row(
-              children: [
-                Icon(Icons.bookmarks_outlined, size: 20),
-                SizedBox(width: 12),
-                Text('Skills Manager'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'skillWizard',
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome, size: 20),
-                SizedBox(width: 12),
-                Text('Skill Wizard'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'catalog',
-            child: Row(
-              children: [
-                const Icon(Icons.list_alt, size: 20),
-                const SizedBox(width: 12),
-                Text(l10n.get('catalogTooltip')),
-              ],
-            ),
-          ),
-          if (_playgroundStarted && widget.showAgentInspector)
-            PopupMenuItem(
-              value: 'inspector',
-              child: Row(
-                children: [
-                  const Icon(Icons.analytics_outlined, size: 20),
-                  const SizedBox(width: 12),
-                  Text(l10n.get('agentInspector')),
-                ],
-              ),
-            ),
-        ],
-      ),
+        ),
     ];
   }
 
@@ -1698,78 +1857,30 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
           child: Row(
             children: [
               ActionChip(
-                avatar: const Icon(Icons.edit_note, size: 16),
-                label: const Text('System Prompt (tap to edit)'),
-                onPressed: () {
-                  final promptCtrl = TextEditingController(
-                    text: _controller.systemPrompt,
-                  );
-                  final isMobile = MediaQuery.sizeOf(context).width < 600;
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      insetPadding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 8 : 24,
-                        vertical: isMobile ? 12 : 24,
-                      ),
-                      contentPadding: EdgeInsets.fromLTRB(
-                        isMobile ? 12 : 24,
-                        16,
-                        isMobile ? 12 : 24,
-                        12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      title: const Row(
-                        children: [
-                          Icon(Icons.edit_note, color: Color(0xFF0067C0)),
-                          SizedBox(width: 8),
-                          Text('Edit System Prompt'),
-                        ],
-                      ),
-                      content: SizedBox(
-                        width: isMobile ? double.maxFinite : 700,
-                        child: TextFormField(
-                          controller: promptCtrl,
-                          maxLines: isMobile ? 10 : 12,
-                          minLines: 6,
-                          decoration: InputDecoration(
-                            hintText:
-                                'Enter instructions, catalog rules, persona details, or system guidelines...',
-                            border: const OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: isMobile ? 10 : 14,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          onPressed: () {
-                            setState(() {
-                              _controller.systemPrompt = promptCtrl.text;
-                              _systemPromptCtrl.text = promptCtrl.text;
-                            });
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                avatar: const Icon(Icons.psychology_outlined, size: 16),
+                label: Text(
+                  _controller.systemPrompt.trim().isNotEmpty
+                      ? 'Persona Active'
+                      : 'System Prompt',
+                ),
+                onPressed: () => _showSettingsDialog(initialTab: 0),
+                tooltip: 'Configure System Prompt & Persona',
               ),
               const SizedBox(width: 8),
               ActionChip(
-                avatar: const Icon(Icons.build_circle_outlined, size: 16),
-                label: Text('$enabledToolsCount tools selected'),
-                onPressed: _showSelectedToolsDialog,
+                avatar: Icon(
+                  _controller.chatMode
+                      ? Icons.chat_bubble_outline
+                      : Icons.build_circle_outlined,
+                  size: 16,
+                ),
+                label: Text(
+                  _controller.chatMode
+                      ? 'Direct Chat Mode'
+                      : '$enabledToolsCount tools active',
+                ),
+                onPressed: () => _showSettingsDialog(initialTab: 0),
+                tooltip: 'Configure Agent Mode & Enabled Tools',
               ),
             ],
           ),
@@ -1939,7 +2050,11 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(entry.text),
+                      MarkdownBody(
+                        data: entry.text,
+                        styleSheet: markdownStyleSheetFromMaterialUiTheme(theme),
+                        syntaxHighlighter: McpMarkdownSyntaxHighlighter(isDark: isDark),
+                      ),
                       const SizedBox(height: 6),
                       Align(
                         alignment: Alignment.bottomRight,
@@ -2024,32 +2139,104 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
   }
 
   Widget _buildWelcomeWidget(ThemeData theme) {
+    final activeLlm = _getActiveLlmConfig();
+    final hasLlm = activeLlm.isConfigured;
+    final modelName = activeLlm.model.isNotEmpty
+        ? activeLlm.model
+        : activeLlm.provider.displayName;
+    final enabledCount = _controller.enabledToolNames.length;
+    final chatMode = _controller.chatMode;
+
     return Center(
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                size: 72,
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'GenUI Agent Ready',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: (hasLlm ? theme.colorScheme.primary : Colors.orange)
+                        .withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    hasLlm
+                        ? (chatMode
+                            ? Icons.chat_bubble_outline
+                            : Icons.auto_awesome_rounded)
+                        : Icons.tune_outlined,
+                    size: 56,
+                    color: hasLlm ? theme.colorScheme.primary : Colors.orange,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Interactive GenUI widgets will be dynamically rendered directly from agent responses and MCP tool calls.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Text(
+                  hasLlm ? 'GenUI Agent Ready' : 'Welcome to GenUI Assistant',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  hasLlm
+                      ? 'Interactive GenUI widgets will be dynamically rendered directly from agent responses and MCP tool calls.'
+                      : 'To get started, configure your LLM provider (Gemini, Claude, OpenAI, Ollama, etc.) and model.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (!hasLlm)
+                  FilledButton.icon(
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Configure Model & Provider'),
+                    onPressed: () => _showSettingsDialog(initialTab: 1),
+                  )
+                else ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.bolt, size: 16),
+                        label: Text(modelName),
+                        onPressed: () => _showSettingsDialog(initialTab: 1),
+                        tooltip: 'Change LLM Provider or Model',
+                      ),
+                      ActionChip(
+                        avatar: Icon(
+                          chatMode
+                              ? Icons.chat_bubble_outline
+                              : Icons.build_circle_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          chatMode
+                              ? 'Direct Chat'
+                              : '$enabledCount Tools Active',
+                        ),
+                        onPressed: () => _showSettingsDialog(initialTab: 0),
+                        tooltip:
+                            'Configure Agent Mode, Tools & System Prompt',
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.tune_outlined, size: 16),
+                        label: const Text('Agent Settings'),
+                        onPressed: () => _showSettingsDialog(initialTab: 0),
+                        tooltip: 'Open Agent & Tools Settings',
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

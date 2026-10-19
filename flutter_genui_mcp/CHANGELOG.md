@@ -1,3 +1,27 @@
+## 1.3.0
+
+* **Simplified UI & Direct-to-Chat Architecture**:
+  * Default direct-to-chat experience with unified conversation view and interactive empty state.
+  * Interactive title and empty-state badges for fast switching between LLM provider/model and Agent tools/mode.
+  * Consolidated "Agent & Tools" configuration inside the settings dialog with system prompt, persona presets, and granular tool selection.
+* **App Embedding Support & Visibility Controls**:
+  * Added top bar and UI component visibility parameters to `FlutterGenUiMcp` / `GenuiMcpPlayground`:
+    * `showAppBar`: Toggle entire AppBar and navigation drawer for embedding inside custom application layouts.
+    * `showStatusBadges`: Toggle model and active tools status badges in the top bar.
+    * `showNewChatAction`: Toggle New Chat button.
+    * `showSettingsAction`: Toggle Settings action button.
+    * `showSkillsControls`: Toggle Skills Manager and wizard actions.
+    * `showAssistantStatistics`: Toggle Assistant Evals and Benchmark actions.
+    * `showMemoryArchive`: Toggle Episodic Memory Archive action.
+    * `showToolsCatalog`: Toggle Tools Catalog viewer action.
+    * `showWorkflowActions`: Toggle workflow save/load actions.
+* **Agent Inspector Visibility Toggle**:
+  * Added direct toggle button in the top action bar to expand or collapse the side-by-side Agent Inspector panel on desktop and tablet views (`showAgentInspector`).
+* **Markdown Dark Mode Styling**:
+  * Crisp, high-contrast dark theme markdown styling across codeblocks, lists, and tabular data.
+* **Dependencies**:
+  * Synchronized version 1.3.0 across `dart_mcp_core`, `flutter_ui_mcp`, and `flutter_ui_mcp_core`.
+
 ## 1.2.0
 
 * **Embedded On-Device LLM & Mobile UX**:

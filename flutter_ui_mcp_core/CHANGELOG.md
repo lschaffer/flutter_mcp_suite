@@ -1,3 +1,35 @@
+## 1.3.0
+
+* **Episodic Memory Archive & Retrieval UI**:
+  * Added `MemoryArchiveDialog` for searching, inspecting, and navigating compressed episodic memory summaries and raw interaction histories.
+  * Added reactive `memoryArchive` store and `retrieve_memory` tool integration in `PlaygroundController`.
+* **Autonomous Sub-Agent Execution Tracking**:
+  * Added `SubAgentExecution` model tracking child sub-agent workflows, hierarchy/depth, status, execution logs, and completed results.
+  * Integrated autonomous `DelegateTaskTool` runner into `PlaygroundController` with dynamic tool cascading.
+  * Added specialized visual execution cards in `ChatBubble` for sub-agent runs, episodic memory lookups, and skill activations.
+* **Dynamic Skill Activation Dock**:
+  * Added `DynamicSkillDock` widget allowing users to toggle dynamic skill availability on the fly.
+  * Integrated agent-driven skill activation via `ActivateSkillsTool` and `DeactivateSkillsTool`.
+* **Multimodal Chat Content Staging**:
+  * Added `pendingParts` staging in `PlaygroundController` for multimodal input.
+  * Enhanced `ChatBubble` with rich rendering for images (with full-resolution lightbox viewer), documents, and audio clips.
+* **Evaluation Benchmark Runner**:
+  * Added `EvalController` and `EvalBenchmarkDialog` enabling automated LLM/agent benchmarking directly in Flutter apps with real-time pass/fail metrics, scoring, and output inspection.
+* **Dynamic Model Pricing & Context Limits (`ModelPricingService`)**:
+  * Real-time dynamic token pricing and context window resolution without hardcoded static tables (queries host `/models` catalogs, OpenRouter live API, DeepInfra, and local endpoints).
+  * Rich model autocomplete suggestions with multimodal indicator badges, context length tags, and real-time input/output rates.
+  * Interactive model pricing and context banner beneath the model selector in `LlmConfigForm` with USD ($) and EUR (€) rate conversions and live freshness tracking.
+* **Autonomous Multi-Turn Sub-Agent Execution Loop**:
+  * Enhanced `delegate_task` runner in `PlaygroundController` into a full autonomous multi-turn loop supporting up to 5 iterative tool turns.
+  * Real-time progress updates streamed to `SubAgentExecution` and rendered in `ChatBubble` cards as child tools run.
+* **Markdown Dark Mode Styling**:
+  * High-contrast markdown text and syntax styles (`darkMarkdownStyleSheet`) ensuring crystal-clear codeblock, table, and list readability in dark theme mode.
+* **Attachment Resilience & Inspector Metrics**:
+  * Added `allowMalformed: true` to attachment UTF-8 decoding to protect against non-UTF8/ISO-8859-1 character crashes.
+  * `AgentInspector` sent characters and token usage metrics now accurately account for staged file attachments.
+* **Dependencies**:
+  * Upgraded dependency to `dart_mcp_core: ^1.3.0`.
+
 ## 1.2.0
 
 * **Embedded On-Device LLM Standardization (`.gguf` via `llamadart`)**:

@@ -152,18 +152,24 @@ class LLMService {
         i++;
       } else if (msg.role == ChatRole.user) {
         final parts = <openai.ContentPart>[];
+        final addedImageUris = <String>{};
         if (msg.parts != null && msg.parts!.isNotEmpty) {
           for (final part in msg.parts!) {
             if (part is TextPart && part.text.isNotEmpty) {
               parts.add(openai.ContentPart.text(part.text));
             } else if (part is ImagePart) {
+              String? uri;
               if (part.url != null) {
-                parts.add(openai.ContentPart.imageUrl(part.url!));
+                uri = part.url!;
               } else if (part.bytes != null) {
                 final base64Str = base64Encode(part.bytes!);
-                parts.add(openai.ContentPart.imageUrl('data:${part.mimeType};base64,$base64Str'));
+                uri = 'data:${part.mimeType};base64,$base64Str';
               } else if (part.base64 != null) {
-                parts.add(openai.ContentPart.imageUrl('data:${part.mimeType};base64,${part.base64!}'));
+                uri = 'data:${part.mimeType};base64,${part.base64!}';
+              }
+              if (uri != null && !addedImageUris.contains(uri)) {
+                addedImageUris.add(uri);
+                parts.add(openai.ContentPart.imageUrl(uri));
               }
             } else if (part is DocumentPart) {
               if (part.textContent != null && part.textContent!.isNotEmpty) {
@@ -180,7 +186,10 @@ class LLMService {
             if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
               final base64Str = base64Encode(att.bytes!);
               final dataUri = 'data:${att.mimeType};base64,$base64Str';
-              parts.add(openai.ContentPart.imageUrl(dataUri));
+              if (!addedImageUris.contains(dataUri)) {
+                addedImageUris.add(dataUri);
+                parts.add(openai.ContentPart.imageUrl(dataUri));
+              }
             }
           }
         }
@@ -1186,13 +1195,15 @@ class LLMService {
         i++;
       } else if (msg.role == ChatRole.user) {
         final List<String> images = [];
+        final addedImageB64 = <String>{};
         if (msg.parts != null) {
           for (final part in msg.parts!) {
             if (part is ImagePart) {
               if (part.bytes != null) {
-                images.add(base64Encode(part.bytes!));
+                final b64 = base64Encode(part.bytes!);
+                if (addedImageB64.add(b64)) images.add(b64);
               } else if (part.base64 != null) {
-                images.add(part.base64!);
+                if (addedImageB64.add(part.base64!)) images.add(part.base64!);
               }
             }
           }
@@ -1200,7 +1211,8 @@ class LLMService {
         if (msg.attachments != null) {
           for (final att in msg.attachments!) {
             if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
-              images.add(base64Encode(att.bytes!));
+              final b64 = base64Encode(att.bytes!);
+              if (addedImageB64.add(b64)) images.add(b64);
             }
           }
         }
