@@ -1,0 +1,11 @@
+order_id,customer_name,company,country,product_tier,order_value_usd,payment_status,order_date
+ORD-1092,Elena Rostova,AeroDynamics GmbH,Germany,Enterprise,14500.00,Paid,2026-09-14
+ORD-1093,Marcus Sterling,Vanguard Capital,United Kingdom,Enterprise,28000.00,Paid,2026-09-15
+ORD-1094,Kenji Sato,Sakura AI Tech,Japan,Pro,4200.00,Paid,2026-09-18
+ORD-1095,Chloe Martin,Lumiere Studio,France,Starter,850.00,Pending,2026-09-20
+ORD-1096,Liam O'Connor,Horizon Logistics,Ireland,Pro,3900.00,Paid,2026-09-22
+ORD-1097,Mateo Alvarez,Solaria Energy,Spain,Enterprise,19200.00,Paid,2026-09-25
+ORD-1098,Hannah Lindqvist,Nordic Data Labs,Sweden,Enterprise,32000.00,Paid,2026-09-28
+ORD-1099,David Miller,Apex Cloud,United States,Starter,790.00,Cancelled,2026-10-01
+ORD-1100,Amira Mansour,Nile FinTech,Egypt,Pro,5400.00,Paid,2026-10-04
+ORD-1101,Lucas Silva,Amazonas AI,Brazil,Pro,4800.00,Paid,2026-10-08
