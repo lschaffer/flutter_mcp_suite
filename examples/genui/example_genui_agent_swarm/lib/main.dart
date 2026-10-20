@@ -696,7 +696,7 @@ class AgentSwarmScreen extends StatelessWidget {
 
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.7-flash'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );

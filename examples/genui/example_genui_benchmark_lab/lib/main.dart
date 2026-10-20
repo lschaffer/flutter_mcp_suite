@@ -73,55 +73,55 @@ class RunPromptBenchmarkTool extends McpLocalTool {
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final prompt = arguments['test_prompt']?.toString() ?? 'Extract structured entities';
     final candidateModels = (arguments['models'] as List?)?.cast<String>() ?? [
-      'claude-3-5-sonnet',
-      'gpt-4o',
+      'claude-3-7-sonnet',
+      'o3-mini',
       'deepseek-chat',
-      'gemini-1.5-flash',
+      'gemini-3.7-flash',
     ];
 
     final runs = [
       {
-        'model': 'claude-3-5-sonnet',
-        'latency_ms': 740,
-        'accuracy_score': 98.2,
-        'instruction_score': 99.0,
-        'conciseness_score': 94.0,
-        'hallucination_resistance': 98.5,
+        'model': 'claude-3-7-sonnet',
+        'latency_ms': 690,
+        'accuracy_score': 98.6,
+        'instruction_score': 99.2,
+        'conciseness_score': 95.0,
+        'hallucination_resistance': 99.0,
         'cost_per_1k': 0.0090,
         'tokens_used': 340,
         'is_winner': true,
       },
       {
-        'model': 'gpt-4o',
-        'latency_ms': 620,
-        'accuracy_score': 96.5,
-        'instruction_score': 96.0,
-        'conciseness_score': 91.0,
-        'hallucination_resistance': 96.0,
-        'cost_per_1k': 0.0075,
-        'tokens_used': 365,
+        'model': 'o3-mini',
+        'latency_ms': 540,
+        'accuracy_score': 97.4,
+        'instruction_score': 97.5,
+        'conciseness_score': 93.0,
+        'hallucination_resistance': 97.5,
+        'cost_per_1k': 0.0035,
+        'tokens_used': 350,
         'is_winner': false,
       },
       {
         'model': 'deepseek-chat',
-        'latency_ms': 480,
-        'accuracy_score': 95.0,
-        'instruction_score': 94.5,
-        'conciseness_score': 92.0,
-        'hallucination_resistance': 94.0,
+        'latency_ms': 460,
+        'accuracy_score': 95.5,
+        'instruction_score': 95.0,
+        'conciseness_score': 92.5,
+        'hallucination_resistance': 94.5,
         'cost_per_1k': 0.00042,
         'tokens_used': 320,
         'is_winner': false,
       },
       {
-        'model': 'gemini-1.5-flash',
-        'latency_ms': 310,
-        'accuracy_score': 91.8,
-        'instruction_score': 92.0,
-        'conciseness_score': 88.0,
-        'hallucination_resistance': 90.5,
+        'model': 'gemini-3.7-flash',
+        'latency_ms': 280,
+        'accuracy_score': 93.8,
+        'instruction_score': 94.0,
+        'conciseness_score': 91.0,
+        'hallucination_resistance': 93.5,
         'cost_per_1k': 0.00030,
-        'tokens_used': 310,
+        'tokens_used': 305,
         'is_winner': false,
       },
     ];
@@ -168,14 +168,14 @@ class EvaluateModelTradeoffsTool extends McpLocalTool {
     final evaluation = {
       'optimization_priority': priority,
       'recommendation': priority == 'quality'
-          ? 'Claude 3.5 Sonnet delivers highest accuracy (98.2%) with superior instruction following.'
+          ? 'Claude 3.7 Sonnet delivers highest accuracy (98.6%) with superior instruction following.'
           : priority == 'speed'
-              ? 'Gemini 1.5 Flash delivers lowest TTFT and end-to-end latency (310ms).'
-              : 'DeepSeek-Chat offers optimal Pareto frontier: 95% accuracy at 95% lower cost than frontier models.',
+              ? 'Gemini 3.7 Flash delivers lowest TTFT and end-to-end latency (280ms).'
+              : 'DeepSeek-Chat offers optimal Pareto frontier: 95.5% accuracy at 95% lower cost than frontier models.',
       'winner_model': priority == 'quality'
-          ? 'claude-3-5-sonnet'
+          ? 'claude-3-7-sonnet'
           : priority == 'speed'
-              ? 'gemini-1.5-flash'
+              ? 'gemini-3.7-flash'
               : 'deepseek-chat',
     };
 
@@ -614,7 +614,7 @@ class BenchmarkLabScreen extends StatelessWidget {
 
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.7-flash'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );

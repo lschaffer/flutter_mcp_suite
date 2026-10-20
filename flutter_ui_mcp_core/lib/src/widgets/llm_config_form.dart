@@ -41,16 +41,19 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
   final Set<String> _pendingPriceFetches = {};
 
   final Map<LlmProvider, List<String>> _defaultModels = const {
-    LlmProvider.openai: ['gpt-4o', 'gpt-4o-mini', 'o1-mini', 'o3-mini'],
+    LlmProvider.openai: ['o3-mini', 'gpt-4.5-preview', 'gpt-4o', 'gpt-4o-mini', 'o1'],
     LlmProvider.claude: [
+      'claude-3-7-sonnet',
       'claude-3-5-sonnet-latest',
       'claude-3-5-haiku-latest',
       'claude-3-opus-latest',
     ],
     LlmProvider.gemini: [
+      'gemini-3.7-flash',
+      'gemini-3.7-pro',
       'gemini-2.5-flash',
       'gemini-2.5-pro',
-      'gemini-2.0-flash-thinking-exp',
+      'gemini-2.0-flash',
     ],
     LlmProvider.mistral: [
       'mistral-large-latest',

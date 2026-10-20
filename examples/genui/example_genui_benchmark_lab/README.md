@@ -21,7 +21,7 @@ You can either:
 
 ## 💡 Example Prompts
 Try asking the assistant:
-- *"Benchmark our JSON entity extraction prompt against Claude 3.5 Sonnet, GPT-4o, DeepSeek Chat, and Gemini 1.5 Flash."*
+- *"Benchmark our JSON entity extraction prompt against Claude 3.7 Sonnet, o3-mini, DeepSeek Chat, and Gemini 3.7 Flash."*
 - *"Evaluate the Pareto trade-offs focusing on cost-efficiency and recommend the winning model."*
 
 ## Running

@@ -15,7 +15,7 @@ system_prompt: |
      - "LatencyCostScatter" to visually present response latency in milliseconds.
 
 prompts:
-  - text: Benchmark our JSON entity extraction prompt against Claude 3.5 Sonnet, GPT-4o, DeepSeek Chat, and Gemini 1.5 Flash.
+  - text: Benchmark our JSON entity extraction prompt against Claude 3.7 Sonnet, o3-mini, DeepSeek Chat, and Gemini 3.7 Flash.
     tools: [run_prompt_benchmark]
     stop_after_tool_call: true
   - text: Evaluate the Pareto trade-offs focusing on cost-efficiency and recommend the winning model.

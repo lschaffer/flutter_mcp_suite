@@ -63,7 +63,7 @@ class QueryModelPricingTool extends McpLocalTool {
             'type': 'array',
             'items': {'type': 'string'},
             'description':
-                'List of model IDs (e.g. gpt-4o, claude-3-5-sonnet, deepseek-chat, gemini-1.5-flash, llama3:8b)',
+                'List of model IDs (e.g. o3-mini, claude-3-7-sonnet, deepseek-chat, gemini-3.7-flash, llama3.3:70b)',
           },
         },
       };
@@ -71,11 +71,11 @@ class QueryModelPricingTool extends McpLocalTool {
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final rawList = arguments['models'] as List? ?? [
-      'gpt-4o',
-      'claude-3-5-sonnet',
+      'o3-mini',
+      'claude-3-7-sonnet',
       'deepseek-chat',
-      'gemini-1.5-flash',
-      'llama3:8b',
+      'gemini-3.7-flash',
+      'llama3.3:70b',
     ];
 
     final results = <Map<String, dynamic>>[];
@@ -169,9 +169,9 @@ class SimulateWorkloadTool extends McpLocalTool {
     final totalOut1M = (requests * outTokens) / 1000000.0;
 
     final modelsProfile = [
-      {'name': 'gpt-4o', 'in': 2.50, 'out': 10.00, 'color': '#EF4444'},
-      {'name': 'claude-3-5-sonnet', 'in': 3.00, 'out': 15.00, 'color': '#F59E0B'},
-      {'name': 'gemini-1.5-flash', 'in': 0.075, 'out': 0.30, 'color': '#3B82F6'},
+      {'name': 'o3-mini', 'in': 1.10, 'out': 4.40, 'color': '#EF4444'},
+      {'name': 'claude-3-7-sonnet', 'in': 3.00, 'out': 15.00, 'color': '#F59E0B'},
+      {'name': 'gemini-3.7-flash', 'in': 0.075, 'out': 0.30, 'color': '#3B82F6'},
       {'name': 'deepseek-chat', 'in': 0.14, 'out': 0.28, 'color': '#10B981'},
       {'name': 'ollama-local', 'in': 0.0, 'out': 0.0, 'color': '#6B7280'},
     ];
@@ -258,7 +258,7 @@ class RecommendRoutingTool extends McpLocalTool {
       'tiers': [
         {
           'tier_name': 'Tier 1: Complex Synthesis & Reasoning',
-          'model': 'claude-3-5-sonnet',
+          'model': 'claude-3-7-sonnet',
           'traffic_percent': 15,
           'role': 'Multi-step planning, intricate code refactoring, and root-cause analysis.',
         },
@@ -932,7 +932,7 @@ class ModelOptimizerScreen extends StatelessWidget {
 
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gpt-4o'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.7-flash'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );

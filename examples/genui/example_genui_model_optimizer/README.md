@@ -23,7 +23,7 @@ You can either:
 
 ## 💡 Example Prompts
 Try asking the assistant:
-- *"Compare current pricing, context limits, and token costs for GPT-4o, Claude 3.5 Sonnet, DeepSeek Chat, Gemini 1.5 Flash, and local Llama 3."*
+- *"Compare current pricing, context limits, and token costs for o3-mini, Claude 3.7 Sonnet, DeepSeek Chat, Gemini 3.7 Flash, and local Llama 3.3."*
 - *"Simulate our monthly cost for 100,000 queries with 1,800 prompt tokens and 400 completion tokens per query, and show a cost curve chart."*
 - *"We are building an enterprise customer support copilot with a $250 monthly budget. Recommend an optimal tiered multi-model routing architecture."*
 
