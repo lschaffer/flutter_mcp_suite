@@ -45,22 +45,29 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 ### Compatibility across Suite Examples
 
 | Example Application | Target Platform | Min. Recommended Model | Best Experience |
-| **[Interactive Live Canvas](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_interactive_canvas)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | GPT-4o / Claude 3.5 Sonnet |
+| **[Interactive Live Canvas](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_interactive_canvas)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Gemini 3.7 Flash / Claude 3.7 Sonnet |
 | **[Embedded LLM Showcase](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_embedded)** | Desktop / Mobile | **Qwen 2.5 3B** / **Ministral 3B** (GGUF) | Qwen 2.5 3B / 7B (Offline) |
 | **[Device Diagnostics Copilot](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_device_diagnostics)** | Desktop / Mobile | **Gemma 2 2B** / **Qwen 2.5 3B** | Qwen 2.5 7B / Mistral 7B |
-| **[Audio & Meeting Notes Assistant](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_audio_notes)** | Cross-platform | **Ministral 3B** / **Qwen 2.5 3B** | Ministral 8B / GPT-4o-mini |
-| **[GitHub Issue Triage & PR Review](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_github_triage)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Mistral Small 24B / Claude 3.5 Sonnet |
-| **[Primary Multi-Tool Showcase](example)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Gemini 2.5 Flash / GPT-4o |
-| **[Sub-Agent Orchestrator](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_subagents_orchestrator)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | GPT-4o / Claude 3.7 Sonnet |
-| **[Episodic Memory Archive](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_episodic_memory)** | Cross-platform | **Qwen 2.5 3B** / **Ministral 3B** | GPT-4o / Claude 3.5 Sonnet |
-| **[Dynamic Skills Dock](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_dynamic_skills)** | Cross-platform | **Qwen 2.5 3B** / **Ministral 3B** | GPT-4o / Gemini 2.5 Flash |
-| **[Multimodal Media Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_multimodal_vision)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | GPT-4o / Gemini 2.5 Flash |
-| **[Agent Benchmark Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_agent_eval)** | Cross-platform | **Gemma 2 2B** / **Qwen 2.5 3B** | GPT-4o / Claude 3.7 Sonnet |
+| **[Audio & Meeting Notes Assistant](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_audio_notes)** | Cross-platform | **Ministral 3B** / **Qwen 2.5 3B** | Ministral 8B / o3-mini |
+| **[GitHub Issue Triage & PR Review](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_github_triage)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Mistral Small 24B / Claude 3.7 Sonnet |
+| **[Primary Multi-Tool Showcase](example)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Gemini 3.7 Flash / GPT-4.5 |
+| **[Sub-Agent Orchestrator](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_subagents_orchestrator)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Claude 3.7 Sonnet / o3-mini |
+| **[Episodic Memory Archive](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_episodic_memory)** | Cross-platform | **Qwen 2.5 3B** / **Ministral 3B** | Gemini 3.7 Flash / Claude 3.7 Sonnet |
+| **[Dynamic Skills Dock](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_dynamic_skills)** | Cross-platform | **Qwen 2.5 3B** / **Ministral 3B** | Gemini 3.7 Flash / o3-mini |
+| **[Multimodal Media Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_multimodal_vision)** | Cross-platform | **Qwen 2.5 7B** / **Mistral 7B** | Gemini 3.7 Flash / Claude 3.7 Sonnet |
+| **[Agent Benchmark Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/flutter/example_agent_eval)** | Cross-platform | **Gemma 2 2B** / **Qwen 2.5 3B** | Claude 3.7 Sonnet / Gemini 3.7 Flash |
 
 ---
 
-## 🎥 Demo
+## 🎥 Demos & Visual Showcases
 
+### 🤖 Autonomous Sub-Agent Delegation UI
+![Sub-Agent Orchestrator](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_subagents.png)
+
+### 🧩 Dynamic Skills Dock
+![Dynamic Skills Dock](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_dynamic_skills.png)
+
+### 💻 Embedded On-Device LLM & Local MCP Tools
 Watch the AI Agent widget in action using an embedded model to call local dart tools:
 
 ![Flutter UI MCP Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/mcp_playground_embedded_test.gif)

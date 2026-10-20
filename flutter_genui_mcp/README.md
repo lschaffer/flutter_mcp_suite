@@ -32,20 +32,36 @@ Different examples and workflows require different LLM reasoning and structured 
 
 | Example Showcase | Min. Model Size | Recommended Models | GenUI / A2UI Compatibility | Notes |
 |:---|:---|:---|:---:|:---|
-| **[Travel & Stay Planner](example)** | **14B+** | Mistral Medium/Large, Gemini 2.5 Flash/Pro, GPT-4o, Claude 3.7 Sonnet, Qwen 2.5 32B | 🟢 Full Support | Multi-step tool calls + date pickers + SerpAPI parsing + rich itinerary cards. |
-| **[Custom PC Rig Builder & Store](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_pc_builder)** | **14B+** | Mistral Small/Medium, GPT-4o, Gemini 2.5 Flash, Qwen 2.5 14B/32B | 🟢 Full Support | Platform socket compatibility (AM5 vs LGA1700), dynamic product catalog grids, and order invoicing. |
+| **[Model Cost & Architecture Optimizer](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_model_optimizer)** | **7B – 8B** | Gemini 3.7 Flash, o3-mini, Claude 3.7 Sonnet, DeepSeek Chat | 🟢 Full Support | Dynamic token pricing matrices, expenditure projection curves (`fl_chart`), and tiered routing. |
+| **[Autonomous Multi-Agent Mission Control](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_agent_swarm)** | **14B+** | Claude 3.7 Sonnet, GPT-4.5, Gemini 3.7 Flash/Pro, Qwen 2.5 32B | 🟢 Full Support | Autonomous specialist subagents, real-time pipeline timelines, and human-in-the-loop decision gates. |
+| **[File ETL & Data Transformation Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_file_etl)** | **7B – 8B** | Gemini 3.7 Flash, Qwen 2.5 14B, DeepSeek Chat | 🟢 Full Support | Resilient UTF-8 parsing, schema inspector cards, filtered data tables, and multi-format exports. |
+| **[Model & Prompt Benchmark Lab](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_benchmark_lab)** | **7B – 8B** | Gemini 3.7 Flash, Claude 3.7 Sonnet, o3-mini, Mistral Small 24B | 🟢 Full Support | Prompt benchmark scoring, multi-criterion quality bars, and latency vs. cost evaluation. |
+| **[Travel & Stay Planner](example)** | **14B+** | Mistral Medium/Large, Gemini 3.7 Flash/Pro, GPT-4o, Claude 3.7 Sonnet, Qwen 2.5 32B | 🟢 Full Support | Multi-step tool calls + date pickers + SerpAPI parsing + rich itinerary cards. |
+| **[Custom PC Rig Builder & Store](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_pc_builder)** | **14B+** | Mistral Small/Medium, GPT-4o, Gemini 3.7 Flash, Qwen 2.5 14B/32B | 🟢 Full Support | Platform socket compatibility (AM5 vs LGA1700), dynamic product catalog grids, and order invoicing. |
 | **[Dynamic Weather Generator](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_weather)** | **7B – 8B** | Ministral 8B, Qwen 2.5 7B, Mistral 7B, Llama 3.1 8B | 🟢 Full Support | Single/dual tool calls with Open-Meteo and chart component emission. |
-| **[Finance & Budget Planner](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_finance)** | **7B – 8B** | Qwen 2.5 7B, Mistral NeMo 12B, GPT-4o-mini, Gemini 2.5 Flash | 🟢 Full Support | Budget calculations, interactive savings sliders, and compound interest curve charts. |
+| **[Finance & Budget Planner](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_finance)** | **7B – 8B** | Qwen 2.5 7B, Mistral NeMo 12B, o3-mini, Gemini 3.7 Flash | 🟢 Full Support | Budget calculations, interactive savings sliders, and compound interest curve charts. |
 | **[Smart Home Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_smarthome)** | **7B – 8B** | Ministral 8B, Qwen 2.5 7B, Mistral 7B, Gemma 2 9B | 🟢 Full Support | Interactive climate sliders, toggle switches, and energy bar charts. |
-| **[Data Visualizer Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_data_studio)** | **14B+** | Mistral Small/Medium, Qwen 2.5 14B/32B, Gemini 2.5 Flash, GPT-4o | 🟢 Full Support | Tabular schema synthesis, KPI metric grids, and dynamic trend charts. |
+| **[Data Visualizer Studio](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_data_studio)** | **14B+** | Mistral Small/Medium, Qwen 2.5 14B/32B, Gemini 3.7 Flash, GPT-4o | 🟢 Full Support | Tabular schema synthesis, KPI metric grids, and dynamic trend charts. |
 | **[Filesystem Explorer](https://github.com/lschaffer/flutter_mcp_suite/tree/main/examples/genui/example_genui_filesystem)** | **7B – 8B** | Qwen 2.5 7B, Ministral 8B, Llama 3.1 8B | 🟢 Full Support | Directory tree navigation and file preview cards. |
 | **Small Models (2B – 3B)** *(Gemma 2 2B, Ministral 3B, Qwen 2.5 3B)* | *2B – 3B* | Local GGUF via llamadart or Ollama | 🟡 Basic / Limited | Can handle simple tools and direct chat, but may struggle with strict GenUI JSON schema generation. Use standard [`flutter_ui_mcp`](https://pub.dev/packages/flutter_ui_mcp) for best small model experience. |
 
 ---
 
-## 🎥 Demo
+## 🎥 Demos & Visual Showcases
 
-Watch dynamic GenUI in action rendering interactive surfaces:
+Watch dynamic GenUI in action rendering interactive surfaces across all showcase examples:
+
+### 💰 GenUI Model Cost & Architecture Optimizer
+![GenUI Model Cost Optimizer](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_model_optimizer.png)
+
+### 🤖 GenUI Autonomous Multi-Agent Mission Control
+![GenUI Multi-Agent Mission Control](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_multi_agent_human_in_loop.png)
+
+### 📊 GenUI File ETL & Data Transformation Studio
+![GenUI File ETL Studio](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_file_etl_data_studio.png)
+
+### 🔬 GenUI Model & Prompt Benchmark Lab
+![GenUI Benchmark Lab](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_benchmark.png)
 
 ### 🏖️ GenUI Travel & Stay Planner
 ![GenUI MCP Travel Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_mcp_travel_example.gif)
