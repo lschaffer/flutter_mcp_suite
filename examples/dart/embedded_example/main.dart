@@ -440,17 +440,33 @@ Future<void> main() async {
   final engine = LlamaEngine(backend);
 
   try {
+    print('Attempting to load model with GPU acceleration...');
     await engine.setModel(
       LlamaModel(ModelSource.path(fullModelPath)),
       params: ModelParams(
         contextSize: 4096,
         gpuLayers: ModelParams.maxGpuLayers,
+        splitMode: ModelSplitMode.none,
       ),
     );
-    print('Model successfully loaded!');
-  } catch (e) {
-    print('Error loading model with llamadart: $e');
-    exit(1);
+    print('Model successfully loaded with GPU acceleration!');
+  } catch (gpuError) {
+    print('GPU acceleration unavailable or out of memory ($gpuError).');
+    print('Falling back to CPU inference...');
+    try {
+      await engine.setModel(
+        LlamaModel(ModelSource.path(fullModelPath)),
+        params: ModelParams(
+          contextSize: 4096,
+          gpuLayers: 0,
+          device: ComputeDevice.cpu,
+        ),
+      );
+      print('Model successfully loaded on CPU!');
+    } catch (e) {
+      print('Error loading model on CPU with llamadart: $e');
+      exit(1);
+    }
   }
 
   // 4. Register llamadart delegates with LLMService

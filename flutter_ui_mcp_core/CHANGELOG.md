@@ -1,3 +1,27 @@
+## 1.4.0
+
+* **⚠️ BREAKING CHANGES & MIGRATION (Embedded LLM Decoupling)**:
+  * **Removed `llamadart` from `flutter_ui_mcp_core`**: The base core library no longer compiles or bundles native C++, FFI, WebGPU, or WASM dependencies.
+  * **Migration for On-Device GGUF users**:
+    1. Add `flutter_ui_mcp_embedded: ^1.4.0` to your `pubspec.yaml`.
+    2. Register the driver via `FlutterUiMcpEmbedded.register()` during app startup.
+    3. If the companion driver is omitted, `LlmProvider.embedded` is safely suppressed from UI dropdowns and stored preferences fall back to `LlmProvider.none`.
+  * **Contract Extracted**: Core now provides abstract interfaces `EmbeddedLlmDriver` and global registry `EmbeddedLlmRegistry`.
+* **Standalone Prompt Composer (`McpChatInputBar`)**:
+  * Added `McpChatInputBar` widget for host applications needing only the prompt textfield, attachment chips, clipboard paste, and send triggers.
+* **Configurable System Prompt Templates (`SystemPromptTemplate`)**:
+  * Added `SystemPromptTemplate` model and `kDefaultSystemPromptTemplates`.
+  * Added `systemPromptTemplates` and `showSystemPromptTemplates` options to `SettingsPanel`, `SettingsDrawer`, `showMcpSettingsDialog()`, and `PlaygroundController` to allow providing custom persona templates or hiding the quick persona chips altogether.
+* **Cancel / Stop Generation Support**:
+  * Added `stopGeneration()` alias and interactive stop button in `McpChatInputBar`.
+  * Added `onCancel` callback support falling back directly to `PlaygroundController.cancelGeneration()`.
+* **Mobile Fullscreen Inspector & Dialog Polish**:
+  * Updated `showMcpInspectorDialog()` to open in full screen on mobile screens (`< 900` px) using `Dialog.fullscreen` with zero double/duplicate title headers.
+* **Local Model Directory Discovery**:
+  * `EmbeddedModelManager` now automatically discovers `.gguf` weights in `~/.models` as well as application documents.
+* **Runtime Local Tool Registration**:
+  * Added `controller.addLocalTools(tools)` for batch registration of native Dart tools.
+
 ## 1.3.0
 
 * **Episodic Memory Archive & Retrieval UI**:

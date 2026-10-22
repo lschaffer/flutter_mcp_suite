@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:llamadart/llamadart.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
 
-/// Adapter that wraps the llamadart library and exposes an interface compatible
-/// with [LLMService]. This is the ONLY place where llamadart is used.
-class EmbeddedLlmAdapter {
+/// Implementation of [EmbeddedLlmDriver] that wraps the `llamadart` library
+/// (`llama.cpp` on native, WebGPU/WASM on web).
+class EmbeddedLlmAdapter implements EmbeddedLlmDriver {
   EmbeddedLlmAdapter._();
   static final EmbeddedLlmAdapter instance = EmbeddedLlmAdapter._();
 
@@ -19,14 +20,17 @@ class EmbeddedLlmAdapter {
   String? _loadedModelPath;
   Future<void>? _loadingFuture;
 
+  @override
   bool get isLoaded => _engine?.isReady == true;
 
+  @override
   String? get loadedModelPath => _loadedModelPath;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   static const int _mobileMaxContextSize = 4096;
 
+  @override
   Future<void> initialize(
     String modelPath, {
     int gpuLayers = 0,
@@ -83,41 +87,63 @@ class EmbeddedLlmAdapter {
     if (contextSize > 2048) sizesToTry.add(contextSize ~/ 2);
     if (contextSize > 1024) sizesToTry.add(1024);
 
+    final gpuLayerAttempts = <int>[gpuLayers];
+    if (gpuLayers > 0) {
+      gpuLayerAttempts.add(0);
+    }
+
     Object? lastError;
-    for (final size in sizesToTry) {
-      _engine ??= LlamaEngine(_backend);
-      try {
-        final params = ModelParams(contextSize: size, gpuLayers: gpuLayers);
-        if (_backend.supportsUrlLoading &&
-            (modelPath.startsWith('http://') || modelPath.startsWith('https://'))) {
-          await _engine!.setModel(
-            LlamaModel(ModelSource.parse(modelPath)),
-            params: params,
-            onProgress: onProgress != null
-                ? (progress) {
-                    final fraction = progress.fraction;
-                    if (fraction != null) onProgress(fraction);
-                  }
-                : null,
+    for (final currentGpuLayers in gpuLayerAttempts) {
+      for (final size in sizesToTry) {
+        _engine ??= LlamaEngine(_backend);
+        try {
+          final params = ModelParams(
+            contextSize: size,
+            gpuLayers: currentGpuLayers,
+            device: currentGpuLayers == 0 ? ComputeDevice.cpu : ComputeDevice.auto,
+            splitMode: ModelSplitMode.none,
           );
-        } else {
-          await _engine!.setModel(
-            LlamaModel(ModelSource.path(modelPath)),
-            params: params,
-          );
+          if (_backend.supportsUrlLoading &&
+              (modelPath.startsWith('http://') || modelPath.startsWith('https://'))) {
+            await _engine!.setModel(
+              LlamaModel(ModelSource.parse(modelPath)),
+              params: params,
+              onProgress: onProgress != null
+                  ? (progress) {
+                      final fraction = progress.fraction;
+                      if (fraction != null) onProgress(fraction);
+                    }
+                  : null,
+            );
+          } else {
+            await _engine!.setModel(
+              LlamaModel(ModelSource.path(modelPath)),
+              params: params,
+            );
+          }
+          _loadedModelPath = modelPath;
+          onProgress?.call(1.0);
+          return; // Success
+        } catch (e) {
+          lastError = e;
+          // Clean up the failed attempt before retrying.
+          if (_engine != null && _engine!.isReady) {
+            await _engine!.unloadModel();
+          }
+          _engine = null;
+
+          // If this was a GPU failure on a GPU attempt, break to try CPU (currentGpuLayers = 0)
+          if (currentGpuLayers > 0) {
+            debugPrint('[EmbeddedLlmAdapter] GPU allocation failed ($e). Retrying on CPU...');
+            break;
+          }
+
+          // If on CPU and context creation failed, continue down sizesToTry
+          if (e.toString().contains('create context')) {
+            continue;
+          }
+          rethrow;
         }
-        _loadedModelPath = modelPath;
-        onProgress?.call(1.0);
-        return; // Success
-      } on LlamaModelException catch (e) {
-        lastError = e;
-        // Only retry if this is a context-related failure.
-        if (!e.toString().contains('create context')) rethrow;
-        // Clean up the failed attempt before retrying.
-        if (_engine != null && _engine!.isReady) {
-          await _engine!.unloadModel();
-        }
-        _engine = null;
       }
     }
 
@@ -132,6 +158,7 @@ class EmbeddedLlmAdapter {
     _loadedModelPath = null;
   }
 
+  @override
   Future<void> dispose() async {
     await _unloadCurrentModel();
     _engine = null;
@@ -139,6 +166,7 @@ class EmbeddedLlmAdapter {
 
   // ── GPU capabilities ───────────────────────────────────────────────────────
 
+  @override
   Future<bool> isGpuSupported() async {
     try {
       return await _backend.isGpuSupported();
@@ -147,6 +175,7 @@ class EmbeddedLlmAdapter {
     }
   }
 
+  @override
   Future<({int total, int free})> getVramInfo() async {
     try {
       return await _backend.getVramInfo();
@@ -157,16 +186,23 @@ class EmbeddedLlmAdapter {
 
   // ── Inference ────────────────────────────────────────────────────────────────
 
+  @override
   Future<LLMResponse> generateResponse({
     required List<ChatMessage> messages,
     List<MCPTool>? availableTools,
-    double temperature = 0.3,
-    int maxTokens = 1024,
-    int topK = 40,
-    double topP = 0.9,
-    double penalty = 1.15,
+    double? temperature,
+    int? maxTokens,
+    int? topK,
+    double? topP,
+    double? penalty,
     void Function(String chunk)? onStreamChunk,
   }) async {
+    final effectiveTemp = temperature ?? 0.3;
+    final effectiveMaxTokens = maxTokens ?? 1024;
+    final effectiveTopK = topK ?? 40;
+    final effectiveTopP = topP ?? 0.9;
+    final effectivePenalty = penalty ?? 1.15;
+
     final engine = _engine;
     if (engine == null || !engine.isReady) {
       throw StateError('Embedded model not loaded. Call initialize() first.');
@@ -219,11 +255,11 @@ class EmbeddedLlmAdapter {
         ? _convertTools(availableTools)
         : null;
     final params = GenerationParams(
-      maxTokens: maxTokens,
-      temp: temperature,
-      topK: topK,
-      topP: topP,
-      penalty: penalty,
+      maxTokens: effectiveMaxTokens,
+      temp: effectiveTemp,
+      topK: effectiveTopK,
+      topP: effectiveTopP,
+      penalty: effectivePenalty,
     );
 
     String fullText = '';

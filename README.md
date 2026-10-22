@@ -12,8 +12,9 @@ Welcome to the **Flutter MCP Suite** monorepo! This project is modularized into 
 | Package | Description | Directory |
 |---|---|---|
 | **[`dart_mcp_core`](dart_mcp_core)** | Pure Dart core engine. Handles agent orchestration, LLM service adapters, MCP client transport (HTTP/SSE/stdio subprocesses), and loop execution — **no Flutter dependencies**. | [`/dart_mcp_core`](dart_mcp_core) |
-| **[`flutter_ui_mcp_core`](flutter_ui_mcp_core)** | Shared Flutter UI library containing reusable controllers, LLM forms, MCP server manager tabs, settings drawers, embedded model discoverers, and the side-by-side **Agent Inspector** panel. | [`/flutter_ui_mcp_core`](flutter_ui_mcp_core) |
-| **[`flutter_ui_mcp`](flutter_ui_mcp)** | Classic AI Agent widget for Flutter. Drop-in interactive chat widget with markdown rendering, tool call execution, attachment support, and live inspector debugging. | [`/flutter_ui_mcp`](flutter_ui_mcp) |
+| **[`flutter_ui_mcp_core`](flutter_ui_mcp_core)** | Shared Flutter UI library containing reusable controllers, modular `McpChatInputBar`, LLM forms, MCP server manager tabs, settings dialog helpers, and the side-by-side **Agent Inspector** panel — **no native C++ dependencies**. | [`/flutter_ui_mcp_core`](flutter_ui_mcp_core) |
+| **[`flutter_ui_mcp`](flutter_ui_mcp)** | Classic AI Agent widget (`McpPlayground`) & headless `McpChatView` for Flutter. Supports custom `topBarBuilder` and `settingsDialogBuilder` for integration in existing multi-window or grid-based desktop and mobile apps — **lean & lightweight**. | [`/flutter_ui_mcp`](flutter_ui_mcp) |
+| **[`flutter_ui_mcp_embedded`](flutter_ui_mcp_embedded)** | Opt-in companion package providing on-device GGUF model execution via `llamadart` (`llama.cpp` and WebGPU). Keeps the base UI packages completely free of native C++ bloat. | [`/flutter_ui_mcp_embedded`](flutter_ui_mcp_embedded) |
 | **[`flutter_genui_mcp`](flutter_genui_mcp)** | Standalone dynamic GenUI (`A2UI`) widget. Enables LLMs to emit structured UI components and render rich, interactive Flutter widgets directly in the conversation flow. | [`/flutter_genui_mcp`](flutter_genui_mcp) |
 
 ---

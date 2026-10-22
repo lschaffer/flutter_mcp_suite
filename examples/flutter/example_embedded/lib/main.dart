@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_ui_mcp/flutter_ui_mcp.dart';
+import 'package:flutter_ui_mcp_embedded/flutter_ui_mcp_embedded.dart';
 import 'package:mcp_playground_shared_tools/shared_tools.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterUiMcpEmbedded.register();
   runApp(const McpPlaygroundExampleEmbeddedApp());
 }
 
@@ -36,93 +38,220 @@ class McpPlaygroundExampleEmbeddedApp extends StatelessWidget {
   }
 }
 
-class McpPlaygroundScreen extends StatelessWidget {
+class McpPlaygroundScreen extends StatefulWidget {
   const McpPlaygroundScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<McpLocalTool> demoLocalTools = [
-      // --- Weather tools (free Open-Meteo API, no key required) ---
-      GetCurrentWeatherTool(),
-      GetHourlyForecastTool(),
-      GetDailyForecastTool(),
-      GeocodeWeatherCityTool(),
+  State<McpPlaygroundScreen> createState() => _McpPlaygroundScreenState();
+}
 
-      // --- Chart tools ---
-      CreateChartPngTool(),
-      Chart2PngTool(),
-    ];
+class _McpPlaygroundScreenState extends State<McpPlaygroundScreen> {
+  late final PlaygroundController _controller;
+  bool _headlessChatMode = false;
 
-    // Configure the playground widget with an initial embedded model
-    const initialLlm = LlmConfig(
-      provider: LlmProvider.embedded,
-      model: 'ministral3-3b-instruct q4',
-      apiKey: '',
-      useStreaming: true,
+  final List<McpLocalTool> _demoLocalTools = [
+    // --- Weather tools (free Open-Meteo API, no key required) ---
+    GetCurrentWeatherTool(),
+    GetHourlyForecastTool(),
+    GetDailyForecastTool(),
+    GeocodeWeatherCityTool(),
+
+    // --- Chart tools ---
+    CreateChartPngTool(),
+    Chart2PngTool(),
+  ];
+
+  static const LlmConfig _initialLlm = LlmConfig(
+    provider: LlmProvider.embedded,
+    model: 'ministral3-3b-instruct q4',
+    apiKey: '',
+    useStreaming: true,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PlaygroundController(
+      initialLlmConfig: _initialLlm,
+      customLocalTools: _demoLocalTools,
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget? _buildCustomMessageContent(BuildContext context, ChatMessage? message) {
+    if (message == null) return null;
+    if (message.type != MessageType.toolResponse) return null;
+    if (message.toolName != 'create_chart_png') return null;
+    final contentText = message.content.trim();
+    if (!((contentText.startsWith('{') && contentText.endsWith('}')) ||
+        (contentText.startsWith('[') && contentText.endsWith(']')))) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(contentText);
+      if (decoded is! Map<String, dynamic>) return null;
+
+      final chartType =
+          ((decoded['chart_type'] ?? decoded['chartType']) as String? ?? 'line')
+              .trim()
+              .toLowerCase();
+      final labels =
+          ((decoded['labels'] ?? decoded['xAxis']) as List?)?.cast<String>() ??
+              [];
+      final dataList = ((decoded['data'] ?? decoded['yAxis']) as List?)
+              ?.map((d) => (d as num).toDouble())
+              .toList() ??
+          [];
+
+      if (labels.isEmpty || dataList.isEmpty) return null;
+
+      final theme = Theme.of(context);
+      final title =
+          (decoded['title'] ?? decoded['chartTitle'] ?? 'Chart').toString();
+
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 220,
+              child: _renderFlChart(chartType, labels, dataList, theme),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_headlessChatMode) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Row(
+            children: [
+              Icon(Icons.chat_bubble_outline, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Headless Chat View',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.dashboard_customize, size: 18),
+              label: const Text('Full Playground'),
+              onPressed: () => setState(() => _headlessChatMode = false),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'Settings',
+              onPressed: () => _controller.openSettings(context),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: McpChatView(
+          controller: _controller,
+          messageContentBuilder: _buildCustomMessageContent,
+        ),
+      );
+    }
 
     return Scaffold(
       body: McpPlayground(
-        initialLlmConfig: initialLlm,
-        customLocalTools: demoLocalTools,
-        messageContentBuilder: (context, message) {
-          if (message == null) return null;
-          if (message.type != MessageType.toolResponse) return null;
-          if (message.toolName != 'create_chart_png') return null;
-          final contentText = message.content.trim();
-          if (!((contentText.startsWith('{') && contentText.endsWith('}')) ||
-              (contentText.startsWith('[') && contentText.endsWith(']')))) {
-            return null;
-          }
-
-          try {
-            final decoded = jsonDecode(contentText);
-            if (decoded is! Map<String, dynamic>) return null;
-
-            final chartType = ((decoded['chart_type'] ?? decoded['chartType']) as String? ?? 'line').trim().toLowerCase();
-            final labels = ((decoded['labels'] ?? decoded['xAxis']) as List?)?.cast<String>() ?? [];
-            final dataList = ((decoded['data'] ?? decoded['yAxis']) as List?)?.map((d) => (d as num).toDouble()).toList() ?? [];
-
-            if (labels.isEmpty || dataList.isEmpty) return null;
-
-            final theme = Theme.of(context);
-            final title = (decoded['title'] ?? decoded['chartTitle'] ?? 'Chart').toString();
-
-            return Container(
-              margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+        controller: _controller,
+        initialLlmConfig: _initialLlm,
+        customLocalTools: _demoLocalTools,
+        messageContentBuilder: _buildCustomMessageContent,
+        topBarBuilder: (context, controller, actions) {
+          final theme = Theme.of(context);
+          return AppBar(
+            title: Row(
+              children: [
+                const Icon(Icons.memory, size: 22),
+                const SizedBox(width: 8),
+                const Text(
+                  'Embedded AI Agent',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Offline GGUF',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 220,
-                    child: _renderFlChart(chartType, labels, dataList, theme),
-                  ),
-                ],
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.splitscreen),
+                tooltip: 'Switch to Headless Chat View',
+                onPressed: () => setState(() => _headlessChatMode = true),
               ),
-            );
-          } catch (_) {
-            return null;
-          }
+              // Show inspector dialog button only on mobile/compact screens (< 900)
+              // On desktop (>= 900), the inspector is already docked side-by-side
+              if (MediaQuery.sizeOf(context).width < 900)
+                IconButton(
+                  icon: const Icon(Icons.troubleshoot),
+                  tooltip: 'Agent Inspector',
+                  onPressed: actions.openInspector,
+                ),
+              IconButton(
+                icon: const Icon(Icons.tune),
+                tooltip: 'Agent & Model Settings',
+                onPressed: () => actions.openSettings(initialTab: 1),
+              ),
+              if (actions.newChat != null)
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'New Chat',
+                  onPressed: actions.newChat,
+                ),
+            ],
+          );
         },
       ),
     );

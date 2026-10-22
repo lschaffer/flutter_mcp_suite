@@ -1,3 +1,9 @@
+## 1.4.0
+
+- **Suite-Wide Architecture Synchronization**:
+  - Aligned package versioning with companion engine extraction (`flutter_ui_mcp_embedded`).
+  - Strengthened pluggable `LLMService.embeddedHandler` and `LLMService.embeddedStreamHandler` interface stability.
+
 ## 1.3.0
 
 - **Typed Multimodal Parts (`ChatContentPart`)**:

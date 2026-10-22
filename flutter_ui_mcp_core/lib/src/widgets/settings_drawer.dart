@@ -8,26 +8,45 @@ import 'edit_mcp_dialog.dart';
 import 'llm_config_form.dart';
 import 'mcp_server_registry_tab.dart';
 import '../mcp_localizations.dart';
+import '../services/embedded_llm/embedded_llm_driver.dart';
+import '../models/system_prompt_template.dart';
 
 class SettingsDrawer extends StatelessWidget {
   final PlaygroundController controller;
+  final List<SystemPromptTemplate>? systemPromptTemplates;
+  final bool? showSystemPromptTemplates;
 
-  const SettingsDrawer({super.key, required this.controller});
+  const SettingsDrawer({
+    super.key,
+    required this.controller,
+    this.systemPromptTemplates,
+    this.showSystemPromptTemplates,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(child: SettingsPanel(controller: controller));
+    return Drawer(
+      child: SettingsPanel(
+        controller: controller,
+        systemPromptTemplates: systemPromptTemplates,
+        showSystemPromptTemplates: showSystemPromptTemplates,
+      ),
+    );
   }
 }
 
 class SettingsPanel extends StatefulWidget {
   final PlaygroundController controller;
   final int initialTabIndex;
+  final List<SystemPromptTemplate>? systemPromptTemplates;
+  final bool? showSystemPromptTemplates;
 
   const SettingsPanel({
     super.key,
     required this.controller,
     this.initialTabIndex = 0,
+    this.systemPromptTemplates,
+    this.showSystemPromptTemplates,
   });
 
   @override
@@ -90,7 +109,11 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   void _loadLlmValues() {
     final config = widget.controller.llmConfig;
-    _selectedProvider = config.provider;
+    var provider = config.provider;
+    if (provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+      provider = LlmProvider.none;
+    }
+    _selectedProvider = provider;
 
     // Avoid resetting text cursor while user is typing in settings panel
     if (_modelCtrl.text != config.model) {
@@ -667,8 +690,15 @@ class _SettingsPanelState extends State<SettingsPanel> {
   Widget _buildAgentAndToolsTab(ThemeData theme) {
     final localTools = widget.controller.localTools;
     final mcpTools = widget.controller.mcpManager.availableTools;
-    final enabledCount = widget.controller.enabledToolNames.length;
-    final totalTools = localTools.length + mcpTools.length;
+    final allAvailableNames = <String>{
+      ...localTools.map((t) => t.name),
+      ...mcpTools.map((t) => t.name),
+    };
+    final activeCount = widget.controller.enabledToolNames
+        .where((name) => allAvailableNames.contains(name))
+        .length;
+    final totalTools = allAvailableNames.length;
+    final hasConfiguredServers = widget.controller.servers.isNotEmpty;
 
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -843,54 +873,32 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     contentPadding: EdgeInsets.all(12),
                   ),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Quick Persona Templates:',
-                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    ActionChip(
-                      avatar: const Icon(Icons.code, size: 14),
-                      label: const Text('Coding Expert', style: TextStyle(fontSize: 11)),
-                      onPressed: () {
-                        const p =
-                            'You are an expert senior software engineer. Write clean, idiomatic, well-tested code. Use available tools to inspect files and execute commands precisely.';
-                        setState(() {
-                          _systemPromptCtrl.text = p;
-                          widget.controller.systemPrompt = p;
-                        });
-                      },
-                    ),
-                    ActionChip(
-                      avatar: const Icon(Icons.remove_red_eye_outlined, size: 14),
-                      label: const Text('Vision Analyst', style: TextStyle(fontSize: 11)),
-                      onPressed: () {
-                        const p =
-                            'You are a meticulous visual inspection assistant. Analyze screenshots, diagrams, and images thoroughly, highlighting details, bugs, and visual hierarchy.';
-                        setState(() {
-                          _systemPromptCtrl.text = p;
-                          widget.controller.systemPrompt = p;
-                        });
-                      },
-                    ),
-                    ActionChip(
-                      avatar: const Icon(Icons.storage_outlined, size: 14),
-                      label: const Text('Data & Tools Agent', style: TextStyle(fontSize: 11)),
-                      onPressed: () {
-                        const p =
-                            'You are an autonomous data agent equipped with database, API, and tool access. Inspect schemas, query databases, and summarize findings clearly.';
-                        setState(() {
-                          _systemPromptCtrl.text = p;
-                          widget.controller.systemPrompt = p;
-                        });
-                      },
-                    ),
-                  ],
-                ),
+                if ((widget.showSystemPromptTemplates ?? widget.controller.showSystemPromptTemplates) &&
+                    (widget.systemPromptTemplates ?? widget.controller.systemPromptTemplates ?? kDefaultSystemPromptTemplates).isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Quick Persona Templates:',
+                    style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final tpl in (widget.systemPromptTemplates ?? widget.controller.systemPromptTemplates ?? kDefaultSystemPromptTemplates))
+                        ActionChip(
+                          avatar: tpl.icon != null ? Icon(tpl.icon, size: 14) : null,
+                          label: Text(tpl.label, style: const TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setState(() {
+                              _systemPromptCtrl.text = tpl.prompt;
+                              widget.controller.systemPrompt = tpl.prompt;
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -909,7 +917,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     Icon(Icons.handyman_outlined, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
-                      'Tools ($enabledCount / $totalTools Active)',
+                      'Tools ($activeCount / $totalTools Active)',
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
@@ -956,7 +964,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     child: Center(
                       child: Text(
-                        'No tools registered yet. Connect remote MCP servers in the MCP Servers tab to equip the agent.',
+                        hasConfiguredServers
+                            ? 'No tools discovered yet. Make sure configured MCP servers are enabled and connected in the MCP Servers tab.'
+                            : 'No local or remote tools registered yet. Connect remote MCP servers in the MCP Servers tab to equip the agent.',
                         style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                         textAlign: TextAlign.center,
                       ),

@@ -2,6 +2,8 @@
 
 A Flutter application showcasing **Dynamic Skill Activation (`DynamicSkillDock`)**, runtime tool exposure, and agent-driven skill activation (`activate_skills` / `deactivate_skills`).
 
+![Dynamic Skills Dock Showcase](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/flutter_ui_dynamic_skills.gif)
+
 ---
 
 ## 🔌 Where Does the Data Come From?

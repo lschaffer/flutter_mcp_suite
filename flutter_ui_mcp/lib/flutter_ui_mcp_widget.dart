@@ -14,6 +14,40 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 String _mimeFromExtension(String name) => mimeFromExtension(name);
 
+/// Builder signature to customize or completely replace the top navigation bar.
+typedef McpTopBarBuilder = PreferredSizeWidget Function(
+  BuildContext context,
+  PlaygroundController controller,
+  McpTopBarActions defaultActions,
+);
+
+/// Container of default actions and action widgets provided to [McpTopBarBuilder].
+class McpTopBarActions {
+  final void Function({int initialTab}) openSettings;
+  final VoidCallback openInspector;
+  final VoidCallback? openToolsCatalog;
+  final VoidCallback? openSkillsManager;
+  final VoidCallback? newChat;
+  final VoidCallback? clearSession;
+  final VoidCallback? openWorkflowSave;
+  final VoidCallback? openWorkflowLoad;
+  final Widget defaultTitleWidget;
+  final List<Widget> defaultActionWidgets;
+
+  const McpTopBarActions({
+    required this.openSettings,
+    required this.openInspector,
+    this.openToolsCatalog,
+    this.openSkillsManager,
+    this.newChat,
+    this.clearSession,
+    this.openWorkflowSave,
+    this.openWorkflowLoad,
+    required this.defaultTitleWidget,
+    required this.defaultActionWidgets,
+  });
+}
+
 /// An interactive AI Agent Playground widget for Flutter.
 ///
 /// Connects to various LLM providers, registers Dart-native tools,
@@ -91,9 +125,22 @@ class McpPlayground extends StatefulWidget {
   /// instead of sending all MCP tool schemas in the initial prompt context.
   final bool progressiveMcpDiscovery;
 
+  /// Optional list of system prompt persona templates for quick selection in settings.
+  /// If null, defaults to [kDefaultSystemPromptTemplates].
+  final List<SystemPromptTemplate>? systemPromptTemplates;
+
+  /// Whether to display the Quick Persona Templates section in the Agent Settings tab. Defaults to true.
+  final bool showSystemPromptTemplates;
+
   /// Optional external [PlaygroundController] instance. If provided, the widget
   /// will use this controller instead of creating its own internal instance.
   final PlaygroundController? controller;
+
+  /// Optional builder to customize or completely replace the top navigation bar.
+  final McpTopBarBuilder? topBarBuilder;
+
+  /// Optional builder to customize or completely replace the settings dialog.
+  final McpSettingsDialogBuilder? settingsDialogBuilder;
 
   /// Creates a new [McpPlayground] widget instance.
   const McpPlayground({
@@ -122,6 +169,10 @@ class McpPlayground extends StatefulWidget {
     this.showToolsCatalog = true,
     this.showWorkflowActions = true,
     this.progressiveMcpDiscovery = false,
+    this.systemPromptTemplates,
+    this.showSystemPromptTemplates = true,
+    this.topBarBuilder,
+    this.settingsDialogBuilder,
   });
 
   @override
@@ -190,6 +241,13 @@ class _McpPlaygroundState extends State<McpPlayground> {
     }
     if (widget.controller != null) {
       _controller = widget.controller!;
+      if (widget.customLocalTools != null && widget.customLocalTools!.isNotEmpty) {
+        _controller.addLocalTools(widget.customLocalTools!);
+      }
+      if (widget.systemPromptTemplates != null) {
+        _controller.systemPromptTemplates = widget.systemPromptTemplates;
+      }
+      _controller.showSystemPromptTemplates = widget.showSystemPromptTemplates;
     } else {
       _controller = PlaygroundController(
         initialLlmConfig: widget.initialLlmConfig,
@@ -198,6 +256,8 @@ class _McpPlaygroundState extends State<McpPlayground> {
         storageDelegate: widget.storageDelegate,
         enableLogging: widget.enableLogging,
         progressiveMcpDiscovery: widget.progressiveMcpDiscovery,
+        systemPromptTemplates: widget.systemPromptTemplates,
+        showSystemPromptTemplates: widget.showSystemPromptTemplates,
       );
     }
     _controller.messageContentBuilder = widget.messageContentBuilder;
@@ -1077,35 +1137,24 @@ class _McpPlaygroundState extends State<McpPlayground> {
   }
 
   void _showSettingsDialog({int initialTab = 0}) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final screenWidth = MediaQuery.of(ctx).size.width;
-        final isMobile = (!kIsWeb &&
-                (defaultTargetPlatform == TargetPlatform.android ||
-                    defaultTargetPlatform == TargetPlatform.iOS)) ||
-            screenWidth < 700;
-        if (isMobile) {
-          return Dialog.fullscreen(
-            child: SettingsPanel(
-              controller: _controller,
-              initialTabIndex: initialTab,
-            ),
-          );
-        }
-        return Dialog(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: screenWidth * 0.85,
-              minWidth: 420,
-            ),
-            child: SettingsPanel(
-              controller: _controller,
-              initialTabIndex: initialTab,
-            ),
-          ),
-        );
-      },
+    if (widget.settingsDialogBuilder != null) {
+      showDialog(
+        context: context,
+        builder: (ctx) => widget.settingsDialogBuilder!(
+          ctx,
+          _controller,
+          initialTab,
+          () => Navigator.of(ctx).pop(),
+        ),
+      );
+      return;
+    }
+    showMcpSettingsDialog(
+      context,
+      _controller,
+      initialTab: initialTab,
+      systemPromptTemplates: widget.systemPromptTemplates,
+      showSystemPromptTemplates: widget.showSystemPromptTemplates,
     );
   }
 
@@ -1117,7 +1166,9 @@ class _McpPlaygroundState extends State<McpPlayground> {
     if (!mounted) return;
 
     final initialLlm = widget.initialLlmConfig;
-    if (initialLlm == null || initialLlm.provider != LlmProvider.embedded) {
+    if (initialLlm == null ||
+        initialLlm.provider != LlmProvider.embedded ||
+        !EmbeddedLlmRegistry.isAvailable) {
       return;
     }
 
@@ -1214,8 +1265,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
       return false;
     }
 
-    final adapter = EmbeddedLlmAdapter.instance;
-    if (adapter.isLoaded &&
+    if (!EmbeddedLlmRegistry.isAvailable) return false;
+    final adapter = EmbeddedLlmRegistry.driver;
+    if (adapter != null &&
+        adapter.isLoaded &&
         (adapter.loadedModelPath?.endsWith(filename) ?? false)) {
       return true;
     }
@@ -1969,12 +2022,36 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  _controller.chatMode
-                      ? 'Generating response...'
-                      : 'Agent is thinking and processing tool calls...',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
+                Expanded(
+                  child: Text(
+                    _controller.chatMode
+                        ? 'Generating response...'
+                        : 'Agent is thinking and processing tool calls...',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _controller.cancelGeneration(),
+                  icon: Icon(
+                    Icons.stop_circle_outlined,
+                    size: 16,
+                    color: theme.colorScheme.error,
+                  ),
+                  label: Text(
+                    'Stop',
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ],
@@ -2317,13 +2394,22 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   ],
                 ),
                 trailing: isGen
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ? IconButton(
+                        icon: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.errorContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.stop_rounded,
+                            size: 16,
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
                         ),
+                        tooltip: 'Stop generation',
+                        onPressed: () => _controller.cancelGeneration(),
                       )
                     : IconButton(
                         icon: Icon(
@@ -2473,49 +2559,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
   }
 
   void _showAgentInspectorDialog() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    if (isMobile) {
-      showDialog(
-        context: context,
-        builder: (ctx) => Dialog.fullscreen(
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Agent Inspector'),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-            ),
-            body: AgentInspector(controller: _controller),
-          ),
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.analytics_outlined, color: Color(0xFF7C3AED)),
-            const SizedBox(width: 8),
-            const Text('Agent Inspector'),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-        contentPadding: EdgeInsets.zero,
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.95,
-          height: MediaQuery.of(context).size.height * 0.85,
-          child: AgentInspector(controller: _controller),
-        ),
-      ),
-    );
+    showMcpInspectorDialog(context, _controller);
   }
 
 
@@ -2723,114 +2767,194 @@ class _McpPlaygroundState extends State<McpPlayground> {
         autofocus: false,
         child: Scaffold(
           key: _scaffoldKey,
-      appBar: widget.showAppBar
-          ? AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.menu),
-                tooltip: l10n.get('menu'),
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              ),
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      loadedSetupName ?? l10n.get('playground'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (widget.showStatusBadges && isWide) ...[
-                    const SizedBox(width: 12),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => _showSettingsDialog(initialTab: 1),
-                      child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.bolt,
-                              size: 14,
-                              color: _controller.activeLlmConfig.isConfigured
-                                  ? theme.colorScheme.primary
-                                  : Colors.orange,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _controller.activeLlmConfig.isConfigured
-                                  ? (_controller.activeLlmConfig.model.isNotEmpty
-                                      ? _controller.activeLlmConfig.model
-                                      : _controller
-                                          .activeLlmConfig.provider.displayName)
-                                  : 'No Model',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+      appBar: widget.topBarBuilder != null
+          ? widget.topBarBuilder!(
+              context,
+              _controller,
+              McpTopBarActions(
+                openSettings: ({initialTab = 0}) =>
+                    _showSettingsDialog(initialTab: initialTab),
+                openInspector: _showAgentInspectorDialog,
+                openToolsCatalog: widget.showToolsCatalog
+                    ? () => RegisteredToolsDialog.show(context, _controller)
+                    : null,
+                openSkillsManager:
+                    widget.showSkillsControls ? _showSkillsManagerDialog : null,
+                newChat: widget.showNewChatAction ? _resetPlayground : null,
+                clearSession: _clearSetupInputs,
+                openWorkflowSave:
+                    widget.showWorkflowActions ? _showSaveWorkflowDialog : null,
+                openWorkflowLoad:
+                    widget.showWorkflowActions ? _showLoadWorkflowDialog : null,
+                defaultTitleWidget: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        loadedSetupName ?? l10n.get('playground'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => _showSettingsDialog(initialTab: 0),
-                      child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _controller.chatMode
-                              ? theme.colorScheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.6)
-                              : theme.colorScheme.primaryContainer
-                                  .withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                    if (widget.showStatusBadges && isWide) ...[
+                      const SizedBox(width: 12),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => _showSettingsDialog(initialTab: 1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: theme.colorScheme.outline
+                                  .withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.bolt,
+                                size: 14,
+                                color: _controller.activeLlmConfig.isConfigured
+                                    ? theme.colorScheme.primary
+                                    : Colors.orange,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _controller.activeLlmConfig.isConfigured
+                                    ? (_controller.activeLlmConfig.model.isNotEmpty
+                                        ? _controller.activeLlmConfig.model
+                                        : _controller.activeLlmConfig.provider
+                                            .displayName)
+                                    : 'No Model',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _controller.chatMode
-                                  ? Icons.chat_bubble_outline
-                                  : Icons.build_circle_outlined,
-                              size: 14,
-                              color: _controller.chatMode
-                                  ? theme.colorScheme.onSurfaceVariant
-                                  : theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _controller.chatMode
-                                  ? 'Direct Chat'
-                                  : '${_controller.enabledToolNames.length} Tools',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
+                defaultActionWidgets: _buildAppBarActions(context),
               ),
-              actions: _buildAppBarActions(context),
             )
-          : null,
+          : (widget.showAppBar
+              ? AppBar(
+                  leading: IconButton(
+                    icon: const Icon(Icons.menu),
+                    tooltip: l10n.get('menu'),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  ),
+                  title: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          loadedSetupName ?? l10n.get('playground'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (widget.showStatusBadges && isWide) ...[
+                        const SizedBox(width: 12),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => _showSettingsDialog(initialTab: 1),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.outline
+                                    .withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.bolt,
+                                  size: 14,
+                                  color: _controller.activeLlmConfig.isConfigured
+                                      ? theme.colorScheme.primary
+                                      : Colors.orange,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _controller.activeLlmConfig.isConfigured
+                                      ? (_controller.activeLlmConfig.model.isNotEmpty
+                                          ? _controller.activeLlmConfig.model
+                                          : _controller.activeLlmConfig.provider
+                                              .displayName)
+                                      : 'No Model',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => _showSettingsDialog(initialTab: 0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _controller.chatMode
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.6)
+                                  : theme.colorScheme.primaryContainer
+                                      .withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.outline
+                                    .withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _controller.chatMode
+                                      ? Icons.chat_bubble_outline
+                                      : Icons.build_circle_outlined,
+                                  size: 14,
+                                  color: _controller.chatMode
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : theme.colorScheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _controller.chatMode
+                                      ? 'Direct Chat'
+                                      : '${_controller.enabledToolNames.length} Tools',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  actions: _buildAppBarActions(context),
+                )
+              : null),
       drawer: widget.showAppBar
           ? Drawer(
               child: ListView(
@@ -3058,7 +3182,12 @@ class _ModelDownloadProgressDialogState
         final gpuLayers = await EmbeddedModelManager.instance.getGpuLayers(
           widget.model.filename,
         );
-        await EmbeddedLlmAdapter.instance.initialize(
+        if (!EmbeddedLlmRegistry.isAvailable) {
+          throw StateError(
+            'Embedded LLM driver not registered. Add `flutter_ui_mcp_embedded` and call `FlutterUiMcpEmbedded.register()`.',
+          );
+        }
+        await EmbeddedLlmRegistry.driver!.initialize(
           widget.model.url,
           gpuLayers: gpuLayers,
           contextSize: widget.model.contextSize,
@@ -3167,7 +3296,12 @@ class _ModelLoadProgressDialogState extends State<_ModelLoadProgressDialog> {
               );
       }
 
-      await EmbeddedLlmAdapter.instance.initialize(
+      if (!EmbeddedLlmRegistry.isAvailable) {
+        throw StateError(
+          'Embedded LLM driver not registered. Add `flutter_ui_mcp_embedded` and call `FlutterUiMcpEmbedded.register()`.',
+        );
+      }
+      await EmbeddedLlmRegistry.driver!.initialize(
         fullPath,
         gpuLayers: gpuLayers,
         contextSize: widget.model.contextSize,

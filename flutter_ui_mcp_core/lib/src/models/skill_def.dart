@@ -1,3 +1,5 @@
+import 'package:dart_mcp_core/dart_mcp_core.dart';
+
 /// Persistent AgentSkills.io skill definition stored in JSON/SharedPreferences.
 class SkillDef {
   final String id;
@@ -109,6 +111,39 @@ class SkillDef {
       skillDef: skillDef ?? this.skillDef,
       toolNames: toolNames ?? this.toolNames,
       createdAt: createdAt,
+      updatedAt: DateTime.now(),
+    );
+  }
+}
+
+/// Extension to convert an in-memory [SkillDefinition] into an AgentSkills.io [SkillDef].
+extension SkillDefinitionToSkillDef on SkillDefinition {
+  /// Converts this [SkillDefinition] into an AgentSkills.io compliant [SkillDef].
+  SkillDef toSkillDef() {
+    final body = (systemPrompt != null && systemPrompt!.trim().isNotEmpty)
+        ? systemPrompt!
+        : description;
+    final toolsYaml = tools.isNotEmpty
+        ? '\ntools:\n${tools.map((t) => '  - ${t.name}').join('\n')}'
+        : '';
+    final fullMarkdown = '''---
+name: $name
+description: $description$toolsYaml
+---
+
+# $name
+
+$body
+''';
+
+    return SkillDef(
+      id: 'dynamic_$name',
+      name: name,
+      goal: description,
+      description: description,
+      skillDef: fullMarkdown,
+      toolNames: tools.map((t) => t.name).toList(),
+      createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
   }

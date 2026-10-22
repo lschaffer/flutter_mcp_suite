@@ -1,6 +1,14 @@
 import 'dart:convert';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 
+int _parseInt(dynamic value, int fallback) {
+  if (value == null) return fallback;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? fallback;
+  return fallback;
+}
+
 /// Suite of specialized enterprise tools that would typically bloat LLM context
 /// if injected upfront, but are effortlessly discovered on-demand via [McpListToolsTool]
 /// and executed via [McpCallToolTool].
@@ -97,7 +105,7 @@ class QueryDatabaseTableTool extends McpLocalTool {
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final table = arguments['table_name'] as String? ?? 'users';
-    final limit = arguments['limit'] as int? ?? 5;
+    final limit = _parseInt(arguments['limit'], 5);
 
     final rows = List.generate(limit, (i) {
       return {
@@ -254,9 +262,9 @@ class CalculateComputeCostTool extends McpLocalTool {
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final count = arguments['instance_count'] as int? ?? 1;
-    final vcpus = arguments['vcpus_per_instance'] as int? ?? 4;
-    final ram = arguments['ram_gb_per_instance'] as int? ?? 16;
+    final count = _parseInt(arguments['instance_count'], 1);
+    final vcpus = _parseInt(arguments['vcpus_per_instance'], 4);
+    final ram = _parseInt(arguments['ram_gb_per_instance'], 16);
     final provider = (arguments['cloud_provider'] as String? ?? 'aws').toUpperCase();
 
     // Baseline calculation
@@ -361,7 +369,7 @@ class RotateApiCredentialTool extends McpLocalTool {
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final credId = arguments['credential_id'] as String? ?? 'key-default';
-    final grace = arguments['grace_period_hours'] as int? ?? 24;
+    final grace = _parseInt(arguments['grace_period_hours'], 24);
 
     final result = {
       'rotated': true,

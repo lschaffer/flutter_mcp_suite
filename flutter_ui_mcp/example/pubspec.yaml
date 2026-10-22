@@ -20,7 +20,7 @@ dependencies:
   dartssh2: ^4.1.0
   mime: ^2.0.0
   fl_chart: ^1.2.0
-  material_ui: ^1.6.0
+  material_ui: ^1.8.0
 dependency_overrides:
   dart_mcp_core:
     path: ../../dart_mcp_core

@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/embedded_llm/embedded_model.dart';
 import '../../services/embedded_llm/embedded_model_manager.dart';
-import '../../services/embedded_llm/embedded_llm_adapter.dart';
+import '../../services/embedded_llm/embedded_llm_driver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../mcp_localizations.dart';
 import 'add_gguf_dialog.dart';
@@ -84,14 +84,16 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
 
       bool gpuSupported = false;
       int vramFree = 0;
-      final adapter = EmbeddedLlmAdapter.instance;
-      try {
-        gpuSupported = await adapter.isGpuSupported();
-        if (gpuSupported) {
-          final vram = await adapter.getVramInfo();
-          vramFree = vram.free;
-        }
-      } catch (_) {}
+      if (EmbeddedLlmRegistry.isAvailable) {
+        final adapter = EmbeddedLlmRegistry.driver!;
+        try {
+          gpuSupported = await adapter.isGpuSupported();
+          if (gpuSupported) {
+            final vram = await adapter.getVramInfo();
+            vramFree = vram.free;
+          }
+        } catch (_) {}
+      }
 
       if (mounted) {
         setState(() {
@@ -157,8 +159,13 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
         _downloadProgress[model.filename] = 0.0;
       });
       try {
+        if (!EmbeddedLlmRegistry.isAvailable) {
+          throw StateError(
+            'Embedded LLM driver not registered. Add `flutter_ui_mcp_embedded` and call `FlutterUiMcpEmbedded.register()`.',
+          );
+        }
         final gpuLayers = _gpuLayersMap[model.filename] ?? 0;
-        await EmbeddedLlmAdapter.instance.initialize(
+        await EmbeddedLlmRegistry.driver!.initialize(
           model.url,
           gpuLayers: gpuLayers,
           contextSize: model.contextSize,
@@ -468,7 +475,12 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
               );
       }
 
-      await EmbeddedLlmAdapter.instance.initialize(
+      if (!EmbeddedLlmRegistry.isAvailable) {
+        throw StateError(
+          'Embedded LLM driver not registered. Add `flutter_ui_mcp_embedded` and call `FlutterUiMcpEmbedded.register()`.',
+        );
+      }
+      await EmbeddedLlmRegistry.driver!.initialize(
         fullPath,
         gpuLayers: gpuLayers,
         contextSize: model.contextSize,
@@ -514,15 +526,19 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
   }
 
   Future<void> _unloadModelFromApp() async {
-    await EmbeddedLlmAdapter.instance.dispose();
-    if (mounted) setState(() {});
+    if (EmbeddedLlmRegistry.isAvailable) {
+      await EmbeddedLlmRegistry.driver?.dispose();
+      if (mounted) setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = McpPlaygroundLocalizations.of(context);
-    final appLoadedPath = EmbeddedLlmAdapter.instance.loadedModelPath;
+    final appLoadedPath = EmbeddedLlmRegistry.isAvailable
+        ? EmbeddedLlmRegistry.driver?.loadedModelPath
+        : null;
 
     if (_loading) {
       return const Padding(
@@ -554,6 +570,32 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
           ],
         ),
         const SizedBox(height: 8),
+        if (!EmbeddedLlmRegistry.isAvailable)
+          Card(
+            color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.4),
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: theme.colorScheme.onTertiaryContainer,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Embedded LLM driver not registered. To run local GGUF models offline, add `flutter_ui_mcp_embedded` to your pubspec.yaml and call `FlutterUiMcpEmbedded.register()`.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onTertiaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         // Hardware performance tip banner informing user about llama.cpp engine
         _buildHardwarePerformanceTip(context),
         const SizedBox(height: 12),
@@ -599,7 +641,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
             final isDownloaded =
                 _downloadedFilenames.contains(model.filename) ||
                 (!kIsWeb && fileExists(model.url));
-            final isAppLoaded = EmbeddedLlmAdapter.instance.isLoaded &&
+            final isAppLoaded = (EmbeddedLlmRegistry.driver?.isLoaded ?? false) &&
                 (appLoadedPath?.endsWith(model.filename) ?? false);
             final isAppLoading = _appLoadingFilename == model.filename;
             final isCustom = _customModels.any((m) => m.id == model.id);

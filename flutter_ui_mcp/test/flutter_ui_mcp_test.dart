@@ -92,4 +92,45 @@ void main() {
 
     expect(find.byType(AppBar), findsNothing);
   });
+
+  testWidgets('McpPlayground renders custom widget via topBarBuilder',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      MaterialApp(
+        home: McpPlayground(
+          topBarBuilder: (context, controller, actions) {
+            return AppBar(
+              key: const Key('custom-topbar'),
+              title: const Text('Custom Tealkit Bar'),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    expect(find.byKey(const Key('custom-topbar')), findsOneWidget);
+    expect(find.text('Custom Tealkit Bar'), findsOneWidget);
+  });
+
+  testWidgets('McpChatView renders message stream and input bar in isolation',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = PlaygroundController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: McpChatView(controller: controller),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    expect(find.byType(McpChatView), findsOneWidget);
+    expect(find.byType(McpChatInputBar), findsOneWidget);
+    expect(find.text('Ready to assist'), findsOneWidget);
+  });
 }

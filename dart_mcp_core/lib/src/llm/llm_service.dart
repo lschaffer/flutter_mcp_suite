@@ -1630,21 +1630,36 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     http.BaseRequest requestToSend = request;
 
-    if (isMistral &&
-        request.method.toUpperCase() == 'POST' &&
+    if (request.method.toUpperCase() == 'POST' &&
         request.url.path.contains('chat/completions') &&
         request is http.Request) {
       try {
         final decoded = jsonDecode(request.body);
         if (decoded is Map<String, dynamic>) {
-          final patchedPayload = _sanitizeMistralChatRequest(decoded);
-          final cleanHeaders = Map<String, String>.from(request.headers);
-          cleanHeaders.removeWhere(
-            (key, _) => key.toLowerCase() == 'content-length',
-          );
-          requestToSend = http.Request(request.method, request.url)
-            ..headers.addAll(cleanHeaders)
-            ..body = jsonEncode(patchedPayload);
+          bool changed = false;
+          final messages = decoded['messages'];
+          if (messages is List) {
+            for (final m in messages) {
+              if (m is Map) {
+                if (m.containsKey('content') && m['content'] == null) {
+                  m['content'] = '';
+                  changed = true;
+                }
+              }
+            }
+          }
+          final patchedPayload = isMistral ? _sanitizeMistralChatRequest(decoded) : decoded;
+          if (isMistral) changed = true;
+
+          if (changed) {
+            final cleanHeaders = Map<String, String>.from(request.headers);
+            cleanHeaders.removeWhere(
+              (key, _) => key.toLowerCase() == 'content-length',
+            );
+            requestToSend = http.Request(request.method, request.url)
+              ..headers.addAll(cleanHeaders)
+              ..body = jsonEncode(patchedPayload);
+          }
         }
       } catch (_) {}
     }

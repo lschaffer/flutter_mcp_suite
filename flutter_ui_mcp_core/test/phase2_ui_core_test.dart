@@ -409,6 +409,119 @@ void main() {
       expect(find.textContaining('Free / Local Model'), findsOneWidget);
       expect(find.textContaining('131k'), findsOneWidget);
     });
+
+    testWidgets('LlmConfigForm excludes LlmProvider.embedded when driver is not registered', (tester) async {
+      // Ensure driver is unregistered
+      EmbeddedLlmRegistry.unregister();
+      expect(EmbeddedLlmRegistry.isAvailable, isFalse);
+
+      final modelCtrl = TextEditingController();
+      final apiKeyCtrl = TextEditingController();
+      final baseUrlCtrl = TextEditingController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: LlmConfigForm(
+                provider: LlmProvider.none,
+                onProviderChanged: (_) {},
+                modelCtrl: modelCtrl,
+                apiKeyCtrl: apiKeyCtrl,
+                baseUrlCtrl: baseUrlCtrl,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Open the Dropdown
+      await tester.tap(find.byType(DropdownButtonFormField<LlmProvider>));
+      await tester.pumpAndSettle();
+
+      // Verify Embedded provider is NOT shown in dropdown items
+      expect(find.text(LlmProvider.embedded.displayName), findsNothing);
+      expect(find.text(LlmProvider.gemini.displayName), findsWidgets);
+    });
+
+    test('PlaygroundController sanitizes embedded provider to none when driver is not registered', () {
+      EmbeddedLlmRegistry.unregister();
+      expect(EmbeddedLlmRegistry.isAvailable, isFalse);
+
+      final controller = PlaygroundController(
+        initialLlmConfig: const LlmConfig(
+          provider: LlmProvider.embedded,
+          model: 'qwen2.5.gguf',
+          apiKey: '',
+        ),
+      );
+
+      expect(controller.llmConfig.provider, equals(LlmProvider.none));
+    });
+  });
+
+  group('SystemPromptTemplate Tests', () {
+    test('default templates contain expected entries', () {
+      expect(kDefaultSystemPromptTemplates.length, equals(3));
+      expect(kDefaultSystemPromptTemplates.any((t) => t.label == 'Coding Expert'), isTrue);
+      expect(kDefaultSystemPromptTemplates.any((t) => t.label == 'Vision Analyst'), isTrue);
+      expect(kDefaultSystemPromptTemplates.any((t) => t.label == 'Data & Tools Agent'), isTrue);
+    });
+
+    testWidgets('SettingsPanel renders custom templates and updates systemPrompt on tap', (tester) async {
+      final controller = PlaygroundController();
+      const customTemplates = [
+        SystemPromptTemplate(
+          label: 'Customer Support',
+          prompt: 'You are a friendly customer support representative.',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SettingsPanel(
+              controller: controller,
+              initialTabIndex: 0,
+              systemPromptTemplates: customTemplates,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Quick Persona Templates:'), findsOneWidget);
+      expect(find.text('Customer Support'), findsOneWidget);
+      expect(find.text('Coding Expert'), findsNothing);
+
+      // Tap on the chip
+      await tester.tap(find.text('Customer Support'));
+      await tester.pumpAndSettle();
+
+      expect(controller.systemPrompt, 'You are a friendly customer support representative.');
+    });
+
+    testWidgets('SettingsPanel hides templates when showSystemPromptTemplates is false', (tester) async {
+      final controller = PlaygroundController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SettingsPanel(
+              controller: controller,
+              initialTabIndex: 0,
+              showSystemPromptTemplates: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Quick Persona Templates:'), findsNothing);
+      expect(find.text('Coding Expert'), findsNothing);
+    });
   });
 }
 

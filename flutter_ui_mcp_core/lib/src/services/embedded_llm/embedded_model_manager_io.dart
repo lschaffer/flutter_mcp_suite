@@ -29,6 +29,25 @@ class EmbeddedModelManager {
     return dir.path;
   }
 
+  Future<List<Directory>> _candidateDirectories() async {
+    final dirs = <Directory>[];
+    try {
+      dirs.add(await getModelsDirectory());
+    } catch (_) {}
+
+    try {
+      final home =
+          Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+      if (home != null && home.isNotEmpty) {
+        final homeModels = Directory('$home/.models');
+        if (homeModels.existsSync()) {
+          dirs.add(homeModels);
+        }
+      }
+    } catch (_) {}
+    return dirs;
+  }
+
   // ── File listing ─────────────────────────────────────────────────────────────
 
   Future<Set<String>> listDownloadedFilenames() async {
@@ -37,19 +56,32 @@ class EmbeddedModelManager {
       final list = prefs.getStringList('web_downloaded_models') ?? [];
       return list.toSet();
     }
-    final dir = await getModelsDirectory();
-    if (!await dir.exists()) return {};
-    final files = dir.listSync().whereType<File>();
-    return files
-        .map((f) => f.uri.pathSegments.last)
-        .where((name) {
-          final lower = name.toLowerCase();
-          return lower.endsWith('.gguf');
-        })
-        .toSet();
+    final dirs = await _candidateDirectories();
+    final result = <String>{};
+    for (final dir in dirs) {
+      if (dir.existsSync()) {
+        try {
+          final files = dir.listSync().whereType<File>();
+          for (final f in files) {
+            final name = f.uri.pathSegments.last;
+            if (name.toLowerCase().endsWith('.gguf')) {
+              result.add(name);
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    return result;
   }
 
   Future<String> fullPathForFilename(String filename) async {
+    final dirs = await _candidateDirectories();
+    for (final dir in dirs) {
+      final candidate = File('${dir.path}/$filename');
+      if (candidate.existsSync()) {
+        return candidate.path;
+      }
+    }
     final dir = await getModelsDirectory();
     return '${dir.path}/$filename';
   }

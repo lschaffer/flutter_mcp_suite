@@ -75,24 +75,40 @@ Workflow:
   }
 
   void _registerSkills() {
+    final sqlTool = ExplainSqlQueryTool();
+    final releaseTool = GenerateReleaseNotesTool();
+    final securityTool = AuditSecurityHeadersTool();
+
     _controller.registerDynamicSkill(
-      const SkillDefinition(
+      SkillDefinition(
         name: 'sql_optimizer',
-        description: 'Deep SQL query execution plan analysis, index recommendations, and query refactoring.',
+        description:
+            'Deep SQL query execution plan analysis, index recommendations, and query refactoring.',
+        systemPrompt:
+            'Inspect PostgreSQL query plans, check for sequential table scans, calculate node costs, and recommend specific B-Tree or Hash indexes.',
+        tools: [sqlTool],
       ),
     );
 
     _controller.registerDynamicSkill(
-      const SkillDefinition(
+      SkillDefinition(
         name: 'release_manager',
-        description: 'Semantic version tag validation, changelog compilation, and GitHub release drafting.',
+        description:
+            'Semantic version tag validation, changelog compilation, and GitHub release drafting.',
+        systemPrompt:
+            'Parse commit messages, categorize changes under Features and Bug Fixes according to Keep a Changelog, and validate SemVer compliance.',
+        tools: [releaseTool],
       ),
     );
 
     _controller.registerDynamicSkill(
-      const SkillDefinition(
+      SkillDefinition(
         name: 'security_auditor',
-        description: 'HTTP response headers security audit, CORS policies, CSP validation, and cookie security.',
+        description:
+            'HTTP response headers security audit, CORS policies, CSP validation, and cookie security.',
+        systemPrompt:
+            'Audit endpoint security headers, check for missing Content-Security-Policy and HSTS, and flag wildcard Access-Control-Allow-Origin leaks on authenticated routes.',
+        tools: [securityTool],
       ),
     );
   }

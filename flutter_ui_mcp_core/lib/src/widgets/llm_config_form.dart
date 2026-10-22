@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../services/foundry/foundry_process.dart';
 import '../services/model_pricing_service.dart';
+import '../services/embedded_llm/embedded_llm_driver.dart';
 import 'embedded_llm/embedded_model_picker_widget.dart';
 
 /// Reusable widget for base LLM configuration: Provider, Model (with autocomplete),
@@ -72,6 +73,14 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
   @override
   void initState() {
     super.initState();
+    if (widget.provider == LlmProvider.embedded &&
+        !EmbeddedLlmRegistry.isAvailable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onProviderChanged(LlmProvider.none);
+        }
+      });
+    }
     _applyDefaultBaseUrlIfNeeded();
     widget.modelCtrl.addListener(_onModelCtrlChanged);
     widget.baseUrlCtrl.addListener(_onBaseUrlChanged);
@@ -601,20 +610,31 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
 
   @override
   Widget build(BuildContext context) {
+    final availableProviders = LlmProvider.values.where((p) {
+      if (p == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    final effectiveProvider = availableProviders.contains(widget.provider)
+        ? widget.provider
+        : LlmProvider.none;
+
     return Column(
       spacing: 12,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DropdownButtonFormField<LlmProvider>(
-          key: ValueKey(widget.provider),
-          initialValue: widget.provider,
+          key: ValueKey(effectiveProvider),
+          initialValue: effectiveProvider,
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Provider',
             border: OutlineInputBorder(),
             isDense: true,
           ),
-          items: LlmProvider.values.map((provider) {
+          items: availableProviders.map((provider) {
             return DropdownMenuItem(
               value: provider,
               child: Text(
@@ -922,7 +942,8 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           ),
           const SizedBox(height: 12),
         ],
-        if (widget.provider == LlmProvider.embedded) ...[
+        if (effectiveProvider == LlmProvider.embedded &&
+            EmbeddedLlmRegistry.isAvailable) ...[
           EmbeddedModelPickerWidget(
             selectedFilename: widget.modelCtrl.text,
             onFilenameSelected: (val) {

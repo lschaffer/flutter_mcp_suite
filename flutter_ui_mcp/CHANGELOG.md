@@ -1,3 +1,40 @@
+## 1.4.0
+
+* **⚠️ BREAKING CHANGES & MIGRATION (Embedded LLM Decoupling)**:
+  * **Removed `llamadart` from `flutter_ui_mcp`**: The base UI package no longer bundles native C++, FFI, WebGPU, or WASM runtimes by default. Cloud/server LLM users (OpenAI, Anthropic, Gemini, Ollama, LM Studio) now enjoy a lightweight footprint with zero C++ compilation overhead.
+  * **Migration for On-Device GGUF users**:
+    1. Add the companion package to your `pubspec.yaml`:
+       ```yaml
+       dependencies:
+         flutter_ui_mcp: ^1.4.0
+         flutter_ui_mcp_embedded: ^1.4.0
+       ```
+    2. Register the driver in `main()` before `runApp()`:
+       ```dart
+       void main() {
+         WidgetsFlutterBinding.ensureInitialized();
+         FlutterUiMcpEmbedded.register();
+         runApp(const MyApp());
+       }
+       ```
+    3. **Provider Auto-Hiding**: If `FlutterUiMcpEmbedded.register()` is not invoked, `Embedded / Local GGUF` is automatically suppressed from the provider selection menu, preventing unsupported selections.
+* **Custom TopBar & AppBar Builder (`topBarBuilder`)**:
+  * Added `topBarBuilder` (`McpTopBarBuilder`) allowing complete replacement of the default `AppBar` with custom menus, navigation widgets, and branding while providing full access to `McpTopBarActions`.
+* **Custom Settings Dialog Builder (`settingsDialogBuilder`)**:
+  * Added `settingsDialogBuilder` to allow embedding host applications to customize or completely redesign the settings modal.
+* **Configurable System Prompt Templates (`systemPromptTemplates`, `showSystemPromptTemplates`)**:
+  * Added `systemPromptTemplates` and `showSystemPromptTemplates` parameters to `McpPlayground` and `showMcpSettingsDialog()`, allowing host applications to supply custom persona quick-fill templates or hide persona chips entirely.
+* **Standalone Headless Chat View (`McpChatView`)**:
+  * Added `McpChatView` for applications needing only chat message history and input composer without compulsory scaffolds, AppBars, drawers, or two-pane inspector views.
+* **Stop / Cancel Generation Triggers**:
+  * Interactive Stop button on the input bar replaces the static spinner when generating.
+  * Added inline `[Stop]` action in the status bar while the agent is thinking or processing tool calls.
+* **Responsive Agent Inspector & Fullscreen Dialog on Mobile**:
+  * On desktop screens (`>= 900` px), the inspector button in the top action bar is hidden when the inspector side-panel is already visible.
+  * In mobile view (`< 900` px), the inspector dialog opens cleanly in fullscreen mode without redundant duplicate headers.
+* **External Controller Local Tool Registration**:
+  * `McpPlayground` now automatically registers any `customLocalTools` and `systemPromptTemplates` passed to it even if an external `PlaygroundController` is provided.
+
 ## 1.3.0
 
 * **Simplified UI & Direct-to-Chat Architecture**:

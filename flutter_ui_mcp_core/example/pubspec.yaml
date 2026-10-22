@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  material_ui: ^1.6.0
+  material_ui: ^1.8.0
   flutter_ui_mcp_core:
     path: ../
   dart_mcp_core:

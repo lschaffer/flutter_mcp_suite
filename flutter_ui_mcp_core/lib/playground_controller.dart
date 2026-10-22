@@ -6,9 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'src/models/skill_def.dart';
+import 'src/models/system_prompt_template.dart';
 import 'src/models/workflow_def.dart';
 import 'src/utils/mime_utils.dart';
-import 'src/services/embedded_llm/embedded_llm_adapter.dart';
+import 'src/services/embedded_llm/embedded_llm_driver.dart';
 import 'src/skills/file_system_skill_storage_adapter.dart';
 import 'src/skills/web_skill_storage_adapter.dart';
 import 'src/models/sub_agent_execution.dart';
@@ -345,6 +346,8 @@ class PlaygroundController extends ChangeNotifier {
   // ────────────────────────────────────────────────────────────────
 
   String _systemPrompt = '';
+  List<SystemPromptTemplate>? systemPromptTemplates;
+  bool showSystemPromptTemplates = true;
   bool _chatMode = false;
   LlmConfig? _customLlmConfig;
   ModelPriceInfo? _activeModelPrice;
@@ -427,12 +430,12 @@ class PlaygroundController extends ChangeNotifier {
     McpPlaygroundStorageDelegate? storageDelegate,
     this.enableLogging = false,
     bool progressiveMcpDiscovery = false,
-  }) : _llmConfig =
-           initialLlmConfig ??
-           const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
-       // ignore: prefer_initializing_formals
-       _progressiveMcpDiscovery = progressiveMcpDiscovery,
-       _storage = storageDelegate ?? SharedPreferencesStorageDelegate() {
+    this.systemPromptTemplates,
+    this.showSystemPromptTemplates = true,
+  })  : _llmConfig = _sanitizeInitialLlmConfig(initialLlmConfig),
+        // ignore: prefer_initializing_formals
+        _progressiveMcpDiscovery = progressiveMcpDiscovery,
+        _storage = storageDelegate ?? SharedPreferencesStorageDelegate() {
     if (initialServers != null) {
       _servers.addAll(initialServers);
     }
@@ -451,6 +454,16 @@ class PlaygroundController extends ChangeNotifier {
     notifyListeners();
   }
 
+  static LlmConfig _sanitizeInitialLlmConfig(LlmConfig? config) {
+    if (config == null) {
+      return const LlmConfig(provider: LlmProvider.none, model: '', apiKey: '');
+    }
+    if (config.provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+      return const LlmConfig(provider: LlmProvider.none, model: '', apiKey: '');
+    }
+    return config;
+  }
+
   // --- Getters ---
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   LlmConfig get llmConfig => _llmConfig;
@@ -459,8 +472,24 @@ class PlaygroundController extends ChangeNotifier {
 
   /// Dynamically registers an additional local tool at runtime.
   void registerLocalTool(McpLocalTool tool) {
-    _localTools.add(tool);
-    notifyListeners();
+    if (!_localTools.any((t) => t.name == tool.name)) {
+      _localTools.add(tool);
+      notifyListeners();
+    }
+  }
+
+  /// Dynamically registers multiple local tools at runtime.
+  void addLocalTools(Iterable<McpLocalTool> tools) {
+    bool added = false;
+    for (final tool in tools) {
+      if (!_localTools.any((t) => t.name == tool.name)) {
+        _localTools.add(tool);
+        added = true;
+      }
+    }
+    if (added) {
+      notifyListeners();
+    }
   }
   bool get isLoading => _loading;
   bool get isGenerating => _generating;
@@ -474,6 +503,9 @@ class PlaygroundController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Alias for [cancelGeneration].
+  void stopGeneration() => cancelGeneration();
 
   McpPlaygroundStorageDelegate get storage => _storage;
 
@@ -635,6 +667,12 @@ class PlaygroundController extends ChangeNotifier {
   void registerDynamicSkill(SkillDefinition skill) {
     _dynamicSkills.removeWhere((s) => s.name == skill.name);
     _dynamicSkills.add(skill);
+
+    final def = skill.toSkillDef();
+    if (!_skills.any((s) => s.name == skill.name || s.id == def.id)) {
+      _skills.add(def);
+    }
+
     notifyListeners();
   }
 
@@ -642,6 +680,10 @@ class PlaygroundController extends ChangeNotifier {
     for (final s in skills) {
       _dynamicSkills.removeWhere((existing) => existing.name == s.name);
       _dynamicSkills.add(s);
+      final def = s.toSkillDef();
+      if (!_skills.any((existing) => existing.name == s.name || existing.id == def.id)) {
+        _skills.add(def);
+      }
     }
     notifyListeners();
   }
@@ -776,7 +818,14 @@ class PlaygroundController extends ChangeNotifier {
           }
           combinedMessages.addAll(messages);
 
-          return await EmbeddedLlmAdapter.instance.generateResponse(
+          if (!EmbeddedLlmRegistry.isAvailable) {
+            throw StateError(
+              'No EmbeddedLlmDriver registered. '
+              'To use embedded GGUF models on-device, add `flutter_ui_mcp_embedded` '
+              'to your pubspec.yaml and call `FlutterUiMcpEmbedded.register()`.',
+            );
+          }
+          return await EmbeddedLlmRegistry.driver!.generateResponse(
             messages: combinedMessages,
             availableTools: tools,
             temperature: config.temperature,
@@ -814,7 +863,14 @@ class PlaygroundController extends ChangeNotifier {
           runZonedGuarded(
             () async {
               try {
-                final response = await EmbeddedLlmAdapter.instance
+                if (!EmbeddedLlmRegistry.isAvailable) {
+                  throw StateError(
+                    'No EmbeddedLlmDriver registered. '
+                    'To use embedded GGUF models on-device, add `flutter_ui_mcp_embedded` '
+                    'to your pubspec.yaml and call `FlutterUiMcpEmbedded.register()`.',
+                  );
+                }
+                final response = await EmbeddedLlmRegistry.driver!
                     .generateResponse(
                       messages: combinedMessages,
                       availableTools: tools,
@@ -859,7 +915,11 @@ class PlaygroundController extends ChangeNotifier {
       final savedLlm = await _storage.loadLlmConfig();
       // Only use saved config if the initial config was not explicitly provided
       if (savedLlm != null && !_llmConfig.isConfigured) {
-        _llmConfig = savedLlm;
+        if (savedLlm.provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+          _llmConfig = savedLlm.copyWith(provider: LlmProvider.none);
+        } else {
+          _llmConfig = savedLlm;
+        }
       }
       final savedServers = await _storage.loadServers();
       if (savedServers.isNotEmpty) {
@@ -873,6 +933,12 @@ class PlaygroundController extends ChangeNotifier {
       final loadedSkills = await _storage.loadSkills();
       _skills.clear();
       _skills.addAll(loadedSkills);
+      for (final ds in _dynamicSkills) {
+        final def = ds.toSkillDef();
+        if (!_skills.any((s) => s.name == ds.name || s.id == def.id)) {
+          _skills.add(def);
+        }
+      }
 
       final loadedWorkflows = await _storage.loadWorkflows();
       _workflows.clear();
@@ -897,6 +963,9 @@ class PlaygroundController extends ChangeNotifier {
   }
 
   Future<void> updateLlmConfig(LlmConfig config) async {
+    if (config.provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+      config = config.copyWith(provider: LlmProvider.none);
+    }
     _llmConfig = config;
     await _storage.saveLlmConfig(config);
     notifyListeners();

@@ -15,7 +15,7 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 - **Multimodal Chat & Lightbox Preview** – Typed `ChatContentPart` attachments (`ImagePart`, `DocumentPart`, `AudioPart`) with inline preview chips and high-resolution fullscreen image lightboxes.
 - **In-App Evaluation Benchmark Runner** – Run automated LLM and MCP agent benchmark test suites with real-time pass/fail rates, latency metrics, and grading rationales.
 - **Multi-LLM support** – OpenAI, Anthropic Claude, Google Gemini, Ollama (local), Mistral AI, and any OpenAI-compatible endpoint.
-- **Embedded on-device models** – Run local GGUF models via `llamadart` without external network dependencies.
+- **Modular Builders & Headless UI** – Custom `topBarBuilder`, `settingsDialogBuilder`, and headless `McpChatView` for embedding inside custom parent apps and desktop window docks.
 - **HTTP MCP Server registry** – Browse [PulseMCP](https://pulsemcp.com) and [Smithery](https://smithery.ai) catalogs or add custom remote MCP servers.
 - **Local MCP subprocesses** – Install, configure, and launch local stdio MCP servers (Node.js, Python) directly within the application (supported in desktop mode).
 - **Dart-native local tools** – Extend with custom Dart-native tools (e.g., Weather, SSH, Chart-generation tools; see the [example](example) implementation).
@@ -65,7 +65,7 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 ![Sub-Agent Orchestrator](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_subagents.png)
 
 ### 🧩 Dynamic Skills Dock
-![Dynamic Skills Dock](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_dynamic_skills.png)
+![Dynamic Skills Dock](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/flutter_ui_dynamic_skills.gif)
 
 ### 💻 Embedded On-Device LLM & Local MCP Tools
 Watch the AI Agent widget in action using an embedded model to call local dart tools:
@@ -108,6 +108,8 @@ The main widget. Drop it into your app to get a full AI agent interface.
 | `disableConfigDialog` | `bool` | `false` | Disable opening the settings dialog when LLM is not configured. |
 | `messageContentBuilder` | `Widget? Function(BuildContext, ChatMessage)?` | `null` | Optional builder callback to intercept message layouts and render custom widgets (e.g., interactive charts). |
 | `locale` | `String?` | `null` | Optional explicit locale override ('en' or 'de'). Defaults to system language. |
+| `topBarBuilder` | `McpTopBarBuilder?` | `null` | Optional builder to completely customize or replace the top navigation bar with custom menus and branding. |
+| `settingsDialogBuilder` | `McpSettingsDialogBuilder?` | `null` | Optional builder to replace or redesign the Agent & LLM settings dialog or modal sheet. |
 
 #### Basic usage
 
@@ -115,15 +117,33 @@ The main widget. Drop it into your app to get a full AI agent interface.
 FlutterUiMcp()
 ```
 
-#### With Pre-configured LLM
+#### Custom TopBar & Settings Builder (for Apps like Tealkit)
 
 ```dart
-FlutterUiMcp(
-  initialLlmConfig: const LlmConfig(
-    provider: LlmProvider.openai,
-    model: 'gpt-4o',
-    apiKey: 'sk-...',
-  ),
+McpPlayground(
+  topBarBuilder: (context, controller, actions) {
+    return AppBar(
+      title: const Text('My Custom AI App'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.tune),
+          onPressed: () => actions.openSettings(initialTab: 0),
+        ),
+      ],
+    );
+  },
+  settingsDialogBuilder: (context, controller, initialTab, onClose) {
+    return MyCustomSettingsModal(controller: controller, onClose: onClose);
+  },
+)
+```
+
+#### Standalone Headless Chat View (for Grid & Custom Embedded Layouts)
+
+```dart
+// Just the chat stream and composer — no AppBar, no Drawer, no Inspector
+McpChatView(
+  controller: myPlaygroundController,
 )
 ```
 

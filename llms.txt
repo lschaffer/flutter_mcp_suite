@@ -1,26 +1,37 @@
-# MCP Playground Monorepo
+# Flutter MCP Suite Monorepo
 
-> An interactive AI Agent Playground monorepo. It features a headless pure-Dart core package (`mcp_playground_dart`) and an interactive Flutter UI widget package (`mcp_playground_flutter`) side-by-side to prototype, debug, and run agentic Model Context Protocol (MCP) workflows.
+> An interactive AI Agent Playground monorepo. It features a headless pure-Dart core package (`dart_mcp_core`), shared UI components (`flutter_ui_mcp_core`), an interactive Flutter UI widget package (`flutter_ui_mcp`), a dynamic Generative UI widget (`flutter_genui_mcp`), and an opt-in on-device GGUF engine (`flutter_ui_mcp_embedded`).
 
 ## Docs
 
-- [Full Documentation for LLMs](https://raw.githubusercontent.com/lschaffer/mcp_playground/main/llms-full.txt): All documentation inlined in a single file for LLM consumption
+- [Full Documentation for LLMs](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/llms-full.txt): All documentation inlined in a single file for LLM consumption
 
 ## Core Packages
 
-### 1. [`mcp_playground_dart`](mcp_playground_dart) (Headless Core)
-- [mcp_playground_dart/lib/src/llm/llm_service.dart](file:///c:/projects/ls/mcp_playground/mcp_playground_dart/lib/src/llm/llm_service.dart): LLM provider adapters (OpenAI, Anthropic, Gemini, Ollama, and embedded handlers).
-- [mcp_playground_dart/lib/src/llm/llm_response.dart](file:///c:/projects/ls/mcp_playground/mcp_playground_dart/lib/src/llm/llm_response.dart): Common LLM request and stream chunk schemas.
-- [mcp_playground_dart/lib/src/agents/agents_engine.dart](file:///c:/projects/ls/mcp_playground/mcp_playground_dart/lib/src/agents/agents_engine.dart): Monolithic execution loop with multi-prompt piping, tool loop, and events stream.
-- [mcp_playground_dart/lib/src/mcp/mcp_client.dart](file:///c:/projects/ls/mcp_playground/mcp_playground_dart/lib/src/mcp/mcp_client.dart): HTTP/SSE and stdio subprocess client transport handlers.
+### 1. [`dart_mcp_core`](dart_mcp_core) (Headless Core - 1.4.0)
+- [dart_mcp_core/lib/src/llm/llm_service.dart](file:///c:/projects/ls/mcp_playground/dart_mcp_core/lib/src/llm/llm_service.dart): LLM provider adapters (OpenAI, Anthropic, Gemini, Ollama, and embedded delegates).
+- [dart_mcp_core/lib/src/llm/llm_response.dart](file:///c:/projects/ls/mcp_playground/dart_mcp_core/lib/src/llm/llm_response.dart): Common LLM request, response, and stream chunk schemas.
+- [dart_mcp_core/lib/src/agents/agents_engine.dart](file:///c:/projects/ls/mcp_playground/dart_mcp_core/lib/src/agents/agents_engine.dart): Execution loop with tool calling, planning, episodic memory, and sub-agent delegation.
+- [dart_mcp_core/lib/src/mcp/mcp_client.dart](file:///c:/projects/ls/mcp_playground/dart_mcp_core/lib/src/mcp/mcp_client.dart): HTTP/SSE and stdio subprocess client transport handlers.
 
-### 2. [`mcp_playground_flutter`](mcp_playground_flutter) (Flutter UI Layer)
-- [mcp_playground_flutter/lib/mcp_playground.dart](file:///c:/projects/ls/mcp_playground/mcp_playground_flutter/lib/mcp_playground.dart): Main playground widget and visual chat layouts.
-- [mcp_playground_flutter/lib/playground_controller.dart](file:///c:/projects/ls/mcp_playground/mcp_playground_flutter/lib/playground_controller.dart): State manager orchestrating agent runs, FFI delegates binding, and persistence.
+### 2. [`flutter_ui_mcp_core`](flutter_ui_mcp_core) (Shared UI & Controller Layer - 1.4.0)
+- [flutter_ui_mcp_core/lib/playground_controller.dart](file:///c:/projects/ls/mcp_playground/flutter_ui_mcp_core/lib/playground_controller.dart): State manager orchestrating agent runs, tool execution, and reactive state.
+- [flutter_ui_mcp_core/lib/src/widgets/mcp_chat_input_bar.dart](file:///c:/projects/ls/mcp_playground/flutter_ui_mcp_core/lib/src/widgets/mcp_chat_input_bar.dart): Standalone prompt composer with attachment preview and clipboard paste.
+- [flutter_ui_mcp_core/lib/src/services/embedded_llm/embedded_llm_driver.dart](file:///c:/projects/ls/mcp_playground/flutter_ui_mcp_core/lib/src/services/embedded_llm/embedded_llm_driver.dart): Pluggable driver contract and registry decoupling native FFI engines from UI.
+
+### 3. [`flutter_ui_mcp`](flutter_ui_mcp) (Classic AI Agent & Chat UI - 1.4.0)
+- [flutter_ui_mcp/lib/flutter_ui_mcp_widget.dart](file:///c:/projects/ls/mcp_playground/flutter_ui_mcp/lib/flutter_ui_mcp_widget.dart): `McpPlayground` with `topBarBuilder` and `settingsDialogBuilder`.
+- [flutter_ui_mcp/lib/mcp_chat_view.dart](file:///c:/projects/ls/mcp_playground/flutter_ui_mcp/lib/mcp_chat_view.dart): Standalone headless chat stream view for custom parent apps and embedded layouts.
+
+### 4. [`flutter_ui_mcp_embedded`](flutter_ui_mcp_embedded) (Opt-In Embedded GGUF Engine - 1.4.0)
+- [flutter_ui_mcp_embedded/lib/flutter_ui_mcp_embedded.dart](file:///c:/projects/ls/mcp_playground/flutter_ui_mcp_embedded/lib/flutter_ui_mcp_embedded.dart): Provides `FlutterUiMcpEmbedded.register()` to bind `llamadart` (`llama.cpp` / WebGPU) into `EmbeddedLlmRegistry`.
+
+### 5. [`flutter_genui_mcp`](flutter_genui_mcp) (Dynamic Generative UI - 1.4.0)
+- Dynamic GenUI (`A2UI`) widget for structured interactive UI generation.
 
 ## Examples & Demos
 
-- [examples/dart/embedded_example/main.dart](file:///c:/projects/ls/mcp_playground/examples/dart/embedded_example/main.dart): Console app executing `llamadart` GGUF model offline on the CPU, running native weather tools, and streaming tokens.
+- [examples/flutter/example_embedded/lib/main.dart](file:///c:/projects/ls/mcp_playground/examples/flutter/example_embedded/lib/main.dart): Flutter app configured for offline on-device GGUF execution with `flutter_ui_mcp_embedded`.
+- [examples/dart/embedded_example/main.dart](file:///c:/projects/ls/mcp_playground/examples/dart/embedded_example/main.dart): Pure Dart console app executing `llamadart` GGUF model offline on CPU.
 - [examples/dart/cli_example/main.dart](file:///c:/projects/ls/mcp_playground/examples/dart/cli_example/main.dart): CLI chat agent for multi-turn local Node/Python subprocess MCP server runs.
 - [examples/dart/local_filesystem_example/main.dart](file:///c:/projects/ls/mcp_playground/examples/dart/local_filesystem_example/main.dart): Headless agent running `@modelcontextprotocol/server-filesystem` to inspect filesystem.
-- [examples/flutter/example_embedded/lib/main.dart](file:///c:/projects/ls/mcp_playground/examples/flutter/example_embedded/lib/main.dart): Flutter app pre-configured for offline FFI `llamadart` model execution.

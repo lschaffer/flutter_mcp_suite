@@ -1,3 +1,9 @@
+## 1.4.0
+
+* **Synchronized Core Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.4.0` and `flutter_ui_mcp_core: ^1.4.0`.
+  * Inherited decoupled embedded LLM architecture and lightweight native footprint.
+
 ## 1.3.0
 
 * **Simplified UI & Direct-to-Chat Architecture**:
