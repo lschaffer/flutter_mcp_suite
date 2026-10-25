@@ -1,3 +1,12 @@
+## 1.4.1
+
+* **Customization & Extension Hooks**:
+  * Added `inputTopWidgetBuilder` parameter to `McpPlayground` allowing host applications to inject custom widgets (e.g. mode selectors, context banners, prompt chips) directly above the chat input composer.
+  * Added `showDrawer` parameter to `McpPlayground` (defaults to `true`) allowing host applications to disable the built-in navigation drawer while preserving the AppBar.
+* **Synchronized Core Upgrades & Web/WASM Compatibility**:
+  * Upgraded dependency to `flutter_ui_mcp_core: ^1.4.1`.
+  * Inherited pure Web & WASM-compatible clipboard architecture.
+
 ## 1.4.0
 
 * **⚠️ BREAKING CHANGES & MIGRATION (Embedded LLM Decoupling)**:

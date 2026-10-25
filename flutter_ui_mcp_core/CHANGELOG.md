@@ -1,3 +1,10 @@
+## 1.4.1
+
+* **Web & WASM Compatibility**:
+  * Decoupled native clipboard file and PowerShell reading behind conditional imports (`clipboard_native_reader_stub.dart` on Web/WASM, `clipboard_native_reader_io.dart` on native desktop).
+  * Removed unconditional `dart:io` import from `ClipboardContentService` using `platform_file` abstraction.
+  * Added dedicated `embedded_llm.dart` lightweight entrypoint exporting `EmbeddedLlmDriver` and `EmbeddedLlmRegistry` without pulling UI widgets or clipboard services.
+
 ## 1.4.0
 
 * **⚠️ BREAKING CHANGES & MIGRATION (Embedded LLM Decoupling)**:

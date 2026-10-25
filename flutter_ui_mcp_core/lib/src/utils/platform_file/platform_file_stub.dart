@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// Stub implementation of file operations for platforms without dart:io (web/wasm).
 bool fileExists(String path) => false;
 
@@ -8,3 +10,9 @@ Future<String> copyToModelsDir(
   String filename,
   String modelsDirPath,
 ) async => sourcePath;
+
+/// Stub reading file bytes on platforms without dart:io.
+Future<Uint8List?> readLocalFileBytes(String path) async => null;
+
+/// Stub reading file string on platforms without dart:io.
+Future<String?> readLocalFileString(String path) async => null;

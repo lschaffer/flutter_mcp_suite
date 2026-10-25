@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 /// Native implementation of file operations using dart:io.
 bool fileExists(String path) {
@@ -28,4 +29,26 @@ Future<String> copyToModelsDir(
     await sourceFile.copy(destFile.path);
   }
   return destFile.path;
+}
+
+/// Reads file bytes natively using dart:io.
+Future<Uint8List?> readLocalFileBytes(String path) async {
+  try {
+    final file = File(path);
+    if (await file.exists()) {
+      return await file.readAsBytes();
+    }
+  } catch (_) {}
+  return null;
+}
+
+/// Reads file string natively using dart:io.
+Future<String?> readLocalFileString(String path) async {
+  try {
+    final file = File(path);
+    if (await file.exists()) {
+      return await file.readAsString();
+    }
+  } catch (_) {}
+  return null;
 }

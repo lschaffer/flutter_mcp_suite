@@ -1,8 +1,11 @@
+/// Opt-in companion package providing on-device GGUF model execution via
+/// `llamadart` (`llama.cpp` and WebGPU) for the Flutter MCP Suite.
 library;
 
-import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
+import 'package:flutter_ui_mcp_core/embedded_llm.dart';
 import 'src/embedded_llm_adapter.dart';
 
+export 'package:flutter_ui_mcp_core/embedded_llm.dart';
 export 'src/embedded_llm_adapter.dart';
 
 /// Entrypoint to initialize and register the embedded LLM engine for the

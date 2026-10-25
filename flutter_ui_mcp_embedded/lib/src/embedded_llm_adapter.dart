@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:llamadart/llamadart.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
-import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
+import 'package:flutter_ui_mcp_core/embedded_llm.dart';
 
 /// Implementation of [EmbeddedLlmDriver] that wraps the `llamadart` library
 /// (`llama.cpp` on native, WebGPU/WASM on web).
 class EmbeddedLlmAdapter implements EmbeddedLlmDriver {
   EmbeddedLlmAdapter._();
+  /// The singleton instance of [EmbeddedLlmAdapter].
   static final EmbeddedLlmAdapter instance = EmbeddedLlmAdapter._();
 
   // LlamaBackend auto-selects the platform-appropriate backend (llama.cpp

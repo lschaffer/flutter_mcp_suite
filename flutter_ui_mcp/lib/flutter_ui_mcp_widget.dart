@@ -171,9 +171,19 @@ class McpPlayground extends StatefulWidget {
     this.progressiveMcpDiscovery = false,
     this.systemPromptTemplates,
     this.showSystemPromptTemplates = true,
+    this.showDrawer = true,
+    this.inputTopWidgetBuilder,
     this.topBarBuilder,
     this.settingsDialogBuilder,
   });
+
+  /// Whether to display the built-in navigation drawer. Defaults to true.
+  final bool showDrawer;
+
+  /// Optional builder to inject custom widgets directly above the chat input bar
+  /// (e.g. specialized mode switchers, workspace banners, or status bars).
+  final Widget Function(BuildContext context, PlaygroundController controller)?
+      inputTopWidgetBuilder;
 
   @override
   State<McpPlayground> createState() => _McpPlaygroundState();
@@ -2350,6 +2360,8 @@ class _McpPlaygroundState extends State<McpPlayground> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.inputTopWidgetBuilder != null)
+                widget.inputTopWidgetBuilder!(context, _controller),
               ActiveSkillBanner(
                 controller: _controller,
                 padding: const EdgeInsets.only(bottom: 4.0),
@@ -2955,7 +2967,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
                   actions: _buildAppBarActions(context),
                 )
               : null),
-      drawer: widget.showAppBar
+      drawer: (widget.showDrawer && widget.showAppBar)
           ? Drawer(
               child: ListView(
                 padding: EdgeInsets.zero,

@@ -1,3 +1,9 @@
+## 1.4.1
+
+* **Dependency Modernization**:
+  * Expanded `a2ui_core` constraint to `'>=0.1.1 <0.4.0'` to support latest versions while preserving `genui ^0.10.4` compatibility.
+  * Upgraded `shared_preferences` to `^2.5.6` and `file_picker` to `^13.2.0`.
+
 ## 1.4.0
 
 * **Synchronized Core Upgrades**:
