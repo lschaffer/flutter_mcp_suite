@@ -133,19 +133,25 @@ class McpChatInputBar extends StatelessWidget {
                         ? 'Agent is working...'
                         : 'Type a message, paste image/doc (Ctrl+V), or ask a tool...'),
                 leading: leading ??
-                    Row(
+                    Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (onAttach != null)
                           IconButton(
                             icon: const Icon(Icons.attach_file_outlined),
                             tooltip: 'Attach Files / Images',
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            visualDensity: VisualDensity.compact,
                             onPressed: isGenerating ? null : onAttach,
                           ),
                         if (onPaste != null)
                           IconButton(
                             icon: const Icon(Icons.content_paste_go_outlined),
                             tooltip: 'Paste from Clipboard (Ctrl+V)',
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            visualDensity: VisualDensity.compact,
                             onPressed: isGenerating ? null : onPaste,
                           ),
                       ],

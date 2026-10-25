@@ -15,8 +15,10 @@ class RemoteMcpDialog extends StatefulWidget {
     BuildContext context,
     PlaygroundController controller,
   ) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return showDialog(
       context: context,
+      useSafeArea: !isMobile,
       builder: (ctx) => RemoteMcpDialog(controller: controller),
     );
   }

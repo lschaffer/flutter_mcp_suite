@@ -262,44 +262,76 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
       allTools.add(s.name);
     }
 
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
+
+    Widget buildToolList(StateSetter setDlgState) {
+      return allTools.isEmpty
+          ? const Center(child: Text('No tools or MCP servers available.'))
+          : ListView(
+              children: allTools.map((tool) {
+                final selected = _selectedTools.contains(tool);
+                return CheckboxListTile(
+                  title: Text(tool, style: const TextStyle(fontSize: 14)),
+                  value: selected,
+                  dense: true,
+                  onChanged: (val) {
+                    setDlgState(() {
+                      if (val == true) {
+                        _selectedTools.add(tool);
+                      } else {
+                        _selectedTools.remove(tool);
+                      }
+                    });
+                    setState(() {});
+                  },
+                );
+              }).toList(),
+            );
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          title: const Text('Select Required Tools'),
-          content: SizedBox(
-            width: 420,
-            height: 350,
-            child: allTools.isEmpty
-                ? const Center(child: Text('No tools or MCP servers available.'))
-                : ListView(
-                    children: allTools.map((tool) {
-                      final selected = _selectedTools.contains(tool);
-                      return CheckboxListTile(
-                        title: Text(tool, style: const TextStyle(fontSize: 14)),
-                        value: selected,
-                        dense: true,
-                        onChanged: (val) {
-                          setDlgState(() {
-                            if (val == true) {
-                              _selectedTools.add(tool);
-                            } else {
-                              _selectedTools.remove(tool);
-                            }
-                          });
-                          setState(() {});
-                        },
-                      );
-                    }).toList(),
+        builder: (ctx, setDlgState) {
+          if (!isWide) {
+            return Dialog.fullscreen(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: const Text('Select Required Tools'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
                   ),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Done'),
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Done'),
+                      ),
+                    ),
+                  ],
+                ),
+                body: SafeArea(child: buildToolList(setDlgState)),
+              ),
+            );
+          }
+
+          return AlertDialog(
+            title: const Text('Select Required Tools'),
+            content: SizedBox(
+              width: 420,
+              height: 350,
+              child: buildToolList(setDlgState),
             ),
-          ],
-        ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -338,48 +370,10 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
     Navigator.pop(context, skill);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isWide = MediaQuery.sizeOf(context).width >= 700;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isWide ? 20 : 8,
-        vertical: isWide ? 20 : 12,
-      ),
-      child: Container(
-        width: isWide ? 850 : double.maxFinite,
-        height: 780,
-        padding: EdgeInsets.all(isWide ? 20 : 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Row(
-              children: [
-                const Icon(Icons.auto_awesome, color: Colors.cyan, size: 24),
-                const SizedBox(width: 10),
-                const Text(
-                  'Skill Wizard',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const Divider(),
-
-            // Body
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+  Widget _buildForm(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
                     if (_errorMessage != null)
                       Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -506,7 +500,108 @@ Output ONLY the raw markdown skill file starting with `---` YAML frontmatter and
                       ),
                     ),
                   ],
+                );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isWide = MediaQuery.sizeOf(context).width >= 700;
+
+    if (!isWide) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Skill Wizard', style: TextStyle(fontWeight: FontWeight.bold)),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: FilledButton(
+                  onPressed: _handleApply,
+                  child: const Text('Apply'),
                 ),
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildForm(theme),
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _exportSkillFile,
+                        icon: const Icon(Icons.file_upload_outlined, size: 16),
+                        label: const Text('Export'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: _importSkillFile,
+                        icon: const Icon(Icons.file_download_outlined, size: 16),
+                        label: const Text('Import'),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 20,
+      ),
+      child: Container(
+        width: 850,
+        height: 780,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.cyan, size: 24),
+                const SizedBox(width: 10),
+                const Text(
+                  'Skill Wizard',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const Divider(),
+
+            // Body
+            Expanded(
+              child: SingleChildScrollView(
+                child: _buildForm(theme),
               ),
             ),
 

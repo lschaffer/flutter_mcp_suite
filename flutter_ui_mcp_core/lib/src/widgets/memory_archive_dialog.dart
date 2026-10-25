@@ -10,6 +10,15 @@ class MemoryArchiveDialog extends StatefulWidget {
   const MemoryArchiveDialog({super.key, required this.controller});
 
   static Future<void> show(BuildContext context, PlaygroundController controller) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    if (isMobile) {
+      return showDialog(
+        context: context,
+        builder: (ctx) => Dialog.fullscreen(
+          child: MemoryArchiveDialog(controller: controller),
+        ),
+      );
+    }
     return showDialog(
       context: context,
       builder: (ctx) => MemoryArchiveDialog(controller: controller),
@@ -71,152 +80,187 @@ class _MemoryArchiveDialogState extends State<MemoryArchiveDialog> {
           ),
     );
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Material(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          width: 700,
-          height: 480,
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    child: Icon(
-                      Icons.psychology_outlined,
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
+    Widget buildBody() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isMobile) ...[
+            // Header
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.psychology_outlined,
+                    color: theme.colorScheme.onPrimaryContainer,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Episodic Memory Archive',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Episodic Memory Archive',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      Text(
+                        '${archive.length} compressed episode(s) • ~$totalTokensArchived tokens preserved',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Search bar
+          TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Search archived turns, prompts, or tool outputs...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+            onChanged: (val) {
+              setState(() => _searchQuery = val);
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Content List
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.history_edu_outlined,
+                          size: 48,
+                          color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 8),
                         Text(
-                          '${archive.length} compressed episode(s) • ~$totalTokensArchived tokens preserved',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          _searchQuery.isNotEmpty
+                              ? 'No archived memories match "$_searchQuery".'
+                              : 'No memories archived yet.\nOlder turns are automatically preserved here when conversation context compresses.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
+                  )
+                : ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, idx) {
+                      final entry = filtered[idx];
+                      return _buildMemoryCard(entry, theme);
+                    },
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+          ),
 
-              // Search bar
-              TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Search archived turns, prompts, or tool outputs...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          const SizedBox(height: 12),
+          // Footer
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Memory Retrieval Tool ("retrieve_memory") is active.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: theme.colorScheme.primary,
+                  fontStyle: FontStyle.italic,
                 ),
-                onChanged: (val) {
-                  setState(() => _searchQuery = val);
-                },
               ),
-              const SizedBox(height: 12),
-
-              // Content List
-              Expanded(
-                child: filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.history_edu_outlined,
-                              size: 48,
-                              color: theme.colorScheme.outline.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'No archived memories match "$_searchQuery".'
-                                  : 'No memories archived yet.\nOlder turns are automatically preserved here when conversation context compresses.',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (ctx, idx) {
-                          final entry = filtered[idx];
-                          return _buildMemoryCard(entry, theme);
-                        },
-                      ),
-              ),
-
-              const SizedBox(height: 12),
-              // Footer
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Memory Retrieval Tool ("retrieve_memory") is active.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.primary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  if (archive.isNotEmpty)
-                    TextButton.icon(
-                      icon: const Icon(Icons.delete_sweep_outlined, size: 16),
-                      label: const Text('Clear Memory', style: TextStyle(fontSize: 12)),
-                      onPressed: () {
-                        widget.controller.clearMemoryArchive();
-                        setState(() {});
-                      },
-                    ),
-                ],
-              ),
+              if (archive.isNotEmpty)
+                TextButton.icon(
+                  icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+                  label: const Text('Clear Memory', style: TextStyle(fontSize: 12)),
+                  onPressed: () {
+                    widget.controller.clearMemoryArchive();
+                    setState(() {});
+                  },
+                ),
             ],
           ),
+        ],
+      );
+    }
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Episodic Memory Archive',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${archive.length} compressed episode(s) • ~$totalTokensArchived tokens',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: buildBody(),
+          ),
+        ),
+      );
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 650),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: buildBody(),
         ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _buildMemoryCard(EpisodicMemoryEntry entry, ThemeData theme) {

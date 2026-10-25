@@ -162,15 +162,171 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
     final theme = Theme.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 600;
 
+    Widget buildForm() {
+      return SingleChildScrollView(
+        padding: isWide ? EdgeInsets.zero : const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+                ),
+              ),
+
+            if (_existingWorkflow != null) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Currently loaded: "$_loadedWorkflowName"',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    RadioGroup<bool>(
+                      groupValue: _saveAsNew,
+                      onChanged: (val) {
+                        if (val == null) return;
+                        setState(() {
+                          _saveAsNew = val;
+                          if (val) {
+                            _nameCtrl.text = '${_existingWorkflow!.name} (Copy)';
+                          } else {
+                            _nameCtrl.text = _existingWorkflow!.name;
+                            _descriptionCtrl.text = _existingWorkflow!.description;
+                          }
+                        });
+                      },
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile<bool>(
+                            value: false,
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Overwrite existing workflow', style: TextStyle(fontSize: 13)),
+                          ),
+                          RadioListTile<bool>(
+                            value: true,
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Save as new workflow copy', style: TextStyle(fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Workflow Name Field
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Workflow Name *',
+                hintText: 'e.g., Code Review & Security Audit',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.title),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+
+            // Description Field
+            TextField(
+              controller: _descriptionCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+                hintText: 'What this workflow does or instructions for running it...',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.description_outlined),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Summary Info
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Includes:',
+                    style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '• ${_gatherPromptSteps().where((s) => s.text.isNotEmpty).length} prompt step(s)\n'
+                    '• ${widget.controller.enabledToolNames.length} enabled tool(s)\n'
+                    '• System prompt (${widget.controller.systemPrompt.trim().isNotEmpty ? 'custom' : 'default'})\n'
+                    '${widget.controller.activeSkill != null ? '• Active skill: ${widget.controller.activeSkill!.name}' : ''}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!isWide) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Save Workflow Preset'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: FilledButton.icon(
+                  onPressed: _isSaving ? null : _handleSave,
+                  icon: _isSaving
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save, size: 16),
+                  label: Text(!_saveAsNew && _existingWorkflow != null ? 'Update' : 'Save'),
+                ),
+              ),
+            ],
+          ),
+          body: SafeArea(child: buildForm()),
+        ),
+      );
+    }
+
     return AlertDialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isWide ? 24 : 8,
-        vertical: isWide ? 24 : 12,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 24,
       ),
-      contentPadding: EdgeInsets.fromLTRB(
-        isWide ? 24 : 12,
+      contentPadding: const EdgeInsets.fromLTRB(
+        24,
         20,
-        isWide ? 24 : 12,
+        24,
         16,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -178,129 +334,17 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
         children: [
           Icon(Icons.alt_route, color: Color(0xFF0067C0)),
           SizedBox(width: 8),
-          Text('Save Workflow Preset'),
+          Expanded(
+            child: Text(
+              'Save Workflow Preset',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: SizedBox(
-        width: isWide ? 500 : double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
-                  ),
-                ),
-
-              if (_existingWorkflow != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Currently loaded: "$_loadedWorkflowName"',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      RadioGroup<bool>(
-                        groupValue: _saveAsNew,
-                        onChanged: (val) {
-                          if (val == null) return;
-                          setState(() {
-                            _saveAsNew = val;
-                            if (val) {
-                              _nameCtrl.text = '${_existingWorkflow!.name} (Copy)';
-                            } else {
-                              _nameCtrl.text = _existingWorkflow!.name;
-                            }
-                          });
-                        },
-                        child: Column(
-                          children: [
-                            RadioListTile<bool>(
-                              title: Text('Update "$_loadedWorkflowName"', style: const TextStyle(fontSize: 13)),
-                              value: false,
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            RadioListTile<bool>(
-                              title: const Text('Save as a new workflow', style: TextStyle(fontSize: 13)),
-                              value: true,
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              TextField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Workflow Name *',
-                  hintText: 'e.g. Daily log inspection & chart',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              TextField(
-                controller: _descriptionCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                  hintText: 'Summary of what this workflow prompt sequence does...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Summary Info
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Includes:',
-                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '• ${_gatherPromptSteps().where((s) => s.text.isNotEmpty).length} prompt step(s)\n'
-                      '• ${widget.controller.enabledToolNames.length} enabled tool(s)\n'
-                      '• System prompt (${widget.controller.systemPrompt.trim().isNotEmpty ? 'custom' : 'default'})\n'
-                      '${widget.controller.activeSkill != null ? '• Active skill: ${widget.controller.activeSkill!.name}' : ''}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        width: 500,
+        child: buildForm(),
       ),
       actions: [
         TextButton(

@@ -1,3 +1,11 @@
+## 1.4.2
+
+* **Input Bar & Mobile UX Improvements**:
+  * Stacked the clipboard paste button directly below the attachment (paperclip) icon in the chat input bar leading area for cleaner spacing and zero touch target overlaps.
+* **Synchronized Core Upgrades**:
+  * Upgraded dependency to `flutter_ui_mcp_core: ^1.4.2`.
+  * Inherited responsive full-screen mobile dialogs for Settings, Skills, Workflows, Evals, Memory Archive, and MCP Server tools.
+
 ## 1.4.1
 
 * **Customization & Extension Hooks**:

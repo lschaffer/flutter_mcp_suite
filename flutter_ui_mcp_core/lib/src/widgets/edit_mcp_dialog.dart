@@ -82,6 +82,72 @@ class _EditMcpServerDialogState extends State<EditMcpServerDialog> {
 
     final isMobile = MediaQuery.sizeOf(context).width < 600;
 
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          backgroundColor: dialogBgColor,
+          appBar: AppBar(
+            backgroundColor: dialogBgColor,
+            foregroundColor: textColor,
+            title: const Text('Edit MCP Server', style: TextStyle(fontWeight: FontWeight.bold)),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _save,
+                style: TextButton.styleFrom(foregroundColor: tealAccent),
+                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildField(
+                      controller: _nameCtrl,
+                      labelText: 'Name',
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Name is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: _urlCtrl,
+                      labelText: 'Server URL *',
+                      keyboardType: TextInputType.url,
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Server URL is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: _endpointCtrl,
+                      labelText: 'MCP Endpoint',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: _apiKeyCtrl,
+                      labelText: 'API Key (optional)',
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildField(
+                      controller: _apiPasswordCtrl,
+                      labelText: 'API Password (optional)',
+                      obscureText: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Dialog(
       backgroundColor: dialogBgColor,
       insetPadding: EdgeInsets.symmetric(

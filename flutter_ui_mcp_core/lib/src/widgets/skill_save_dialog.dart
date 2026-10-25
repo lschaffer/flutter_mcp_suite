@@ -183,90 +183,119 @@ class _SkillSaveDialogState extends State<SkillSaveDialog> {
     final stepCount = _gatherPromptSteps().length;
     final isMobile = MediaQuery.sizeOf(context).width < 600;
 
-    return AlertDialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 8 : 24,
-        vertical: isMobile ? 12 : 24,
-      ),
-      contentPadding: EdgeInsets.fromLTRB(
-        isMobile ? 12 : 24,
-        20,
-        isMobile ? 12 : 24,
-        16,
-      ),
-      title: const Text('Save Skill'),
-      content: SizedBox(
-        width: isMobile ? double.maxFinite : 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextFormField(
-              controller: _nameCtrl,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Skill Name',
-                hintText: 'e.g. weather-assistant',
-                border: OutlineInputBorder(),
-              ),
+    Widget buildForm() {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _nameCtrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Skill Name',
+              hintText: 'e.g. weather-assistant',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _descriptionCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                hintText: 'What does this skill do?',
-                border: OutlineInputBorder(),
-              ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _descriptionCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Description (optional)',
+              hintText: 'What does this skill do?',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withAlpha(80),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      stepCount > 1
-                          ? '$stepCount prompt steps will be captured from conversation history'
-                          : 'Single prompt will be saved',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withAlpha(80),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    stepCount > 1
+                        ? '$stepCount prompt steps will be captured from conversation history'
+                        : 'Single prompt will be saved',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _errorMessage!,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 12),
               ),
             ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+          ],
+        ],
+      );
+    }
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Save Skill'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: FilledButton(
+                  onPressed: _isSaving || _nameCtrl.text.trim().isEmpty ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
                 ),
               ),
             ],
-          ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: buildForm(),
+          ),
         ),
+      );
+    }
+
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+      title: const Text('Save Skill'),
+      content: SizedBox(
+        width: 420,
+        child: buildForm(),
       ),
       actions: [
         TextButton(
@@ -693,90 +722,114 @@ class _SkillLoadDialogState extends State<SkillLoadDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
+    Widget buildBody() {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.file_open, size: 18),
+              label: const Text('Import Skill from File'),
+              onPressed: _importFromFile,
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null && _skills.isEmpty
+                ? Center(
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(color: Colors.red.shade700),
+                    ),
+                  )
+                : _skills.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No saved skills found.\n\nUse "Save Skill" to create one.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _skills.length,
+                    itemBuilder: (ctx, idx) {
+                      final skill = _skills[idx];
+                      return ListTile(
+                        title: Text(
+                          skill.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (skill.description != null &&
+                                skill.description!.isNotEmpty)
+                              Text(
+                                skill.description!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            Text(
+                              skill.zipFileName,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontFamily: 'monospace',
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          onPressed: () async {
+                            await widget.controller.skillStorage.deleteSkill(
+                              skill.name,
+                            );
+                            _loadSkills();
+                          },
+                        ),
+                        onTap: () => _loadSkill(skill),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      );
+    }
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Load Skill'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: buildBody(),
+          ),
+        ),
+      );
+    }
+
     return AlertDialog(
       title: const Text('Load Skill'),
       content: SizedBox(
         width: 420,
         height: 400,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.file_open, size: 18),
-                label: const Text('Import Skill from File'),
-                onPressed: _importFromFile,
-              ),
-            ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null && _skills.isEmpty
-                  ? Center(
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade700),
-                      ),
-                    )
-                  : _skills.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No saved skills found.\n\nUse "Save Skill" to create one.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _skills.length,
-                      itemBuilder: (ctx, idx) {
-                        final skill = _skills[idx];
-                        return ListTile(
-                          title: Text(
-                            skill.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (skill.description != null &&
-                                  skill.description!.isNotEmpty)
-                                Text(
-                                  skill.description!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              Text(
-                                skill.zipFileName,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontFamily: 'monospace',
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                              size: 20,
-                            ),
-                            onPressed: () async {
-                              await widget.controller.skillStorage.deleteSkill(
-                                skill.name,
-                              );
-                              _loadSkills();
-                            },
-                          ),
-                          onTap: () => _loadSkill(skill),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+        child: buildBody(),
       ),
       actions: [
         TextButton(

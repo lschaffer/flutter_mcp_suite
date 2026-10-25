@@ -20,7 +20,7 @@ dependencies:
   flutter:
     sdk: flutter
   dart_mcp_core: ^1.4.0
-  flutter_ui_mcp_core: ^1.4.1
+  flutter_ui_mcp_core: ^1.4.2
   llamadart: ^0.16.2
 
 dev_dependencies:

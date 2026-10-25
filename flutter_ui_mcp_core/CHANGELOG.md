@@ -1,3 +1,19 @@
+## 1.4.2
+
+* **Responsive Full-Screen Dialogs on Mobile**:
+  * All assistant management dialogs now automatically render as `Dialog.fullscreen(child: Scaffold(...))` on mobile screen widths:
+    * `SettingsPanel` (Config, LLM, MCP servers via `showMcpSettingsDialog` with `useSafeArea: false`).
+    * `SkillsManagerDialog`, `SkillWizardDialog` (including tool selector modal), `SkillDetailsDialog`, `SkillSaveDialog`, and `SkillLoadDialog`.
+    * `WorkflowLoadDialog` and `WorkflowSaveDialog`.
+    * `MemoryArchiveDialog` (Episodic Memory Archive & Search).
+    * `EvalBenchmarkDialog` (Evaluation & Benchmarking suite).
+    * `EditMcpDialog`, `ServerToolsDialog`, and `RegisteredToolsDialog`.
+* **Mobile Layout & Overflow Fixes**:
+  * `SettingsPanel`: wrapped active tools status indicator in `Expanded` and compacted button padding to prevent horizontal text overflow on narrow displays.
+  * `SettingsPanel`: wrapped Persona / System Prompt title in `Expanded` to prevent overflow when long custom names are displayed.
+  * `McpChatInputBar`: stacked the paste-from-clipboard action directly below the attachment (paperclip) icon in a compact vertical `Column`.
+  * `WorkflowSaveDialog`: modernized option selector using Flutter 3.32+ `RadioGroup` and `RadioListTile` with compact zero-padding.
+
 ## 1.4.1
 
 * **Web & WASM Compatibility**:

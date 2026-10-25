@@ -19,19 +19,11 @@ class SkillsManagerDialog extends StatefulWidget {
 
   static Future<SkillDef?> show(BuildContext context, PlaygroundController controller) {
     final isWide = MediaQuery.sizeOf(context).width >= 700;
-    if (isWide) {
-      return showDialog<SkillDef>(
-        context: context,
-        builder: (ctx) => SkillsManagerDialog(controller: controller),
-      );
-    } else {
-      return showDialog<SkillDef>(
-        context: context,
-        builder: (ctx) => Dialog.fullscreen(
-          child: SkillsManagerDialog(controller: controller),
-        ),
-      );
-    }
+    return showDialog<SkillDef>(
+      context: context,
+      useSafeArea: isWide,
+      builder: (ctx) => SkillsManagerDialog(controller: controller),
+    );
   }
 
   @override
@@ -205,13 +197,9 @@ class _SkillsManagerDialogState extends State<SkillsManagerDialog> {
     final theme = Theme.of(context);
     final activeSkillId = widget.controller.activeSkill?.id;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: SizedBox(
-        width: 950,
-        height: 650,
-        child: Scaffold(
+    final isWide = MediaQuery.sizeOf(context).width >= 700;
+
+    final scaffold = Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
@@ -373,7 +361,21 @@ class _SkillsManagerDialogState extends State<SkillsManagerDialog> {
                     }).toList(),
                   ),
                 ),
-        ),
+        );
+
+    if (!isWide) {
+      return Dialog.fullscreen(
+        child: scaffold,
+      );
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: SizedBox(
+        width: 950,
+        height: 650,
+        child: scaffold,
       ),
     );
   }

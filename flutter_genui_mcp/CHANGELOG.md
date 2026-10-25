@@ -1,3 +1,9 @@
+## 1.4.2
+
+* **Synchronized Core Upgrades**:
+  * Bumped dependency to `flutter_ui_mcp_core: ^1.4.2`.
+  * Inherited mobile fullscreen dialogs and responsive layout improvements across all settings, skills, and tools dialogs.
+
 ## 1.4.1
 
 * **Dependency Modernization**:

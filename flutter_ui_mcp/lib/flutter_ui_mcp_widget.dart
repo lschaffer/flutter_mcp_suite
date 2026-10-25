@@ -2390,17 +2390,23 @@ class _McpPlaygroundState extends State<McpPlayground> {
                 hintText: isGen
                     ? 'Agent is working...'
                     : 'Type a message, paste image/doc (Ctrl+V), or ask a tool...',
-                leading: Row(
+                leading: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       icon: const Icon(Icons.attach_file_outlined),
                       tooltip: 'Attach Files / Images',
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      visualDensity: VisualDensity.compact,
                       onPressed: isGen ? null : _pickAttachments,
                     ),
                     IconButton(
                       icon: const Icon(Icons.content_paste_go_outlined),
                       tooltip: 'Paste from Clipboard (Ctrl+V)',
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      visualDensity: VisualDensity.compact,
                       onPressed: isGen ? null : () => _handleClipboardPaste(),
                     ),
                   ],

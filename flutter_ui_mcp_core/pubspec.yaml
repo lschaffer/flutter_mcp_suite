@@ -1,6 +1,6 @@
 name: flutter_ui_mcp_core
 description: "Shared UI components, dialogs, drawers, controllers, and services for the Flutter MCP Suite ecosystem."
-version: 1.4.1
+version: 1.4.2
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/flutter_ui_mcp_core
 

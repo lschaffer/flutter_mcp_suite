@@ -16,8 +16,10 @@ class ServerToolsDialog extends StatefulWidget {
   });
 
   static Future<void> show(BuildContext context, McpServerConfig server, PlaygroundController controller) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return showDialog(
       context: context,
+      useSafeArea: !isMobile,
       builder: (ctx) => ServerToolsDialog(server: server, controller: controller),
     );
   }
@@ -82,6 +84,54 @@ class _ServerToolsDialogState extends State<ServerToolsDialog> {
     final clientDef = clients.isNotEmpty ? clients.first : null;
     final isConnected = clientDef?.isConnected ?? false;
     final tools = clientDef?.availableTools ?? [];
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final scaffold = Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${widget.server.name} Tools',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor),
+            ),
+            Text(
+              !widget.server.enabled
+                  ? l10n.get('serverDisabled')
+                  : (isConnected ? '${tools.length} tools available' : (_connecting ? l10n.get('connecting') : l10n.get('offline'))),
+              style: TextStyle(
+                fontSize: 12,
+                color: !widget.server.enabled
+                    ? Colors.grey
+                    : (isConnected ? Colors.green : Colors.orangeAccent),
+              ),
+            ),
+          ],
+        ),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.close, color: textColor),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+      body: !widget.server.enabled
+          ? _buildDisabledState(context)
+          : (_connecting
+              ? _buildLoadingState(context)
+              : (isConnected ? _buildToolsList(context, tools) : _buildOfflineState(context))),
+    );
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        backgroundColor: dialogBgColor,
+        child: scaffold,
+      );
+    }
 
     return Dialog(
       backgroundColor: dialogBgColor,
@@ -89,45 +139,7 @@ class _ServerToolsDialogState extends State<ServerToolsDialog> {
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580, maxHeight: 600),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${widget.server.name} Tools',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor),
-                ),
-                Text(
-                  !widget.server.enabled
-                      ? l10n.get('serverDisabled')
-                      : (isConnected ? '${tools.length} tools available' : (_connecting ? l10n.get('connecting') : l10n.get('offline'))),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: !widget.server.enabled
-                        ? Colors.grey
-                        : (isConnected ? Colors.green : Colors.orangeAccent),
-                  ),
-                ),
-              ],
-            ),
-            automaticallyImplyLeading: false,
-            actions: [
-              IconButton(
-                icon: Icon(Icons.close, color: textColor),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          body: !widget.server.enabled
-              ? _buildDisabledState(context)
-              : (_connecting
-                  ? _buildLoadingState(context)
-                  : (isConnected ? _buildToolsList(context, tools) : _buildOfflineState(context))),
-        ),
+        child: scaffold,
       ),
     );
   }

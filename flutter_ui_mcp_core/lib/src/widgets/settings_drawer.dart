@@ -286,80 +286,101 @@ class _SettingsPanelState extends State<SettingsPanel> {
       if (!mounted) return;
       Navigator.pop(context); // close loader
 
+      final isMobile = MediaQuery.sizeOf(context).width < 600;
+      Widget buildToolsList() {
+        return tools.isEmpty
+            ? const Center(child: Text('No tools reported by this server.'))
+            : ListView.builder(
+                itemCount: tools.length,
+                itemBuilder: (c, idx) {
+                  final t = tools[idx];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ExpansionTile(
+                      title: Text(
+                        t.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      subtitle: Text(
+                        t.description ?? 'No description',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      childrenPadding: const EdgeInsets.all(12),
+                      children: [
+                        if (t.description != null) ...[
+                          Text(
+                            t.description!,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        const Text(
+                          'Schema:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            const JsonEncoder.withIndent(
+                              '  ',
+                            ).convert(t.inputSchema ?? {}),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+      }
+
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Tools from ${server.name}'),
-          content: SizedBox(
-            width: 480,
-            height: 450,
-            child: tools.isEmpty
-                ? const Center(child: Text('No tools reported by this server.'))
-                : ListView.builder(
-                    itemCount: tools.length,
-                    itemBuilder: (c, idx) {
-                      final t = tools[idx];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ExpansionTile(
-                          title: Text(
-                            t.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                          subtitle: Text(
-                            t.description ?? 'No description',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          childrenPadding: const EdgeInsets.all(12),
-                          children: [
-                            if (t.description != null) ...[
-                              Text(
-                                t.description!,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              const SizedBox(height: 6),
-                            ],
-                            const Text(
-                              'Schema:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                const JsonEncoder.withIndent(
-                                  '  ',
-                                ).convert(t.inputSchema ?? {}),
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+        builder: (ctx) {
+          if (isMobile) {
+            return Dialog.fullscreen(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Text('Tools: ${server.name}'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
                   ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
+                ),
+                body: SafeArea(child: Padding(padding: const EdgeInsets.all(8.0), child: buildToolsList())),
+              ),
+            );
+          }
+          return AlertDialog(
+            title: Text('Tools from ${server.name}'),
+            content: SizedBox(
+              width: 480,
+              height: 450,
+              child: buildToolsList(),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
       );
     } catch (e) {
       if (!mounted) return;
@@ -841,13 +862,20 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   children: [
                     Icon(Icons.edit_note, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
-                    Text(
-                      'System Prompt / Persona',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        'System Prompt / Persona',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    const Spacer(),
                     if (_systemPromptCtrl.text.isNotEmpty)
                       TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         icon: const Icon(Icons.clear, size: 14),
                         label: const Text('Clear', style: TextStyle(fontSize: 12)),
                         onPressed: () {
@@ -916,13 +944,20 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   children: [
                     Icon(Icons.handyman_outlined, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
-                    Text(
-                      'Tools ($activeCount / $totalTools Active)',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        'Tools ($activeCount / $totalTools Active)',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    const Spacer(),
                     if (totalTools > 0) ...[
                       TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         onPressed: () {
                           final allNames = <String>{
                             ...localTools.map((t) => t.name),
@@ -934,7 +969,13 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         },
                         child: const Text('Enable All', style: TextStyle(fontSize: 12)),
                       ),
+                      const SizedBox(width: 4),
                       TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         onPressed: () {
                           setState(() {
                             widget.controller.updateEnabledTools({});

@@ -19,6 +19,145 @@ class SkillDetailsDialog extends StatelessWidget {
     final theme = Theme.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 600;
 
+    Widget buildDetailsContent() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (skill.goal.isNotEmpty) ...[
+            Text(
+              'Goal',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(skill.goal, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+          ],
+          if (skill.description.isNotEmpty) ...[
+            Text(
+              'Description',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(skill.description, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+          ],
+          if (skill.toolNames.isNotEmpty) ...[
+            Text(
+              'Required Tools (${skill.toolNames.length})',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: skill.toolNames.map((t) {
+                return Chip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: const Icon(Icons.build_circle_outlined, size: 14),
+                  label: Text(t, style: const TextStyle(fontSize: 11)),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+          ],
+          Text(
+            'AgentSkills.io Content (skill.md)',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: theme.dividerColor.withValues(alpha: 0.4),
+              ),
+            ),
+            child: SelectableText(
+              skill.skillDef,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (!isWide) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text('Skill: ${skill.name}', overflow: TextOverflow.ellipsis),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit in Skill Wizard',
+                onPressed: () async {
+                  Navigator.pop(context);
+                  final result = await showDialog<SkillDef>(
+                    context: context,
+                    builder: (ctx) => SkillWizardDialog(
+                      controller: controller,
+                      prefillSkill: skill,
+                    ),
+                  );
+                  if (result != null) {
+                    await controller.saveSkill(result);
+                    if (controller.activeSkill?.id == result.id) {
+                      controller.setActiveSkill(result);
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: buildDetailsContent(),
+            ),
+          ),
+          bottomNavigationBar: controller.activeSkill?.id == skill.id
+              ? SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Unload Active Skill'),
+                      onPressed: () {
+                        controller.setActiveSkill(null);
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ),
+                )
+              : null,
+        ),
+      );
+    }
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
@@ -55,87 +194,9 @@ class SkillDetailsDialog extends StatelessWidget {
         ],
       ),
       content: SizedBox(
-        width: isWide ? 680 : double.maxFinite,
+        width: 680,
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (skill.goal.isNotEmpty) ...[
-                Text(
-                  'Goal',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(skill.goal, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 12),
-              ],
-              if (skill.description.isNotEmpty) ...[
-                Text(
-                  'Description',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(skill.description, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 12),
-              ],
-              if (skill.toolNames.isNotEmpty) ...[
-                Text(
-                  'Required Tools (${skill.toolNames.length})',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: skill.toolNames.map((t) {
-                    return Chip(
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.build_circle_outlined, size: 14),
-                      label: Text(t, style: const TextStyle(fontSize: 11)),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 14),
-              ],
-              Text(
-                'AgentSkills.io Content (skill.md)',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.dividerColor.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: SelectableText(
-                  skill.skillDef,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: buildDetailsContent(),
         ),
       ),
       actions: [

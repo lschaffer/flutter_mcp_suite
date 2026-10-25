@@ -45,6 +45,7 @@ Future<void> showMcpSettingsDialog(
   if (isMobile) {
     return showDialog(
       context: context,
+      useSafeArea: false,
       builder: (ctx) => Dialog.fullscreen(
         child: SettingsPanel(
           controller: controller,

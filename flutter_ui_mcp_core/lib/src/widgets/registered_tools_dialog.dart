@@ -11,16 +11,9 @@ class RegisteredToolsDialog extends StatelessWidget {
 
   static Future<void> show(BuildContext context, PlaygroundController controller) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    if (isMobile) {
-      return showDialog(
-        context: context,
-        builder: (ctx) => Dialog.fullscreen(
-          child: RegisteredToolsDialog(controller: controller),
-        ),
-      );
-    }
     return showDialog(
       context: context,
+      useSafeArea: !isMobile,
       builder: (ctx) => RegisteredToolsDialog(controller: controller),
     );
   }
@@ -60,7 +53,7 @@ class RegisteredToolsDialog extends StatelessWidget {
     );
 
     if (isMobile) {
-      return childWidget;
+      return Dialog.fullscreen(child: childWidget);
     }
 
     return Dialog(

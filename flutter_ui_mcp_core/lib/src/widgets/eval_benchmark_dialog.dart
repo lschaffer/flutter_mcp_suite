@@ -9,8 +9,10 @@ class EvalBenchmarkDialog extends StatefulWidget {
   const EvalBenchmarkDialog({super.key, required this.controller});
 
   static Future<void> show(BuildContext context, PlaygroundController controller) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return showDialog(
       context: context,
+      useSafeArea: !isMobile,
       builder: (ctx) => EvalBenchmarkDialog(controller: controller),
     );
   }
@@ -111,17 +113,17 @@ class _EvalBenchmarkDialogState extends State<EvalBenchmarkDialog> {
     final evalCtrl = widget.controller.evalController;
     final isEvaluating = evalCtrl.isEvaluating;
     final report = evalCtrl.lastReport;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 750, maxHeight: 700),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
+    Widget buildContent({required bool showHeader}) {
+      return Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            if (showHeader) ...[
               Row(
                 children: [
                   CircleAvatar(
@@ -158,9 +160,10 @@ class _EvalBenchmarkDialogState extends State<EvalBenchmarkDialog> {
                 ],
               ),
               const SizedBox(height: 16),
+            ],
 
-              // Benchmark Summary Card
-              if (report != null) ...[
+            // Benchmark Summary Card
+            if (report != null) ...[
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -332,7 +335,43 @@ class _EvalBenchmarkDialogState extends State<EvalBenchmarkDialog> {
               ),
             ],
           ),
+        );
+    }
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Agent Evaluation & Benchmarking',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Target: ${widget.controller.activeLlmConfig.model} (${widget.controller.activeLlmConfig.provider.name})',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: buildContent(showHeader: false),
         ),
+      );
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 750, maxHeight: 700),
+        child: buildContent(showHeader: true),
       ),
     );
   }
