@@ -1,3 +1,19 @@
+## 1.5.0
+
+* **Multi-LLM Configuration Profiles & Manager (`LlmProfilesTab`)**:
+  * Create, switch, rename, duplicate (`clone()`), and delete named LLM configuration profiles.
+  * Profile fallback strategies and default profile resolution.
+  * Reorganized `LlmConfigForm` with execution limits (max tool calls, max turns, turn limit) and collapsible parameter sections.
+* **Safe Build-Phase State Dispatching (`_safeNotifyListeners`)**:
+  * Fixed `setState() or markNeedsBuild() called during build` assertion when `fetchActiveModelPrice()` or configuration changes occur during the widget tree build phase.
+  * Automatically defers notifications to `SchedulerPhase.postFrameCallbacks` when called during `persistentCallbacks`.
+* **Synchronous Rebuild Prevention in `AgentInspector`**:
+  * Guarded `fetchActiveModelPrice()` in `initState()` and `didUpdateWidget()` with post-frame callbacks.
+* **Workflow Scratchpad Memory & Progressive Discovery Integration**:
+  * Integrated `WorkflowMemoryStore` in `PlaygroundController` with dynamic blackboard tools (`store_memory`, `recall_memory`).
+  * Improved `WorkflowSaveDialog`: persists single most recent turn prompt and subprompts with clear omit warning banner.
+  * Fixed tool selector in settings drawer: accurately displays active tool counts and selected tools across primary and subagent scopes.
+
 ## 1.4.2
 
 * **Responsive Full-Screen Dialogs on Mobile**:

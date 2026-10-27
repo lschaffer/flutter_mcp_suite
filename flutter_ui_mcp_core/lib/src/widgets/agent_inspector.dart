@@ -26,10 +26,13 @@ class _AgentInspectorState extends State<AgentInspector> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
-    if (widget.controller.activeModelPrice == null &&
-        !widget.controller.isLoadingPrice) {
-      widget.controller.fetchActiveModelPrice();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          widget.controller.activeModelPrice == null &&
+          !widget.controller.isLoadingPrice) {
+        widget.controller.fetchActiveModelPrice();
+      }
+    });
   }
 
   @override
@@ -38,10 +41,13 @@ class _AgentInspectorState extends State<AgentInspector> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_onControllerChanged);
       widget.controller.addListener(_onControllerChanged);
-      if (widget.controller.activeModelPrice == null &&
-          !widget.controller.isLoadingPrice) {
-        widget.controller.fetchActiveModelPrice();
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            widget.controller.activeModelPrice == null &&
+            !widget.controller.isLoadingPrice) {
+          widget.controller.fetchActiveModelPrice();
+        }
+      });
     }
   }
 

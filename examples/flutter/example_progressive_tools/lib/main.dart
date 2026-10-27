@@ -178,10 +178,7 @@ class _ProgressiveToolsScreenState extends State<ProgressiveToolsScreen> {
         progressiveMcpDiscovery: true,
         customLocalTools: _allCatalogTools,
         initialSystemPrompt: progressiveSystemPrompt,
-        initialEnabledTools: const [
-          'mcp_list_tools',
-          'mcp_call_tool',
-        ],
+        initialEnabledTools: _allCatalogTools.map((t) => t.name).toList(),
         messageContentBuilder: (context, message) {
           if (message == null || message.type != MessageType.toolResponse) {
             return null;

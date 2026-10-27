@@ -10,17 +10,31 @@ It initializes the playground widget with custom local Dart-native tools (Weathe
 
 Here is how the playground and its configuration interfaces look:
 
+### 🎛️ Unified Showcase Gallery
+Select and switch between showcase examples (Progressive Discovery, Sub-Agents, Dynamic Skills, Episodic Memory, Multimodal Vision, and more) directly from the top bar:
+
+![Unified Showcase Gallery](../../screenshots/example_ui/flutter_ui_mcp/flutter_ui_combined_menu.png)
+
+> [!TIP]
+> **Mobile Optimization**: On mobile displays (`< 700px`), tapping the showcase selector opens a fullscreen bottom-sheet picker with full feature cards, tags, prompt previews, and a copyable example prompts dialog.
+
+### ⚡ Progressive MCP Tool Discovery
+![Progressive Discovery](../../screenshots/example_ui/flutter_ui_mcp/flutter_ui_combined_progressive.png)
+
+### 🤖 Sub-Agent Delegation & Orchestration
+![Sub-Agents](../../screenshots/example_ui/flutter_ui_mcp/flutter_ui_combined_subagents.png)
+
 ### LLM Provider Setup
-![LLM Config](../screenshots/example_ui/playground_config_llm.png)
+![LLM Config](../../screenshots/example_ui/playground_config_llm.png)
 
 ### Remote MCP Server configuration
-![LLM Config](../screenshots/example_ui/playground_config_remote_mcp.png)
+![Remote MCP Config](../../screenshots/example_ui/playground_config_remote_mcp.png)
 
 ### Local MCP Server configuration
-![LLM Config](../screenshots/example_ui/playground_config_local_mcp.png)
+![Local MCP Config](../../screenshots/example_ui/playground_config_local_mcp.png)
 
 ### Local MCP Server add custom configuration
-![LLM Config](../screenshots/example_ui/playground_config_add_local_mcp.png)
+![Local MCP Config](../../screenshots/example_ui/playground_config_add_local_mcp.png)
 
 
 ### Local MCP Subprocesses Setup (Desktop Mode)

@@ -18,6 +18,9 @@ Shared UI components, dialogs, drawers, controllers, and services for **Flutter 
 - **`PlaygroundController`** – Full lifecycle and state manager for agent conversations, tool execution, MCP server synchronization, and inspector tracing.
 - **Workflow Automation & Execution** – Define, save, load, and run multi-step agent workflows (`WorkflowDef`, `WorkflowSaveDialog`, `WorkflowLoadDialog`, `WorkflowStep`, sub-prompt pipelines).
 - **Skills System & Skill Wizard** – Comprehensive skill authoring and discovery (`SkillsManagerDialog`, `SkillWizardDialog`, `SkillDetailsDialog`, `ActiveSkillBanner`, `SkillStorageAdapter`, ZIP import/export).
+- **Multi-LLM Profiles & Manager (`LlmProfilesTab`)** – Manage, switch, duplicate (`clone()`), and customize multiple named LLM configuration profiles with profile-specific execution limits (max tool calls, max turns, turn limits) and hyperparameter defaults.
+- **Workflow Scratchpad Memory & Progressive Discovery** – Structured blackboard memory sharing (`WorkflowMemoryStore`, `store_memory`, `recall_memory`) across agents and multi-step subprompts, plus on-demand schema discovery (`McpListToolsTool`, `McpCallToolTool`).
+- **Safe State & Lifecycle Management** – Built-in `_safeNotifyListeners()` that defers updates during `SchedulerPhase.persistentCallbacks` to guarantee zero `setState() called during build` assertions across complex widget hierarchies.
 - **LLM Configuration & Settings** – `LlmConfigForm`, `SettingsDrawer`, `SubPromptListEditor`.
 - **MCP Server & Tool Management** – `McpServerRegistryTab`, `EditMcpDialog`, `RemoteMcpDialog`, `RegisteredToolsDialog`, `ServerToolsDialog`.
 - **On-Device Embedded LLMs** – `EmbeddedModelManager`, `EmbeddedModelPickerWidget`, `HfDiscoverDialog`, `AddGgufDialog`.
@@ -40,8 +43,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp_core: ^1.3.0
-  dart_mcp_core: ^1.3.0
+  flutter_ui_mcp_core: ^1.5.0
+  dart_mcp_core: ^1.5.0
 ```
 
 ---

@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('FlutterGenUiMcp default parameters test', () {
     const playground = FlutterGenUiMcp();
     expect(playground.showAppBar, isTrue);
@@ -50,9 +52,44 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-
     expect(find.byType(AppBar), findsNothing);
+  });
+
+  test('McpGenuiChatController dynamically reflects PlaygroundController activeLlmConfig', () {
+    final playgroundCtrl = PlaygroundController(
+      initialLlmConfig: const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
+    );
+    final genuiCtrl = McpGenuiChatController(
+      llmConfig: const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
+      playgroundController: playgroundCtrl,
+    );
+
+    expect(genuiCtrl.llmConfig.provider, equals(LlmProvider.none));
+
+    // Update playground controller active config via customLlmConfig
+    playgroundCtrl.customLlmConfig = const LlmConfig(
+      provider: LlmProvider.openaiCompatible,
+      model: 'qwen-coder',
+      apiKey: 'test-key',
+      baseUrl: 'https://api.deepinfra.com/v1/openai',
+    );
+
+    // McpGenuiChatController should immediately reflect the active config!
+    expect(genuiCtrl.llmConfig.provider, equals(LlmProvider.openaiCompatible));
+    expect(genuiCtrl.llmConfig.model, equals('qwen-coder'));
+
+    // Also test direct setter
+    genuiCtrl.llmConfig = const LlmConfig(
+      provider: LlmProvider.gemini,
+      model: 'gemini-2.5-flash',
+      apiKey: 'gemini-key',
+    );
+    playgroundCtrl.customLlmConfig = null;
+    expect(genuiCtrl.llmConfig.provider, equals(LlmProvider.gemini));
+    expect(genuiCtrl.llmConfig.model, equals('gemini-2.5-flash'));
+
+    genuiCtrl.dispose();
+    playgroundCtrl.dispose();
   });
 }
 

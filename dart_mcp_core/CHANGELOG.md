@@ -1,8 +1,45 @@
+## 1.5.0
+
+- **Multi-LLM Profiles & Configuration Schema (`LlmConfig`)**:
+  - Added profile identification attributes: `id`, `name`, `displayName`, and `profileId`.
+  - Added `clone({String? newId, String? newName})` for profile duplication and migration.
+  - Added execution and turn limits: `maxToolCalls`, `maxTurns`, and `turnLimit`.
+  - Changed default `maxToolIterations` / `maxToolCalls` from 400 to **30** for safe guardrails against runaway tool loops.
+  - Added resilient JSON parsing supporting snake_case (`max_tool_calls`, `max_turns`, `turn_limit`, `api_key`, `base_url`).
+- **Infinite Tool Loop Protection (`ToolLoopGuard`, `LoopEvaluation`, `LoopAction`)**:
+  - Canonicalized argument hashing to detect repetitive tool calls.
+  - Injects loop warnings upon 3 consecutive identical calls or alternating patterns (A-B-A-B-A-B).
+  - Automatically blocks tool execution at 4+ identical calls, preventing runaway token consumption.
+- **Execution Limits & Session Auto-Rotation (`McpExecutionLimits`, `SessionRotator`)**:
+  - Added `McpExecutionLimits` for turn thresholds (`maxTurns`, `turnLimit`, `maxToolCalls`).
+  - Added `SessionRotator` for automatic rotation of session log files when turn thresholds or file size limits are exceeded.
+- **Bulk Serialization for `EpisodicMemoryStore`**:
+  - Added `loadEntries(List<EpisodicMemoryEntry> entries, {bool replace = false})` and `loadFromJsonList(List<dynamic> jsonList)`.
+  - Added bulk `toJson()` and `toJsonList()` for persisting conversation archives.
+  - Added `EpisodicMemoryStore.fromJson(Map<String, dynamic> json)` factory constructor.
+- **Dynamic Model Override in Sub-Agent Delegation (`DelegateTaskTool`)**:
+  - Added optional `model` / `modelOverride` support to automatically apply model overrides to child agent's `llmConfig`.
+- **Shared Workflow Blackboard Memory (`WorkflowMemoryStore`, `StoreMemoryTool`, `RecallMemoryTool`)**:
+  - In-memory key-value scratchpad for passing structured state across multi-agent workflows and sub-agents.
+  - Automatically injected tools (`store_memory`, `recall_memory`) when `workflowMemoryStore` is provided to `Agent` or `McpAgentEngine`.
+
 ## 1.4.0
 
 - **Suite-Wide Architecture Synchronization**:
   - Aligned package versioning with companion engine extraction (`flutter_ui_mcp_embedded`).
   - Strengthened pluggable `LLMService.embeddedHandler` and `LLMService.embeddedStreamHandler` interface stability.
+- **Shared Workflow Blackboard / Scratchpad Memory (`WorkflowMemoryStore`, `StoreMemoryTool`, `RecallMemoryTool`)**:
+  - In-memory key-value scratchpad store for passing structured state across multi-agent workflows and sub-agents.
+  - Automatically injected tools (`store_memory`, `recall_memory`) when a `workflowMemoryStore` is provided to `Agent` or `McpAgentEngine`.
+  - Sub-agent clones and targets inherit the parent's workflow memory store automatically.
+  - Emits `AgentWorkflowMemoryEvent` on storage and retrieval operations.
+- **Dynamic Model Override in Sub-Agent Delegation (`DelegateTaskTool`)**:
+  - Added optional `model` / `modelOverride` parameter to `delegate_task` tool schema.
+  - Automatically applies model override to child agent's `llmConfig` (`copyWith(model: model)`) for specialized sub-tasks without requiring pre-registered agent configurations.
+- **Bulk Serialization for `EpisodicMemoryStore`**:
+  - Added `loadEntries(List<EpisodicMemoryEntry> entries, {bool replace = false})` and `loadFromJsonList(List<dynamic> jsonList)`.
+  - Added bulk `toJson()` and `toJsonList()` for persisting conversation archives to DuckDB or disk.
+  - Added `EpisodicMemoryStore.fromJson(Map<String, dynamic> json)` factory constructor.
 
 ## 1.3.0
 

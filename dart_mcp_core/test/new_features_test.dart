@@ -160,7 +160,7 @@ void main() {
 
       final tool = DelegateTaskTool(
         availableAssignees: ['clone', 'researcher'],
-        runner: ({required String assignee, required String task, List<String>? enabledTools}) async {
+        runner: ({required String assignee, required String task, List<String>? enabledTools, String? model}) async {
           delegatedAssignee = assignee;
           delegatedTask = task;
           return 'Sub-agent completed task: Found 3 articles.';
@@ -252,4 +252,202 @@ void main() {
       expect(restored[1].content, equals('Hi there!'));
     });
   });
+
+  group('6. Workflow Scratchpad Memory (WorkflowMemoryStore, StoreMemoryTool, RecallMemoryTool)', () {
+    test('WorkflowMemoryStore set, get, remove, listKeys, and json roundtrip', () {
+      final store = WorkflowMemoryStore();
+      store.set('auth_vulnerabilities', 'Found SQL injection on line 42');
+      store.set('port_count', 8080);
+      store.set('tags', ['security', 'audit']);
+
+      expect(store.has('auth_vulnerabilities'), isTrue);
+      expect(store.get('auth_vulnerabilities'), equals('Found SQL injection on line 42'));
+      expect(store.getTyped<int>('port_count'), equals(8080));
+      expect(store.listKeys(), containsAll(['auth_vulnerabilities', 'port_count', 'tags']));
+
+      final json = store.toJson();
+      final restored = WorkflowMemoryStore.fromJson(json);
+      expect(restored.get('auth_vulnerabilities'), equals('Found SQL injection on line 42'));
+      expect(restored.get('port_count'), equals(8080));
+
+      store.remove('port_count');
+      expect(store.has('port_count'), isFalse);
+    });
+
+    test('StoreMemoryTool and RecallMemoryTool interact with WorkflowMemoryStore', () async {
+      final store = WorkflowMemoryStore();
+      final storeTool = StoreMemoryTool(store: store);
+      final recallTool = RecallMemoryTool(store: store);
+
+      // Initially empty
+      final emptyRecall = await recallTool.execute({});
+      expect(emptyRecall.text, contains('currently empty'));
+
+      // Store memory
+      final storeResult = await storeTool.execute({
+        'key': 'api_endpoint',
+        'value': 'https://api.example.com/v1',
+      });
+      expect(storeResult.isError, isFalse);
+      expect(store.get('api_endpoint'), equals('https://api.example.com/v1'));
+
+      // Recall by key
+      final recallResult = await recallTool.execute({'key': 'api_endpoint'});
+      expect(recallResult.isError, isFalse);
+      expect(recallResult.text, equals('https://api.example.com/v1'));
+
+      // List keys
+      final listResult = await recallTool.execute({'key': '*'});
+      expect(listResult.text, contains('api_endpoint'));
+
+      // Missing key returns error with suggestion
+      final missingResult = await recallTool.execute({'key': 'missing_key'});
+      expect(missingResult.isError, isTrue);
+      expect(missingResult.text, contains('Key "missing_key" not found'));
+    });
+  });
+
+  group('7. Dynamic model parameter in DelegateTaskTool', () {
+    test('DelegateTaskTool passes model override to runner', () async {
+      String? executedModel;
+      final tool = DelegateTaskTool(
+        availableAssignees: ['clone', 'qwen_sub'],
+        runner: ({
+          required String assignee,
+          required String task,
+          List<String>? enabledTools,
+          String? model,
+        }) async {
+          executedModel = model;
+          return 'Completed with model $model';
+        },
+      );
+
+      final result = await tool.execute({
+        'assignee': 'clone',
+        'task': 'Optimize query',
+        'model': 'qwen2.5-coder:32b',
+      });
+
+      expect(result.isError, isFalse);
+      expect(executedModel, equals('qwen2.5-coder:32b'));
+    });
+
+    test('DelegateTaskTool accepts modelOverride as alternative parameter name', () async {
+      String? executedModel;
+      final tool = DelegateTaskTool(
+        availableAssignees: ['clone'],
+        runner: ({
+          required String assignee,
+          required String task,
+          List<String>? enabledTools,
+          String? model,
+        }) async {
+          executedModel = model;
+          return 'Done';
+        },
+      );
+
+      await tool.execute({
+        'assignee': 'clone',
+        'task': 'Check types',
+        'modelOverride': 'fast-mini',
+      });
+
+      expect(executedModel, equals('fast-mini'));
+    });
+  });
+
+  group('8. Bulk Serialization for EpisodicMemoryStore', () {
+    test('EpisodicMemoryStore bulk toJson, toJsonList, and loadEntries roundtrip', () {
+      final store = EpisodicMemoryStore();
+      final entry1 = EpisodicMemoryEntry(
+        archiveId: 'mem_1',
+        startTurnIndex: 0,
+        endTurnIndex: 3,
+        timestamp: DateTime.parse('2026-10-27T10:00:00Z'),
+        rawMessages: [ChatMessage.user('Turn 1'), ChatMessage.assistant('Response 1')],
+        summary: 'First discussion about architecture',
+      );
+      final entry2 = EpisodicMemoryEntry(
+        archiveId: 'mem_2',
+        startTurnIndex: 4,
+        endTurnIndex: 7,
+        timestamp: DateTime.parse('2026-10-27T11:00:00Z'),
+        rawMessages: [ChatMessage.user('Turn 2'), ChatMessage.assistant('Response 2')],
+        summary: 'Second discussion about database',
+      );
+
+      store.addEntry(entry1);
+      store.addEntry(entry2);
+
+      // Serialize
+      final json = store.toJson();
+      expect(json['entries'], isA<List>());
+      expect((json['entries'] as List).length, equals(2));
+
+      // Restore via factory
+      final restored = EpisodicMemoryStore.fromJson(json);
+      expect(restored.entries.length, equals(2));
+      expect(restored.getById('mem_1')?.summary, equals('First discussion about architecture'));
+      expect(restored.getById('mem_2')?.rawMessages.first.content, equals('Turn 2'));
+
+      // Test loadEntries with replace: false vs replace: true
+      final store3 = EpisodicMemoryStore();
+      store3.loadEntries([entry1]);
+      expect(store3.entries.length, equals(1));
+      store3.loadEntries([entry2], replace: false);
+      expect(store3.entries.length, equals(2));
+      store3.loadEntries([entry1], replace: true);
+      expect(store3.entries.length, equals(1));
+    });
+
+    test('9. Multi-Profile LlmConfig (id, name, clone, roundtrip)', () {
+      const config1 = LlmConfig(
+        id: 'llm_mistral_1',
+        name: 'Fast Assistant',
+        provider: LlmProvider.mistral,
+        model: 'mistral-medium-latest',
+        apiKey: 'key_123',
+        baseUrl: 'https://api.mistral.ai/v1',
+      );
+
+      expect(config1.displayName, equals('Fast Assistant'));
+      expect(config1.profileId, equals('llm_mistral_1'));
+
+      // Test clone
+      final cloned = config1.clone();
+      expect(cloned.id, contains('llm_mistral_1_copy_'));
+      expect(cloned.name, equals('Fast Assistant (Copy)'));
+      expect(cloned.model, equals('mistral-medium-latest'));
+      expect(cloned.apiKey, equals('key_123'));
+
+      // Test custom clone
+      final customClone = config1.clone(newId: 'llm_custom', newName: 'Custom Name');
+      expect(customClone.id, equals('llm_custom'));
+      expect(customClone.name, equals('Custom Name'));
+
+      // Test JSON roundtrip
+      final json = config1.toJson();
+      expect(json['id'], equals('llm_mistral_1'));
+      expect(json['name'], equals('Fast Assistant'));
+
+      final restored = LlmConfig.fromJson(json);
+      expect(restored.id, equals('llm_mistral_1'));
+      expect(restored.name, equals('Fast Assistant'));
+      expect(restored.provider, equals(LlmProvider.mistral));
+      expect(restored.model, equals('mistral-medium-latest'));
+      expect(restored.apiKey, equals('key_123'));
+
+      // Test fallback display name and profile ID when id/name omitted
+      const anonConfig = LlmConfig(
+        provider: LlmProvider.gemini,
+        model: 'gemini-3.7-flash',
+        apiKey: 'key_gemini',
+      );
+      expect(anonConfig.displayName, equals('gemini-3.7-flash'));
+      expect(anonConfig.profileId, equals('llm_gemini_gemini_3_7_flash'));
+    });
+  });
 }
+

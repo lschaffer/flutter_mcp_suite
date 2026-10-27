@@ -34,6 +34,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
   bool _fetchingModels = false;
   bool _testingLlm = false;
   bool _loadingModel = false;
+  bool _manualModelEntry = false;
   List<String> _fetchedModels = [];
 
   ModelPriceInfo? _currentModelPrice;
@@ -649,6 +650,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
               widget.onProviderChanged(val);
               setState(() {
                 _fetchedModels = [];
+                _manualModelEntry = false;
                 if (val == LlmProvider.gemini &&
                     widget.modelCtrl.text.isEmpty) {
                   widget.modelCtrl.text = 'gemini-2.5-flash';
@@ -717,177 +719,140 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           ),
           const SizedBox(height: 12),
 
-          // Autocomplete for Model name + Load Model Button
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth <= 450;
-              final autocompleteField = LayoutBuilder(
-                builder: (fieldCtx, fieldConstraints) {
-                  return Autocomplete<String>(
-                    key: ValueKey(
-                      '${widget.provider}_${_fetchedModels.length}_${widget.modelCtrl.text}',
-                    ),
-                    initialValue: widget.modelCtrl.value,
-                    optionsBuilder: (textEditingValue) {
-                      final defaultOpts = _getModelsForProvider(widget.provider);
-                      final models = _fetchedModels.isNotEmpty
-                          ? _fetchedModels
-                          : defaultOpts;
-                      if (textEditingValue.text.isEmpty) {
-                        return models;
-                      }
-                      return models.where(
-                        (m) => m.toLowerCase().contains(
-                          textEditingValue.text.toLowerCase(),
-                        ),
-                      );
-                    },
-                    optionsViewBuilder: (ctx, onSelected, options) {
-                      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-                      final badgeColor = isDark
-                          ? const Color(0xFFFFB74D)
-                          : const Color(0xFFE65100);
-                      final hoverColor = Theme.of(ctx)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.08);
+          // Model Selection: Searchable Dropdown with Textfield Fallback
+          Builder(
+            builder: (context) {
+              final defaultOpts = _getModelsForProvider(widget.provider);
+              final models =
+                  _fetchedModels.isNotEmpty ? _fetchedModels : defaultOpts;
+              final isFoundry = defaultTargetPlatform == TargetPlatform.windows &&
+                  (widget.baseUrlCtrl.text.contains('58101') ||
+                      widget.baseUrlCtrl.text.contains('127.0.0.1') ||
+                      widget.baseUrlCtrl.text.contains('localhost'));
 
-                      return Align(
-                        alignment: Alignment.topLeft,
-                        child: Material(
-                          elevation: 6.0,
-                          color: Theme.of(ctx).cardColor,
-                          surfaceTintColor: Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          clipBehavior: Clip.antiAlias,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxHeight: 280,
-                              maxWidth: fieldConstraints.maxWidth,
-                              minWidth: fieldConstraints.maxWidth,
-                            ),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              shrinkWrap: true,
-                              itemCount: options.length,
-                              itemBuilder: (context, index) {
-                                final option = options.elementAt(index);
-                                final pricing = _getPriceForOption(option);
-                                final isMulti = _isMultimodalModel(option);
-                                final badgeText = _formatDropdownBadge(pricing);
+              Widget modelWidget;
+              if (models.isEmpty || _manualModelEntry) {
+                // Fallback: standard TextFormField
+                modelWidget = TextFormField(
+                  controller: widget.modelCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Model Name',
+                    hintText: models.isEmpty
+                        ? 'Enter model name (e.g. gpt-4o, qwen2.5-coder)'
+                        : 'Enter custom model name',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    helperText: models.isEmpty
+                        ? 'No models loaded. Type name or tap "Fetch Available Models" below.'
+                        : null,
+                    suffixIcon: models.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.list_alt, size: 20),
+                            tooltip:
+                                'Choose from available models list (${models.length})',
+                            onPressed: () =>
+                                setState(() => _manualModelEntry = false),
+                          )
+                        : null,
+                  ),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Model name is required'
+                      : null,
+                );
+              } else {
+                // Searchable Dropdown Selector
+                final hasSelection = widget.modelCtrl.text.trim().isNotEmpty;
+                final displayText = hasSelection
+                    ? widget.modelCtrl.text
+                    : 'Select model (${models.length} available)...';
 
-                                return InkWell(
-                                  hoverColor: hoverColor,
-                                  onTap: () => onSelected(option),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            option,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        if (isMulti) ...[
-                                          const SizedBox(width: 6),
-                                          const Icon(
-                                            Icons.visibility_outlined,
-                                            size: 15,
-                                            color: Colors.blueAccent,
-                                          ),
-                                        ],
-                                        if (badgeText != null) ...[
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            badgeText,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: badgeColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                modelWidget = InkWell(
+                  onTap: () => _openModelSearchPicker(context, models),
+                  borderRadius: BorderRadius.circular(4),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Model Name',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_note, size: 20),
+                            tooltip: 'Enter custom model name manually',
+                            onPressed: () =>
+                                setState(() => _manualModelEntry = true),
                           ),
-                        ),
-                      );
-                    },
-                    fieldViewBuilder: (ctx, controller, focusNode, onSubmitted) {
-                      if (controller.text != widget.modelCtrl.text) {
-                        controller.text = widget.modelCtrl.text;
-                      }
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onChanged: (value) {
-                          widget.modelCtrl.text = value;
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Model Name',
-                          hintText: 'Enter or select model name',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        validator: (v) => v == null || v.trim().isEmpty
-                            ? 'Model name is required'
-                            : null,
-                      );
-                    },
-                    onSelected: (v) {
-                      widget.modelCtrl.text = v;
-                    },
-                  );
-                },
-              );
-
-              final loadButton = FilledButton.tonalIcon(
-                onPressed: _loadingModel ? null : _loadCurrentModel,
-                icon: _loadingModel
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_circle_outline, size: 16),
-                label: Text(_loadingModel ? 'Loading...' : 'Load Model'),
-                style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-                ),
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    autocompleteField,
-                    const SizedBox(height: 8),
-                    loadButton,
-                  ],
+                          IconButton(
+                            icon: const Icon(Icons.arrow_drop_down, size: 22),
+                            tooltip: 'Select model',
+                            onPressed: () =>
+                                _openModelSearchPicker(context, models),
+                          ),
+                        ],
+                      ),
+                    ),
+                    child: Text(
+                      displayText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            hasSelection ? FontWeight.w600 : FontWeight.normal,
+                        color: hasSelection
+                            ? Theme.of(context).textTheme.bodyMedium?.color
+                            : Theme.of(context).hintColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 );
               }
 
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: autocompleteField),
-                  const SizedBox(width: 8),
-                  loadButton,
-                ],
-              );
+              // Load button: ONLY shown for Windows local Foundry
+              if (isFoundry) {
+                final loadButton = FilledButton.tonalIcon(
+                  onPressed: _loadingModel ? null : _loadCurrentModel,
+                  icon: _loadingModel
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_circle_outline, size: 16),
+                  label: Text(_loadingModel ? 'Loading...' : 'Load into Foundry'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 15,
+                    ),
+                  ),
+                );
+
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth <= 450) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          modelWidget,
+                          const SizedBox(height: 8),
+                          loadButton,
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: modelWidget),
+                        const SizedBox(width: 8),
+                        loadButton,
+                      ],
+                    );
+                  },
+                );
+              }
+
+              return modelWidget;
             },
           ),
           _buildModelPricingBanner(context),
@@ -956,6 +921,343 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
       ],
     );
   }
+
+  void _openModelSearchPicker(BuildContext context, List<String> models) {
+    final isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+
+    if (isMobile) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => _ModelSearchPickerSheet(
+          models: models,
+          initialSelected: widget.modelCtrl.text,
+          onSelected: (model) {
+            setState(() {
+              widget.modelCtrl.text = model;
+            });
+            Navigator.of(ctx).pop();
+          },
+          isMultimodalModel: _isMultimodalModel,
+          getPriceForOption: _getPriceForOption,
+          formatDropdownBadge: _formatDropdownBadge,
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 580),
+            child: _ModelSearchPickerDialog(
+              models: models,
+              initialSelected: widget.modelCtrl.text,
+              onSelected: (model) {
+                setState(() {
+                  widget.modelCtrl.text = model;
+                });
+                Navigator.of(ctx).pop();
+              },
+              isMultimodalModel: _isMultimodalModel,
+              getPriceForOption: _getPriceForOption,
+              formatDropdownBadge: _formatDropdownBadge,
+            ),
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class _ModelSearchPickerContent extends StatefulWidget {
+  final List<String> models;
+  final String initialSelected;
+  final ValueChanged<String> onSelected;
+  final bool Function(String) isMultimodalModel;
+  final ModelPriceInfo? Function(String) getPriceForOption;
+  final String? Function(ModelPriceInfo?) formatDropdownBadge;
+  final VoidCallback? onClose;
+
+  const _ModelSearchPickerContent({
+    required this.models,
+    required this.initialSelected,
+    required this.onSelected,
+    required this.isMultimodalModel,
+    required this.getPriceForOption,
+    required this.formatDropdownBadge,
+    this.onClose,
+  });
+
+  @override
+  State<_ModelSearchPickerContent> createState() =>
+      _ModelSearchPickerContentState();
+}
+
+class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final badgeColor =
+        isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
+
+    final filtered = _filter.isEmpty
+        ? widget.models
+        : widget.models
+            .where((m) => m.toLowerCase().contains(_filter.toLowerCase()))
+            .toList();
+
+    final showCustomOption = _filter.trim().isNotEmpty &&
+        !widget.models.any(
+          (m) => m.toLowerCase() == _filter.trim().toLowerCase(),
+        );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.psychology_outlined, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Select Model (${widget.models.length} available)',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (widget.onClose != null)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: widget.onClose,
+                ),
+            ],
+          ),
+        ),
+        // Search field
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: TextField(
+            controller: _searchCtrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search models...',
+              prefixIcon: const Icon(Icons.search, size: 18),
+              suffixIcon: _filter.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: () {
+                        setState(() {
+                          _searchCtrl.clear();
+                          _filter = '';
+                        });
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+            ),
+            onChanged: (val) {
+              setState(() {
+                _filter = val;
+              });
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Divider(height: 1),
+        // Custom model entry option if search text doesn't match list
+        if (showCustomOption) ...[
+          Material(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.25),
+            child: ListTile(
+              dense: true,
+              leading: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.blueAccent,
+              ),
+              title: Text(
+                'Use custom: "${_filter.trim()}"',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text('Select to enter this model name manually'),
+              onTap: () => widget.onSelected(_filter.trim()),
+            ),
+          ),
+          const Divider(height: 1),
+        ],
+        // Models list
+        Flexible(
+          child: filtered.isEmpty && !showCustomOption
+              ? const Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Center(
+                    child: Text('No models found matching your search.'),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final model = filtered[index];
+                    final isSelected = model == widget.initialSelected;
+                    final pricing = widget.getPriceForOption(model);
+                    final isMulti = widget.isMultimodalModel(model);
+                    final badgeText = widget.formatDropdownBadge(pricing);
+
+                    return ListTile(
+                      dense: true,
+                      selected: isSelected,
+                      title: Text(
+                        model,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isMulti) ...[
+                            const Icon(
+                              Icons.visibility_outlined,
+                              size: 15,
+                              color: Colors.blueAccent,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          if (badgeText != null) ...[
+                            Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: badgeColor,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          if (isSelected)
+                            const Icon(
+                              Icons.check,
+                              size: 18,
+                              color: Colors.green,
+                            ),
+                        ],
+                      ),
+                      onTap: () => widget.onSelected(model),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ModelSearchPickerSheet extends StatelessWidget {
+  final List<String> models;
+  final String initialSelected;
+  final ValueChanged<String> onSelected;
+  final bool Function(String) isMultimodalModel;
+  final ModelPriceInfo? Function(String) getPriceForOption;
+  final String? Function(ModelPriceInfo?) formatDropdownBadge;
+
+  const _ModelSearchPickerSheet({
+    required this.models,
+    required this.initialSelected,
+    required this.onSelected,
+    required this.isMultimodalModel,
+    required this.getPriceForOption,
+    required this.formatDropdownBadge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      child: SafeArea(
+        top: false,
+        child: _ModelSearchPickerContent(
+          models: models,
+          initialSelected: initialSelected,
+          onSelected: onSelected,
+          isMultimodalModel: isMultimodalModel,
+          getPriceForOption: getPriceForOption,
+          formatDropdownBadge: formatDropdownBadge,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModelSearchPickerDialog extends StatelessWidget {
+  final List<String> models;
+  final String initialSelected;
+  final ValueChanged<String> onSelected;
+  final bool Function(String) isMultimodalModel;
+  final ModelPriceInfo? Function(String) getPriceForOption;
+  final String? Function(ModelPriceInfo?) formatDropdownBadge;
+
+  const _ModelSearchPickerDialog({
+    required this.models,
+    required this.initialSelected,
+    required this.onSelected,
+    required this.isMultimodalModel,
+    required this.getPriceForOption,
+    required this.formatDropdownBadge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _ModelSearchPickerContent(
+      models: models,
+      initialSelected: initialSelected,
+      onSelected: onSelected,
+      isMultimodalModel: isMultimodalModel,
+      getPriceForOption: getPriceForOption,
+      formatDropdownBadge: formatDropdownBadge,
+      onClose: () => Navigator.of(context).pop(),
+    );
+  }
 }
 
 /// Reusable advanced settings widget matching layout of Image 2 & 3.
@@ -982,6 +1284,8 @@ class LlmAdvancedSettingsForm extends StatelessWidget {
   final ValueChanged<bool> onUseNativeToolCallChanged;
   final bool useStreaming;
   final ValueChanged<bool> onUseStreamingChanged;
+  final TextEditingController? maxToolCallsCtrl;
+  final TextEditingController? turnLimitCtrl;
 
   const LlmAdvancedSettingsForm({
     super.key,
@@ -1003,6 +1307,8 @@ class LlmAdvancedSettingsForm extends StatelessWidget {
     required this.onUseNativeToolCallChanged,
     required this.useStreaming,
     required this.onUseStreamingChanged,
+    this.maxToolCallsCtrl,
+    this.turnLimitCtrl,
   });
 
   @override
@@ -1057,6 +1363,57 @@ class LlmAdvancedSettingsForm extends StatelessWidget {
             ),
           ],
         ),
+        if (maxToolCallsCtrl != null || turnLimitCtrl != null)
+          Row(
+            children: [
+              if (maxToolCallsCtrl != null)
+                Expanded(
+                  child: TextFormField(
+                    controller: maxToolCallsCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Max Tool Calls',
+                      hintText: '30 (0 = unlimited)',
+                      helperText: 'Per prompt turn (0 = unlimited)',
+                      helperStyle: TextStyle(fontSize: 10, color: Colors.grey),
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.build_outlined),
+                      isDense: true,
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final n = int.tryParse(v.trim());
+                      if (n == null || n < 0) return 'Must be >= 0';
+                      return null;
+                    },
+                  ),
+                ),
+              if (maxToolCallsCtrl != null && turnLimitCtrl != null)
+                const SizedBox(width: 12),
+              if (turnLimitCtrl != null)
+                Expanded(
+                  child: TextFormField(
+                    controller: turnLimitCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Turn Limit',
+                      hintText: '0 = unlimited',
+                      helperText: 'Max session turns (0 = unlimited)',
+                      helperStyle: TextStyle(fontSize: 10, color: Colors.grey),
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.repeat),
+                      isDense: true,
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final n = int.tryParse(v.trim());
+                      if (n == null || n < 0) return 'Must be >= 0';
+                      return null;
+                    },
+                  ),
+                ),
+            ],
+          ),
         TextFormField(
           controller: maxToolOutputSizeCtrl,
           keyboardType: TextInputType.number,

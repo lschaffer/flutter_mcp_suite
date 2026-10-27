@@ -97,7 +97,26 @@ class McpGenuiChatController extends ChangeNotifier {
   }
 
   final PlaygroundController? _playgroundController;
-  final mp.LlmConfig _llmConfig;
+  mp.LlmConfig _llmConfig;
+
+  /// Returns the active LLM configuration, prioritizing the live config
+  /// from the attached [PlaygroundController] if configured.
+  mp.LlmConfig get llmConfig {
+    final live = _playgroundController?.activeLlmConfig;
+    if (live != null && live.isConfigured) {
+      return live;
+    }
+    return _llmConfig;
+  }
+
+  /// Updates the LLM configuration and notifies listeners.
+  set llmConfig(mp.LlmConfig config) {
+    if (_llmConfig != config) {
+      _llmConfig = config;
+      notifyListeners();
+    }
+  }
+
   final List<mp.McpLocalTool> _tools;
   final String? _systemPrompt;
   final Catalog _catalog;
@@ -139,9 +158,25 @@ class McpGenuiChatController extends ChangeNotifier {
   void _parseAndApplyA2uiBlocks(String text) {
     final matches =
         RegExp(r'```(?:json)?\s*([\s\S]*?)\s*```').allMatches(text);
+    final candidates = <String>[];
     for (final m in matches) {
-      final jsonStr = m.group(1)?.trim();
-      if (jsonStr == null || !jsonStr.startsWith('{')) continue;
+      final s = m.group(1)?.trim();
+      if (s != null && s.isNotEmpty) candidates.add(s);
+    }
+
+    // Also look for un-fenced JSON objects containing "component"
+    if (candidates.isEmpty) {
+      final jsonBlockRegex = RegExp(
+        r'\{[\s\S]*?"component"\s*:[\s\S]*?\}',
+        caseSensitive: false,
+      );
+      for (final m in jsonBlockRegex.allMatches(text)) {
+        final s = m.group(0)?.trim();
+        if (s != null && s.isNotEmpty) candidates.add(s);
+      }
+    }
+
+    for (final jsonStr in candidates) {
       try {
         final decoded = jsonDecode(jsonStr);
         if (decoded is Map<String, dynamic>) {
@@ -158,11 +193,59 @@ class McpGenuiChatController extends ChangeNotifier {
             }
             final msg = a2ui_core.A2uiMessage.fromJson(decoded);
             _surfaceController.handleMessage(msg);
+          } else if (decoded.containsKey('component')) {
+            _applyDirectComponent(decoded);
+          }
+        } else if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map<String, dynamic> && item.containsKey('component')) {
+              _applyDirectComponent(item);
+            }
           }
         }
       } catch (_) {}
     }
     _syncSurfaces();
+  }
+
+  void _applyDirectComponent(Map<String, dynamic> comp) {
+    final compName = comp['component']?.toString() ?? '';
+    if (compName.isEmpty) return;
+
+    final surfaceId =
+        'surface_${compName.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
+    final compId = comp['id']?.toString() ?? 'root';
+    final compProps = Map<String, dynamic>.from(comp);
+    compProps.remove('id');
+    compProps.remove('component');
+
+    try {
+      _surfaceController.handleMessage(
+        a2ui_core.A2uiMessage.fromJson({
+          'version': 'v0.9',
+          'createSurface': {
+            'surfaceId': surfaceId,
+            'catalogId': _catalog.catalogId,
+          },
+        }),
+      );
+
+      _surfaceController.handleMessage(
+        a2ui_core.A2uiMessage.fromJson({
+          'version': 'v0.9',
+          'updateComponents': {
+            'surfaceId': surfaceId,
+            'components': [
+              {
+                'id': compId,
+                'component': compName,
+                ...compProps,
+              },
+            ],
+          },
+        }),
+      );
+    } catch (_) {}
   }
 
   /// The GenUI [SurfaceController] backing this chat.
@@ -174,8 +257,19 @@ class McpGenuiChatController extends ChangeNotifier {
   /// The [Catalog] in use.
   Catalog get catalog => _catalog;
 
+  bool _cancelled = false;
+
   /// Whether a request is currently being generated.
   bool get isGenerating => _isGenerating;
+
+  /// Stops / cancels the in-flight generation stream or tool execution loop.
+  void cancelGeneration() {
+    if (!_isGenerating) return;
+    _cancelled = true;
+    _isGenerating = false;
+    _playgroundController?.cancelGeneration();
+    notifyListeners();
+  }
 
   /// The chat transcript entries (user + assistant text).
   List<GenuiChatEntry> get entries => List.unmodifiable(_entries);
@@ -221,6 +315,7 @@ class McpGenuiChatController extends ChangeNotifier {
   Future<void> _handleSend(ChatMessage message) async {
     if (_isGenerating) return;
     _isGenerating = true;
+    _cancelled = false;
     notifyListeners();
 
     final atts = _pendingAttachments;
@@ -342,6 +437,7 @@ class McpGenuiChatController extends ChangeNotifier {
 
     try {
       for (var iteration = 0; iteration < maxToolIterations; iteration++) {
+        if (_cancelled) break;
         mp.LLMResponse? finalResponse;
         final mcpTools = <mp.MCPTool>[
           ..._tools.map((t) => t.toMCPTool()),
@@ -357,11 +453,12 @@ class McpGenuiChatController extends ChangeNotifier {
         final iterationEntryId = _newId();
 
         await for (final chunk in mp.LLMService.generateStream(
-          config: _llmConfig,
+          config: llmConfig,
           messages: List.unmodifiable(_history),
           tools: mcpTools,
           systemPrompt: _effectiveSystemPrompt,
         )) {
+          if (_cancelled) break;
           if (chunk.textDelta.isNotEmpty) {
             iterationBuffer.write(chunk.textDelta);
             _transport.addChunk(chunk.textDelta);
@@ -384,6 +481,8 @@ class McpGenuiChatController extends ChangeNotifier {
             _syncSurfaces();
           }
         }
+
+        if (_cancelled) break;
 
         final rawIterationText = iterationBuffer.toString();
         _parseAndApplyA2uiBlocks(rawIterationText);
@@ -411,7 +510,7 @@ class McpGenuiChatController extends ChangeNotifier {
         }
 
         final toolCalls = finalResponse?.toolCalls ?? const <mp.LLMToolCall>[];
-        if (toolCalls.isEmpty) break;
+        if (toolCalls.isEmpty || _cancelled) break;
 
         for (final call in toolCalls) {
           final toolCallMsg = mp.ChatMessage(
@@ -428,6 +527,7 @@ class McpGenuiChatController extends ChangeNotifier {
         }
 
         for (final call in toolCalls) {
+          if (_cancelled) break;
           final result = await _executeTool(call);
           final toolRespMsg = mp.ChatMessage(
             id: call.id.isNotEmpty ? call.id : _newId(),
@@ -443,15 +543,18 @@ class McpGenuiChatController extends ChangeNotifier {
         }
       }
     } catch (error) {
-      _entries.add(
-        GenuiChatEntry(
-          id: _newId(),
-          kind: GenuiChatEntryKind.error,
-          text: 'Generation error: $error',
-        ),
-      );
+      if (!_cancelled) {
+        _entries.add(
+          GenuiChatEntry(
+            id: _newId(),
+            kind: GenuiChatEntryKind.error,
+            text: 'Generation error: $error',
+          ),
+        );
+      }
     } finally {
       _isGenerating = false;
+      _cancelled = false;
       notifyListeners();
     }
   }
@@ -619,7 +722,7 @@ class McpGenuiChatController extends ChangeNotifier {
               Map<String, dynamic>.from(func.argumentSchema.value),
         ),
     ];
-    if (allTools.isNotEmpty && !_llmConfig.useNativeToolCall) {
+    if (allTools.isNotEmpty && !llmConfig.useNativeToolCall) {
       buffer.writeln('\n\nAvailable Tools:');
       for (final tool in allTools) {
         buffer.writeln('- Tool Name: ${tool.name}');
@@ -633,13 +736,26 @@ class McpGenuiChatController extends ChangeNotifier {
   }
 
   static final RegExp _a2uiJsonBlockRegex = RegExp(
-    r'```(?:json)?\s*[\s\S]*?```|\{\s*"version"\s*:\s*"v0\.9"[\s\S]*\}',
+    r'```(?:json)?\s*[\s\S]*?```|\{\s*"version"\s*:\s*"v0\.9"[\s\S]*\}|,\s*\{\s*"id"\s*:[\s\S]*\}|\{\s*"id"\s*:[\s\S]*?"component"[\s\S]*?\}|\{\s*"component"\s*:[\s\S]*?\}',
     caseSensitive: false,
   );
 
   /// Strips A2UI JSON code blocks so they are not displayed in the chat view.
   static String _sanitizeAssistantText(String raw) {
-    return raw.replaceAll(_a2uiJsonBlockRegex, '').trim();
+    String cleaned = raw;
+    // Strip in-progress code blocks during streaming
+    final unclosedCodeBlock =
+        RegExp(r'```(?:json)?\s*\{?[\s\S]*$', caseSensitive: false);
+    cleaned = cleaned.replaceAll(unclosedCodeBlock, '');
+    // Strip closed A2UI and component JSON blocks
+    cleaned = cleaned.replaceAll(_a2uiJsonBlockRegex, '');
+    // Strip trailing/dangling JSON fragments like ", { ... " or indented JSON
+    final danglingJson = RegExp(
+      r',?\s*\{\s*"(?:id|component|title|version)"[\s\S]*$',
+      caseSensitive: false,
+    );
+    cleaned = cleaned.replaceAll(danglingJson, '');
+    return cleaned.trim();
   }
 
   /// Extracts user action name and context parameters from a GenUI [ChatMessage].

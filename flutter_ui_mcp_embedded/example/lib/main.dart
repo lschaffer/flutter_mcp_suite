@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_ui_mcp_embedded/flutter_ui_mcp_embedded.dart';
-import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart'
-    show EmbeddedLlmRegistry;
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 
 void main() {

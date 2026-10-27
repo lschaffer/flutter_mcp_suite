@@ -78,10 +78,7 @@ McpPlayground(
     SendSlackNotificationTool(),
     CalculateComputeCostTool(),
   ],
-  initialEnabledTools: const [
-    'mcp_list_tools',
-    'mcp_call_tool',
-  ],
+  initialEnabledTools: _allCatalogTools.map((t) => t.name).toList(),
 )
 ```
 

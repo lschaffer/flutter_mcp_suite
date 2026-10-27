@@ -81,6 +81,12 @@ class EpisodicMemoryEntry {
 class EpisodicMemoryStore {
   final List<EpisodicMemoryEntry> _entries = [];
 
+  EpisodicMemoryStore([List<EpisodicMemoryEntry>? initialEntries]) {
+    if (initialEntries != null) {
+      _entries.addAll(initialEntries);
+    }
+  }
+
   List<EpisodicMemoryEntry> get entries => List.unmodifiable(_entries);
 
   void addEntry(EpisodicMemoryEntry entry) {
@@ -118,6 +124,43 @@ class EpisodicMemoryStore {
 
   void clear() {
     _entries.clear();
+  }
+
+  /// Bulk loads entries into the episodic memory store.
+  /// If [replace] is true (default is false), clears existing entries first.
+  void loadEntries(List<EpisodicMemoryEntry> entries, {bool replace = false}) {
+    if (replace) {
+      _entries.clear();
+    }
+    _entries.addAll(entries);
+  }
+
+  /// Bulk loads entries from a serialized list of JSON maps (e.g. from DuckDB or disk).
+  void loadFromJsonList(List<dynamic> jsonList, {bool replace = false}) {
+    final parsed = jsonList
+        .whereType<Map<String, dynamic>>()
+        .map(EpisodicMemoryEntry.fromJson)
+        .toList();
+    loadEntries(parsed, replace: replace);
+  }
+
+  /// Serializes all entries to a list of JSON-encodable maps.
+  List<Map<String, dynamic>> toJsonList() =>
+      _entries.map((e) => e.toJson()).toList();
+
+  /// Bulk serialization of all entries into a map.
+  Map<String, dynamic> toJson() => {
+        'entries': toJsonList(),
+      };
+
+  /// Restores an [EpisodicMemoryStore] from a serialized map.
+  factory EpisodicMemoryStore.fromJson(Map<String, dynamic> json) {
+    final store = EpisodicMemoryStore();
+    final rawEntries = json['entries'];
+    if (rawEntries is List) {
+      store.loadFromJsonList(rawEntries, replace: true);
+    }
+    return store;
   }
 }
 

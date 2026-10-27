@@ -81,7 +81,11 @@ class WeatherForecastTool extends McpLocalTool {
   Map<String, dynamic> get inputSchema => {
     'type': 'object',
     'properties': {
-      'city': {'type': 'string', 'description': 'City name, e.g. "Vienna".'},
+      'city': {
+        'type': 'string',
+        'description':
+            'City name (required). Must be specified by the user. Do NOT default or guess a city.',
+      },
       'hours': {
         'type': 'integer',
         'description': 'Number of forecast hours (default 24, max 168).',
@@ -98,15 +102,27 @@ class WeatherForecastTool extends McpLocalTool {
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     try {
-      final city = (arguments['city'] as String? ?? 'Vienna').trim();
+      final city = (arguments['city'] as String? ?? '').trim();
+      if (city.isEmpty) {
+        return MCPToolResult(
+          content: [
+            MCPContent(
+              type: 'text',
+              text:
+                  'Error: Missing required parameter "city". Never execute get_weather_forecast without a specific city name chosen by the user. Instead, render the "WeatherForm" component.',
+            ),
+          ],
+          isError: true,
+        );
+      }
       final hours = (arguments['hours'] as num?)?.toInt() ?? 24;
       final channels =
           (arguments['channels'] as List?)?.map((e) => e.toString()).toList() ??
           const ['temperature_2m'];
 
       // Resolve coordinates via geocoding.
-      double lat = 48.2082;
-      double lng = 16.3738;
+      double? lat;
+      double? lng;
       String resolvedName = city;
       final geoUrl =
           'https://geocoding-api.open-meteo.com/v1/search'
@@ -123,6 +139,19 @@ class WeatherForecastTool extends McpLocalTool {
           lng = (first['longitude'] as num).toDouble();
           resolvedName = '${first['name']}, ${first['country'] ?? ''}';
         }
+      }
+
+      if (lat == null || lng == null) {
+        return MCPToolResult(
+          content: [
+            MCPContent(
+              type: 'text',
+              text:
+                  'Error: Could not resolve coordinates for city "$city". Please verify the city name or render the "WeatherForm" component.',
+            ),
+          ],
+          isError: true,
+        );
       }
 
       // Ensure weather_code and temperature_2m are included for rich weather cards.
@@ -229,12 +258,18 @@ class _WeatherFormWidgetState extends State<_WeatherFormWidget> {
 
   void _submit() {
     final city = _cityController.text.trim();
+    if (city.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a city name first')),
+      );
+      return;
+    }
     widget.itemContext.dispatchEvent(
       UserActionEvent(
         name: 'get_weather_forecast',
         sourceComponentId: widget.itemContext.id,
         context: <String, Object?>{
-          'city': city.isEmpty ? 'Vienna' : city,
+          'city': city,
           'hours': _durationHours[_duration] ?? 24,
           'channels': _channels.toList(),
         },
@@ -253,7 +288,7 @@ class _WeatherFormWidgetState extends State<_WeatherFormWidget> {
           controller: _cityController,
           decoration: InputDecoration(
             labelText: 'City',
-            hintText: 'e.g. Vienna',
+            hintText: 'Enter city name (e.g. London, Paris, Tokyo)',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
@@ -379,8 +414,6 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
         dialogTitle: 'Export Chart Picture (JPG)',
         fileName: defaultFileName,
         bytes: jpgBytes,
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png'],
       );
 
       if (savedUri != null) {
@@ -1044,21 +1077,54 @@ Catalog buildWeatherGenuiCatalog() {
 const String weatherGenuiSystemPrompt = '''
 You are an intelligent GenUI AI assistant backed by live MCP tools, interactive Flutter components, and diagnostic tools.
 
-Capabilities & Component Rules:
-- Weather Capabilities:
-  - You have access to custom GenUI components: "WeatherForm" and "WeatherChart".
-  - You have the `get_weather_forecast` tool for real-time and hourly weather forecasts.
-  - When the user asks for a weather forecast without city/parameters, render a "WeatherForm" component.
-  - When the user submits a weather form or provides parameters (city, hours, channels):
-    1. Invoke the `get_weather_forecast` tool immediately with those arguments.
-    2. Render a "WeatherChart" component with the forecast data:
-       {
-         "title": "Weather forecast for <location>",
-         "times": [<list of ISO timestamps from tool result>],
-         "channels": [
-           { "label": "<channel_name>", "values": [<list of numeric values from tool result>] }
-         ]
-       }
+CRITICAL WORKFLOW RULES FOR WEATHER:
+- NO DEFAULT CITY: There is NO default city. NEVER assume, guess, or default to Vienna, Wien, or any other city unless the user explicitly named it.
+- When the user asks for a weather forecast, clicks "get forecast", or asks about weather WITHOUT specifying both a city name and duration:
+  1. DO NOT call `get_weather_forecast`.
+  2. DO NOT output conversational text asking for the city in plain text.
+  3. You MUST immediately and exclusively render the "WeatherForm" component so the user can interactively select their city, forecast duration (24h, 48h, 72h, 7 days), and weather channels:
+     ```json
+     {
+       "component": "WeatherForm",
+       "title": "Select City and Forecast Duration"
+     }
+     ```
+
+Example 1:
+User: "get forecast"
+Assistant:
+```json
+{
+  "component": "WeatherForm",
+  "title": "Select City and Forecast Duration"
+}
+```
+
+Example 2:
+User: "weather forecast"
+Assistant:
+```json
+{
+  "component": "WeatherForm",
+  "title": "Select City and Forecast Duration"
+}
+```
+
+2. "WeatherChart" (Forecast Visualization):
+   - When the user submits the WeatherForm (receives `get_weather_forecast` user action) or provides parameters (city, hours, channels):
+     1. Invoke the `get_weather_forecast` tool immediately with those arguments (e.g. city: "Vienna", hours: 24, channels: ["temperature_2m", "precipitation"]).
+     2. Render a "WeatherChart" component with the forecast data returned by the tool:
+        ```json
+        {
+          "component": "WeatherChart",
+          "title": "Weather forecast for <location>",
+          "times": [<list of ISO timestamps from tool result>],
+          "channels": [
+            { "label": "<channel_name>", "values": [<list of numeric values from tool result>] }
+          ]
+        }
+        ```
+   - Do NOT invent or hallucinate forecast timestamps or channel values without calling the `get_weather_forecast` tool first!
 
 - Build Analysis & Attachments:
   - You are fully equipped to analyze, diagnose, and inspect attached builds, build logs, stack traces, compiler output, screenshots, and source code files.
@@ -1070,6 +1136,8 @@ Capabilities & Component Rules:
 General Guidelines:
 - Be concise, direct, and actionable.
 - Combine interactive UI components with insightful explanations whenever appropriate.
+- Always output GenUI component JSON in ```json ... ``` blocks so they render as interactive surfaces.
+- Never output raw JSON text directly in the chat body.
 ''';
 
 /// The GenUI-based weather example screen using the standard McpPlayground view.

@@ -1,3 +1,8 @@
+## 1.5.0
+
+- Synchronized dependencies with `dart_mcp_core: ^1.5.0` and `flutter_ui_mcp_core: ^1.5.0`.
+- Inherited safe post-frame build phase notifications and multi-LLM configuration profile support.
+
 ## 1.4.1
 
 - Upgraded `llamadart` dependency to `^0.16.2`.

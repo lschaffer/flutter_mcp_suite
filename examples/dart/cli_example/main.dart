@@ -257,6 +257,10 @@ Future<void> main(List<String> args) async {
             print('✅ Sub-agent "$subAgentKey" finished: $result');
           case AgentSkillsChangedEvent(:final activeSkills):
             print('⚡ Skills updated: ${activeSkills.isEmpty ? "None" : activeSkills.join(", ")}');
+          case AgentWorkflowMemoryEvent(:final operation, :final key, :final value):
+            print(
+              '💾 Scratchpad Memory [$operation]: "$key"${value != null ? ' => ${_truncate(jsonEncode(value), 60)}' : ''}',
+            );
         }
       });
 

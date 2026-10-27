@@ -17,8 +17,10 @@ import 'agent_plan.dart';
 import 'delegate_task_tool.dart';
 import '../context/context_compressor.dart';
 import '../context/retrieve_memory_tool.dart';
+import '../memory/workflow_memory_store.dart';
 import '../skills/skill_definition.dart';
 import '../skills/dynamic_skill_tools.dart';
+import '../tools/tool_loop_guard.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Agent Status
@@ -185,6 +187,19 @@ class AgentSkillsChangedEvent extends AgentEvent {
   });
 }
 
+/// Event emitted when an agent interacts with shared workflow blackboard / scratchpad memory.
+class AgentWorkflowMemoryEvent extends AgentEvent {
+  final String operation; // 'store' or 'recall'
+  final String key;
+  final dynamic value;
+
+  AgentWorkflowMemoryEvent({
+    required this.operation,
+    required this.key,
+    this.value,
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Agent Definition
 // ═══════════════════════════════════════════════════════════════
@@ -234,6 +249,9 @@ class Agent {
   /// Optional context window auto-compressor for long sessions or SLMs.
   final ContextCompressor? contextCompressor;
 
+  /// Optional shared workflow blackboard / key-value scratchpad memory.
+  final WorkflowMemoryStore? workflowMemoryStore;
+
   /// Whether this agent is executing as a child sub-agent. Suppresses nested delegation.
   final bool isSubAgent;
 
@@ -265,6 +283,7 @@ class Agent {
     this.enablePlanning = false,
     this.progressiveMcpDiscovery = false,
     this.contextCompressor,
+    this.workflowMemoryStore,
     this.isSubAgent = false,
     this.delegationDepth = 0,
     this.enableDelegation = false,
@@ -308,6 +327,7 @@ class Agent {
     bool? enablePlanning,
     bool? progressiveMcpDiscovery,
     ContextCompressor? contextCompressor,
+    WorkflowMemoryStore? workflowMemoryStore,
     bool? isSubAgent,
     int? delegationDepth,
     bool? enableDelegation,
@@ -330,6 +350,7 @@ class Agent {
       progressiveMcpDiscovery:
           progressiveMcpDiscovery ?? this.progressiveMcpDiscovery,
       contextCompressor: contextCompressor ?? this.contextCompressor,
+      workflowMemoryStore: workflowMemoryStore ?? this.workflowMemoryStore,
       isSubAgent: isSubAgent ?? this.isSubAgent,
       delegationDepth: delegationDepth ?? this.delegationDepth,
       enableDelegation: enableDelegation ?? this.enableDelegation,
@@ -344,6 +365,7 @@ class Agent {
     List<McpLocalTool> dartTools = const [],
     List<AgentHook> hooks = const [],
     ContextCompressor? contextCompressor,
+    WorkflowMemoryStore? workflowMemoryStore,
     List<SkillDefinition> skills = const [],
   }) {
     return Agent(
@@ -379,6 +401,7 @@ class Agent {
               .toList() ??
           [],
       contextCompressor: contextCompressor,
+      workflowMemoryStore: workflowMemoryStore,
       isSubAgent: json['isSubAgent'] as bool? ?? false,
       delegationDepth: json['delegationDepth'] as int? ?? 0,
       enableDelegation: json['enableDelegation'] as bool? ?? false,
@@ -443,11 +466,15 @@ class McpAgentEngine {
   /// Optional context window auto-compressor.
   final ContextCompressor? contextCompressor;
 
+  /// Optional shared workflow blackboard / key-value scratchpad memory.
+  final WorkflowMemoryStore? workflowMemoryStore;
+
   McpAgentEngine({
     this.maxToolIterations = defaultMaxToolIterations,
     this.enableLogging = false,
     this.hooks = const [],
     this.contextCompressor,
+    this.workflowMemoryStore,
   });
   void _log(String message) {
     if (enableLogging) {
@@ -826,7 +853,36 @@ class McpAgentEngine {
         localTools.add(memTool);
       }
 
-      // 2. Sub-Agent Delegation Tool Injection
+      // 2. Shared Workflow Memory Tool Injection (Blackboard / Scratchpad)
+      final workflowStore = agent.workflowMemoryStore ?? workflowMemoryStore;
+      if (workflowStore != null) {
+        localTools.add(
+          StoreMemoryTool(
+            store: workflowStore,
+            onStored: (key, value) {
+              emit(AgentWorkflowMemoryEvent(
+                operation: 'store',
+                key: key,
+                value: value,
+              ));
+            },
+          ),
+        );
+        localTools.add(
+          RecallMemoryTool(
+            store: workflowStore,
+            onRecalled: (key, value) {
+              emit(AgentWorkflowMemoryEvent(
+                operation: 'recall',
+                key: key,
+                value: value,
+              ));
+            },
+          ),
+        );
+      }
+
+      // 3. Sub-Agent Delegation Tool Injection
       if (agent.enableDelegation && !agent.isSubAgent && agent.delegationDepth < 2) {
         final delegateTool = DelegateTaskTool(
           availableAssignees: ['clone', ...agent.subAgentKeys],
@@ -834,6 +890,7 @@ class McpAgentEngine {
             required String assignee,
             required String task,
             List<String>? enabledTools,
+            String? model,
           }) async {
             emit(AgentSubAgentStartedEvent(
               parentAgentKey: agentKey,
@@ -841,30 +898,41 @@ class McpAgentEngine {
               task: task,
             ));
             final Agent childAgent;
+            final childWorkflowStore = agent.workflowMemoryStore ?? workflowMemoryStore;
             if (assignee == 'clone') {
+              final effectiveLlmConfig = (model != null && model.isNotEmpty)
+                  ? agent.llmConfig.copyWith(model: model)
+                  : agent.llmConfig;
               childAgent = agent.copyWith(
                 key: '${agent.key}_sub_${_uuid.v4().substring(0, 6)}',
                 name: '${agent.name} (Sub-Agent)',
+                llmConfig: effectiveLlmConfig,
                 initialMessages: [],
                 prompts: [
                   SubPromptStep(text: task, enabledToolNames: enabledTools),
                 ],
                 isSubAgent: true,
                 delegationDepth: agent.delegationDepth + 1,
+                workflowMemoryStore: childWorkflowStore,
               );
             } else {
               final target = _agents[assignee];
               if (target == null) {
                 throw ArgumentError('Sub-agent with key "$assignee" not found.');
               }
+              final targetLlmConfig = (model != null && model.isNotEmpty)
+                  ? target.llmConfig.copyWith(model: model)
+                  : target.llmConfig;
               childAgent = target.copyWith(
                 key: '${target.key}_sub_${_uuid.v4().substring(0, 6)}',
+                llmConfig: targetLlmConfig,
                 initialMessages: [],
                 prompts: [
                   SubPromptStep(text: task, enabledToolNames: enabledTools),
                 ],
                 isSubAgent: true,
                 delegationDepth: agent.delegationDepth + 1,
+                workflowMemoryStore: target.workflowMemoryStore ?? childWorkflowStore,
               );
             }
 
@@ -1097,12 +1165,30 @@ class McpAgentEngine {
             (steps[stepIdx + 1].text.contains(r'${tool_result}') ||
                 steps[stepIdx + 1].text.contains('[tool_result]'));
 
+        // Check session turn limit
+        final userTurns = messages.where((m) => m.role == ChatRole.user).length;
+        if (agent.llmConfig.turnLimit > 0 && userTurns >= agent.llmConfig.turnLimit) {
+          final notice =
+              '⚠️ Session turn limit (${agent.llmConfig.turnLimit}) reached. Turn stopped.';
+          emit(AgentLogEvent(notice));
+          onLog?.call(notice);
+          final noticeMsg = ChatMessage(
+            id: _uuid.v4(),
+            content: notice,
+            role: ChatRole.assistant,
+            timestamp: DateTime.now(),
+          );
+          messages.add(noticeMsg);
+          break;
+        }
+
         // Reset loop tracking
         int toolIterationCount = 0;
         bool forceNoToolCalls = false;
         String? forcedNoToolHint;
         final executedSignatures = <String>{};
         final executedIds = <String>{};
+        final loopGuard = ToolLoopGuard();
 
         // Filter step tools
         final List<MCPTool> activeStepTools = step.isAllTools
@@ -1146,7 +1232,8 @@ class McpAgentEngine {
 
           final effectiveMaxIterations =
               agent.maxToolIterations ?? agent.llmConfig.maxToolIterations;
-          if (toolIterationCount >= effectiveMaxIterations) {
+          if (effectiveMaxIterations > 0 &&
+              toolIterationCount >= effectiveMaxIterations) {
             if (!forceNoToolCalls) {
               _log(
                 'Tool iteration limit ($effectiveMaxIterations) reached. Forcing final response synthesis...',
@@ -1296,41 +1383,34 @@ class McpAgentEngine {
           }
 
           if (response.toolCalls.isEmpty) {
-            if (response.text.isNotEmpty) {
-              final textMsg = ChatMessage(
-                id: _uuid.v4(),
-                content: response.text,
-                role: ChatRole.assistant,
-                timestamp: DateTime.now(),
-              );
-              messages.add(textMsg);
-              stepNewMsgs.add(textMsg);
+            final replyText = response.text.trim().isNotEmpty
+                ? response.text
+                : (toolIterationCount > 0
+                    ? 'Completed tool executions.'
+                    : 'The model returned an empty response.');
+            final textMsg = ChatMessage(
+              id: _uuid.v4(),
+              content: replyText,
+              role: ChatRole.assistant,
+              timestamp: DateTime.now(),
+            );
+            messages.add(textMsg);
+            stepNewMsgs.add(textMsg);
 
-              final promptForEvent = prompt.isNotEmpty
-                  ? prompt
-                  : '[tool result]';
-              emit(
-                AgentAssistantResultEvent(
-                  prompt: promptForEvent,
-                  response: response.text,
-                ),
-              );
-              onAssistantResult?.call(promptForEvent, response.text);
+            final promptForEvent = prompt.isNotEmpty
+                ? prompt
+                : '[tool result]';
+            emit(
+              AgentAssistantResultEvent(
+                prompt: promptForEvent,
+                response: replyText,
+              ),
+            );
+            onAssistantResult?.call(promptForEvent, replyText);
 
-              _log('Assistant Response: ${response.text}');
-              lastResponse = response.text;
-              continueLoop = false;
-            } else if (toolIterationCount > 0 && !forceNoToolCalls) {
-              // The model executed tools but returned an empty response. Prompt it to formulate its response.
-              forceNoToolCalls = true;
-              forcedNoToolHint =
-                  'You have executed tools and gathered results above. '
-                  'Now proceed with your task and provide your complete response to the user.';
-              continueLoop = true;
-              continue;
-            } else {
-              continueLoop = false;
-            }
+            _log('Assistant Response: $replyText');
+            lastResponse = replyText;
+            continueLoop = false;
           } else {
             final call = response.toolCalls.first;
             _log(
@@ -1338,6 +1418,33 @@ class McpAgentEngine {
             );
 
             toolIterationCount++;
+            final loopEval = loopGuard.evaluate(call.name, call.arguments);
+
+            if (loopEval.action == LoopAction.block) {
+              final blockText = loopEval.message ??
+                  '⛔ [EXECUTION BLOCKED]: Infinite tool loop detected. Tool "${call.name}" was invoked ${loopEval.repeatCount} times consecutively with identical parameters without making progress. Execution halted. Please analyze why this failed and summarize your answer to the user.';
+              _log('⛔ Loop guard blocked tool call: ${call.name} (${loopEval.repeatCount}x)');
+              emit(AgentLogEvent(blockText));
+              onLog?.call(blockText);
+
+              final blockMsg = ChatMessage(
+                id: call.id,
+                content: blockText,
+                role: ChatRole.tool,
+                type: MessageType.toolResponse,
+                toolName: call.name,
+                toolResult: MCPToolResult.error(blockText),
+                timestamp: DateTime.now(),
+              );
+              messages.add(blockMsg);
+              stepNewMsgs.add(blockMsg);
+
+              forceNoToolCalls = true;
+              forcedNoToolHint = blockText;
+              continueLoop = true;
+              continue;
+            }
+
             final signature = '${call.name}|${jsonEncode(call.arguments)}';
             final hasDuplicateId = executedIds.contains(call.id);
             final hasDuplicateSignature = executedSignatures.contains(
@@ -1546,19 +1653,26 @@ class McpAgentEngine {
                 .map((c) => c.text ?? '')
                 .join('\n');
 
+            String finalContentText = responseContentText;
+            if (loopEval.action == LoopAction.warn && loopEval.message != null) {
+              finalContentText = '$finalContentText\n\n${loopEval.message}';
+              emit(AgentLogEvent(loopEval.message!));
+              onLog?.call(loopEval.message!);
+            }
+
             final String finalContent;
             if (agent.llmConfig.provider == LlmProvider.ollama) {
               finalContent = jsonEncode({
                 'tool': call.name,
                 'id': call.id,
                 'tool_executed': true,
-                'tool_result': responseContentText.isNotEmpty
-                    ? responseContentText
+                'tool_result': finalContentText.isNotEmpty
+                    ? finalContentText
                     : 'Executed.',
               });
             } else {
-              finalContent = responseContentText.isNotEmpty
-                  ? responseContentText
+              finalContent = finalContentText.isNotEmpty
+                  ? finalContentText
                   : 'Executed.';
             }
 

@@ -1,3 +1,18 @@
+## 1.5.0
+
+* **Unified GenUI Showcase Gallery & Responsive Feature Selector**:
+  * Unified all 11 GenUI showcases (Travel & Accommodation, Weather, Smart Home, PC Hardware, Finance, Cloud Filesystem, File ETL, Data Studio, Model Optimizer, Benchmarks, Agent Swarm) into the main example app with an interactive top bar feature switcher.
+  * Desktop mode: expanded dropdown menu width (`menuWidth: 420`) preventing clipped or truncated labels.
+  * Mobile mode (`< 700px`): Fullscreen draggable modal bottom sheet (`_showFeaturePicker()`) with complete cards, badge chips, prompt preview, and copy-prompt action.
+  * Integrated "Example Prompts" dialog with copyable prompt chips for instant generative UI rendering.
+* **Safe State Management & Persistent Callback Guards**:
+  * Guarded `_onStateChange()` in `GenuiMcpPlayground` with post-frame scheduling when notified during persistent build callbacks, eliminating `setState() called during build` assertions.
+* **Multi-LLM Profiles & Execution Limits**:
+  * Integrated multi-profile LLM management (`LlmProfilesTab`) supporting profile cloning, switching, and custom execution limits.
+* **Synchronized Core Upgrades**:
+  * Upgraded dependencies to `dart_mcp_core: ^1.5.0` and `flutter_ui_mcp_core: ^1.5.0`.
+  * Inherited infinite tool loop protection (`ToolLoopGuard`), turn quotas (`McpExecutionLimits`), and shared blackboard memory (`WorkflowMemoryStore`).
+
 ## 1.4.2
 
 * **Synchronized Core Upgrades**:

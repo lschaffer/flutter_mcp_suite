@@ -24,6 +24,26 @@ dependencies:
   file_picker: ^13.1.0
   url_launcher: ^6.3.1
   material_ui: ^1.8.0
+  example_genui_weather:
+    path: ../../examples/genui/example_genui_weather
+  example_genui_smarthome:
+    path: ../../examples/genui/example_genui_smarthome
+  example_genui_pc_builder:
+    path: ../../examples/genui/example_genui_pc_builder
+  example_genui_finance:
+    path: ../../examples/genui/example_genui_finance
+  mcp_playground_flutter_example_genui_filesystem:
+    path: ../../examples/genui/example_genui_filesystem
+  example_genui_file_etl:
+    path: ../../examples/genui/example_genui_file_etl
+  example_genui_data_studio:
+    path: ../../examples/genui/example_genui_data_studio
+  example_genui_model_optimizer:
+    path: ../../examples/genui/example_genui_model_optimizer
+  example_genui_benchmark_lab:
+    path: ../../examples/genui/example_genui_benchmark_lab
+  example_genui_agent_swarm:
+    path: ../../examples/genui/example_genui_agent_swarm
 dependency_overrides:
   dart_mcp_core:
     path: ../../dart_mcp_core

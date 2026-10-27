@@ -1246,8 +1246,6 @@ class _TravelItineraryCardWidgetState
         dialogTitle: 'Export Travel Itinerary as JPG',
         fileName: fileName,
         bytes: jpgBytes,
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg'],
       );
 
       if (savedUri != null) {

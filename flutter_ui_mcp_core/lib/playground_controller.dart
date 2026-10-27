@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -87,11 +88,39 @@ abstract class McpPlaygroundStorageDelegate {
 
   /// Loads the root directory path for skill ZIP storage.
   Future<String?> loadSkillsRootPath() async => null;
+
+  /// Saves the list of configured LLM profiles.
+  Future<void> saveLlmConfigs(
+    List<LlmConfig> configs, {
+    String? selectedId,
+  }) async {}
+
+  /// Loads the saved list of configured LLM profiles and the selected profile ID.
+  Future<({List<LlmConfig> configs, String? selectedId})?>
+  loadLlmConfigs() async => null;
+
+  /// Saves the global tool delivery strategy and execution rules.
+  Future<void> saveToolStrategy({
+    required String strategy,
+    required bool injectRules,
+    required String filterSource,
+  }) async {}
+
+  /// Loads the saved tool delivery strategy and execution rules.
+  Future<({String strategy, bool injectRules, String filterSource})?>
+  loadToolStrategy() async => null;
 }
 
 /// A default implementation of [McpPlaygroundStorageDelegate] using SharedPreferences.
 class SharedPreferencesStorageDelegate implements McpPlaygroundStorageDelegate {
   static const _kLlm = 'mcp_playground_llm_config';
+  static const _kLlmProfiles = 'mcp_playground_llm_profiles';
+  static const _kSelectedLlmId = 'mcp_playground_selected_llm_id';
+  static const _kToolDeliveryStrategy = 'mcp_playground_tool_delivery_strategy';
+  static const _kInjectToolCallingRules =
+      'mcp_playground_inject_tool_calling_rules';
+  static const _kToolFilteringLlmSource =
+      'mcp_playground_tool_filtering_llm_source';
   static const _kServers = 'mcp_playground_servers';
   static const _kSetups = 'mcp_playground_saved_setups';
   static const _kSkills = 'mcp_playground_skills_list';
@@ -121,6 +150,64 @@ class SharedPreferencesStorageDelegate implements McpPlaygroundStorageDelegate {
     } catch (_) {
       return null;
     }
+  }
+
+  @override
+  Future<void> saveLlmConfigs(
+    List<LlmConfig> configs, {
+    String? selectedId,
+  }) async {
+    final prefs = await _instance;
+    final list = configs.map((c) => c.toJson()).toList();
+    await prefs.setString(_kLlmProfiles, jsonEncode(list));
+    if (selectedId != null) {
+      await prefs.setString(_kSelectedLlmId, selectedId);
+    }
+  }
+
+  @override
+  Future<({List<LlmConfig> configs, String? selectedId})?>
+  loadLlmConfigs() async {
+    final prefs = await _instance;
+    final raw = prefs.getString(_kLlmProfiles);
+    final sel = prefs.getString(_kSelectedLlmId);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final list = jsonDecode(raw) as List;
+      final configs = list
+          .map((item) => LlmConfig.fromJson(item as Map<String, dynamic>))
+          .toList();
+      return (configs: configs, selectedId: sel);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveToolStrategy({
+    required String strategy,
+    required bool injectRules,
+    required String filterSource,
+  }) async {
+    final prefs = await _instance;
+    await prefs.setString(_kToolDeliveryStrategy, strategy);
+    await prefs.setBool(_kInjectToolCallingRules, injectRules);
+    await prefs.setString(_kToolFilteringLlmSource, filterSource);
+  }
+
+  @override
+  Future<({String strategy, bool injectRules, String filterSource})?>
+  loadToolStrategy() async {
+    final prefs = await _instance;
+    final strategy = prefs.getString(_kToolDeliveryStrategy);
+    final inject = prefs.getBool(_kInjectToolCallingRules);
+    final filter = prefs.getString(_kToolFilteringLlmSource);
+    if (strategy == null && inject == null && filter == null) return null;
+    return (
+      strategy: strategy ?? 'auto',
+      injectRules: inject ?? true,
+      filterSource: filter ?? 'llm1',
+    );
   }
 
   @override
@@ -207,7 +294,9 @@ class SharedPreferencesStorageDelegate implements McpPlaygroundStorageDelegate {
     try {
       final list = jsonDecode(raw) as List;
       return list
-          .map((item) => PlaygroundWorkflow.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) => PlaygroundWorkflow.fromJson(item as Map<String, dynamic>),
+          )
           .toList();
     } catch (_) {
       return [];
@@ -313,6 +402,7 @@ class PlaygroundController extends ChangeNotifier {
   bool _loading = false;
   bool _generating = false;
   bool _cancelRequested = false;
+  bool _isDisposed = false;
   String? _errorMessage;
   bool _stopAfterToolCall = false;
   final Set<String> _enabledToolNames = {};
@@ -323,9 +413,18 @@ class PlaygroundController extends ChangeNotifier {
   Widget? Function(BuildContext context, ChatMessage message)?
   messageContentBuilder;
 
-  // ── Tool loop interception ──────────────────────────────────────
-  /// Maximum number of tool call iterations per user request.
-  static const int _maxToolIterations = 10;
+  // ── Execution limits & Tool loop guard ────────────────────────────
+  /// Maximum number of tool call iterations per user turn (default 30, 0 = unlimited).
+  int _maxToolIterations = 30;
+
+  /// Maximum session conversation turns before auto-rotation (default 500).
+  int _maxTurns = 500;
+
+  /// Restricts maximum conversational turns in a session (default 0 = unlimited).
+  int _turnLimit = 0;
+
+  /// Optional callback invoked when max conversation turns are reached for session rotation.
+  VoidCallback? onSessionRotate;
 
   /// Counts tool call iterations in the current request.
   int _toolIterationCount = 0;
@@ -422,20 +521,55 @@ class PlaygroundController extends ChangeNotifier {
   /// Direct access to the internal [MultiMCPManager].
   MultiMCPManager get mcpManager => _mcpManager;
 
+  // ── Multi-LLM Profiles & Tool Execution Strategy ──────────────
+  final List<LlmConfig> _llmConfigs = [];
+  String _selectedLlmId = '';
+  String _toolDeliveryStrategy = 'auto';
+  bool _injectToolCallingRules = true;
+  String _toolFilteringLlmSource = 'llm1';
+
   /// Creates a new [PlaygroundController] instance.
   PlaygroundController({
     LlmConfig? initialLlmConfig,
+    List<LlmConfig>? initialLlmConfigs,
     List<McpServerConfig>? initialServers,
     List<McpLocalTool>? customLocalTools,
     McpPlaygroundStorageDelegate? storageDelegate,
     this.enableLogging = false,
     bool progressiveMcpDiscovery = false,
+    String toolDeliveryStrategy = 'auto',
+    this._injectToolCallingRules = true,
+    this._toolFilteringLlmSource = 'llm1',
     this.systemPromptTemplates,
     this.showSystemPromptTemplates = true,
-  })  : _llmConfig = _sanitizeInitialLlmConfig(initialLlmConfig),
-        // ignore: prefer_initializing_formals
-        _progressiveMcpDiscovery = progressiveMcpDiscovery,
-        _storage = storageDelegate ?? SharedPreferencesStorageDelegate() {
+  }) : _llmConfig = _sanitizeInitialLlmConfig(
+         (initialLlmConfigs != null && initialLlmConfigs.isNotEmpty)
+             ? initialLlmConfigs.first
+             : initialLlmConfig,
+       ),
+       _toolDeliveryStrategy = toolDeliveryStrategy,
+       // ignore: prefer_initializing_formals
+       _progressiveMcpDiscovery =
+           progressiveMcpDiscovery || toolDeliveryStrategy == 'progressive',
+       _storage = storageDelegate ?? SharedPreferencesStorageDelegate() {
+    if (initialLlmConfigs != null) {
+      for (final c in initialLlmConfigs) {
+        final sanitized = _sanitizeInitialLlmConfig(c);
+        _llmConfigs.add(sanitized);
+      }
+      if (_llmConfigs.isNotEmpty) {
+        _selectedLlmId = _llmConfigs.first.profileId;
+        _llmConfig = _llmConfigs.first;
+      }
+    } else if (initialLlmConfig != null) {
+      final sanitized = _sanitizeInitialLlmConfig(initialLlmConfig);
+      if (sanitized.isConfigured ||
+          sanitized.model.isNotEmpty ||
+          sanitized.provider != LlmProvider.none) {
+        _llmConfigs.add(sanitized);
+        _selectedLlmId = sanitized.profileId;
+      }
+    }
     if (initialServers != null) {
       _servers.addAll(initialServers);
     }
@@ -458,7 +592,8 @@ class PlaygroundController extends ChangeNotifier {
     if (config == null) {
       return const LlmConfig(provider: LlmProvider.none, model: '', apiKey: '');
     }
-    if (config.provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+    if (config.provider == LlmProvider.embedded &&
+        !EmbeddedLlmRegistry.isAvailable) {
       return const LlmConfig(provider: LlmProvider.none, model: '', apiKey: '');
     }
     return config;
@@ -467,8 +602,132 @@ class PlaygroundController extends ChangeNotifier {
   // --- Getters ---
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   LlmConfig get llmConfig => _llmConfig;
+  List<LlmConfig> get llmConfigs => List.unmodifiable(_llmConfigs);
+  String get selectedLlmId => _selectedLlmId;
+  String get toolDeliveryStrategy => _toolDeliveryStrategy;
+  bool get injectToolCallingRules => _injectToolCallingRules;
+  String get toolFilteringLlmSource => _toolFilteringLlmSource;
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
   List<McpLocalTool> get localTools => List.unmodifiable(_localTools);
+
+  /// Selects an active LLM profile by ID and persists selection.
+  Future<void> selectLlm(String id) async {
+    final idx = _llmConfigs.indexWhere((c) => c.profileId == id || c.id == id);
+    if (idx != -1) {
+      _selectedLlmId = id;
+      _llmConfig = _llmConfigs[idx];
+      await _storage.saveLlmConfigs(_llmConfigs, selectedId: _selectedLlmId);
+      await _storage.saveLlmConfig(_llmConfig);
+      notifyListeners();
+      unawaited(fetchActiveModelPrice());
+    }
+  }
+
+  /// Saves or creates a named LLM profile.
+  Future<void> saveProfile(LlmConfig profile) async {
+    var sanitized = _sanitizeInitialLlmConfig(profile);
+    if (sanitized.id == null || sanitized.id!.isEmpty) {
+      sanitized = sanitized.copyWith(
+        id: 'llm_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    }
+    if (sanitized.name == null || sanitized.name!.isEmpty) {
+      sanitized = sanitized.copyWith(name: sanitized.displayName);
+    }
+
+    final targetId = sanitized.profileId;
+    final idx = _llmConfigs.indexWhere(
+      (c) =>
+          (sanitized.id != null && c.id == sanitized.id) ||
+          c.profileId == targetId,
+    );
+
+    if (idx != -1) {
+      _llmConfigs[idx] = sanitized;
+    } else {
+      _llmConfigs.add(sanitized);
+    }
+
+    if (_selectedLlmId == targetId ||
+        _selectedLlmId.isEmpty ||
+        _llmConfigs.length == 1) {
+      _selectedLlmId = targetId;
+      _llmConfig = sanitized;
+    }
+
+    await _storage.saveLlmConfigs(_llmConfigs, selectedId: _selectedLlmId);
+    await _storage.saveLlmConfig(_llmConfig);
+    notifyListeners();
+    unawaited(fetchActiveModelPrice());
+  }
+
+  /// Deletes a profile by ID.
+  Future<void> deleteProfile(String id) async {
+    _llmConfigs.removeWhere((c) => c.profileId == id || c.id == id);
+    if (_selectedLlmId == id) {
+      if (_llmConfigs.isNotEmpty) {
+        _selectedLlmId = _llmConfigs.first.profileId;
+        _llmConfig = _llmConfigs.first;
+      } else {
+        _selectedLlmId = '';
+        _llmConfig = const LlmConfig(
+          provider: LlmProvider.none,
+          model: '',
+          apiKey: '',
+        );
+      }
+    }
+    await _storage.saveLlmConfigs(_llmConfigs, selectedId: _selectedLlmId);
+    await _storage.saveLlmConfig(_llmConfig);
+    notifyListeners();
+    unawaited(fetchActiveModelPrice());
+  }
+
+  /// Clones a profile and appends it to the profiles list.
+  Future<LlmConfig> cloneProfile(String id, {String? newName}) async {
+    final idx = _llmConfigs.indexWhere((c) => c.profileId == id || c.id == id);
+    final source = idx != -1 ? _llmConfigs[idx] : _llmConfig;
+    final cloned = source.clone(newName: newName);
+    _llmConfigs.add(cloned);
+    await _storage.saveLlmConfigs(_llmConfigs, selectedId: _selectedLlmId);
+    notifyListeners();
+    return cloned;
+  }
+
+  /// Updates global tool delivery strategy ('auto', 'progressive', 'prefilter', 'direct').
+  Future<void> setToolDeliveryStrategy(String strategy) async {
+    _toolDeliveryStrategy = strategy;
+    _progressiveMcpDiscovery =
+        (strategy == 'progressive' || strategy == 'auto');
+    await _storage.saveToolStrategy(
+      strategy: _toolDeliveryStrategy,
+      injectRules: _injectToolCallingRules,
+      filterSource: _toolFilteringLlmSource,
+    );
+    notifyListeners();
+  }
+
+  /// Toggles whether tool calling instructions are appended to system prompts.
+  Future<void> setInjectToolCallingRules(bool value) async {
+    _injectToolCallingRules = value;
+    await _storage.saveToolStrategy(
+      strategy: _toolDeliveryStrategy,
+      injectRules: _injectToolCallingRules,
+      filterSource: _toolFilteringLlmSource,
+    );
+    notifyListeners();
+  }
+
+  /// Updates the secondary model used for tool prefiltering.
+  Future<void> setToolFilteringLlmSource(String source) async {
+    _toolFilteringLlmSource = source;
+    await _storage.saveToolStrategy(
+      strategy: _toolDeliveryStrategy,
+      injectRules: _injectToolCallingRules,
+      filterSource: _toolFilteringLlmSource,
+    );
+    notifyListeners();
+  }
 
   /// Dynamically registers an additional local tool at runtime.
   void registerLocalTool(McpLocalTool tool) {
@@ -491,6 +750,7 @@ class PlaygroundController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   bool get isLoading => _loading;
   bool get isGenerating => _generating;
   String? get errorMessage => _errorMessage;
@@ -529,6 +789,27 @@ class PlaygroundController extends ChangeNotifier {
     notifyListeners();
   }
 
+  int get maxToolIterations => _maxToolIterations;
+  int get maxToolCalls => _maxToolIterations;
+  set maxToolIterations(int val) {
+    _maxToolIterations = val;
+    notifyListeners();
+  }
+
+  set maxToolCalls(int val) => maxToolIterations = val;
+
+  int get maxTurns => _maxTurns;
+  set maxTurns(int val) {
+    _maxTurns = val;
+    notifyListeners();
+  }
+
+  int get turnLimit => _turnLimit;
+  set turnLimit(int val) {
+    _turnLimit = val;
+    notifyListeners();
+  }
+
   LlmConfig? get customLlmConfig => _customLlmConfig;
   set customLlmConfig(LlmConfig? val) {
     _customLlmConfig = val;
@@ -551,14 +832,32 @@ class PlaygroundController extends ChangeNotifier {
       return;
     }
     _isLoadingPrice = true;
-    notifyListeners();
+    _safeNotifyListeners();
     try {
       _activeModelPrice = await ModelPricingService.fetchPrice(config);
     } catch (_) {
       _activeModelPrice = ModelPriceInfo.unknown;
     } finally {
       _isLoadingPrice = false;
-      notifyListeners();
+      _safeNotifyListeners();
+    }
+  }
+
+  void _safeNotifyListeners() {
+    if (_isDisposed) return;
+    try {
+      final binding = WidgetsBinding.instance;
+      if (binding.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+        binding.addPostFrameCallback((_) {
+          if (!_isDisposed) notifyListeners();
+        });
+      } else {
+        notifyListeners();
+      }
+    } catch (_) {
+      if (!_isDisposed) {
+        notifyListeners();
+      }
     }
   }
 
@@ -658,7 +957,8 @@ class PlaygroundController extends ChangeNotifier {
   Map<String, SubAgentExecution> get subAgents => Map.unmodifiable(_subAgents);
 
   List<SubAgentExecution> get subAgentList =>
-      _subAgents.values.toList()..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      _subAgents.values.toList()
+        ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
   // ── v1.3.0 Dynamic Skills ───────────────────────────────────────
   List<SkillDefinition> get dynamicSkills => List.unmodifiable(_dynamicSkills);
@@ -681,7 +981,9 @@ class PlaygroundController extends ChangeNotifier {
       _dynamicSkills.removeWhere((existing) => existing.name == s.name);
       _dynamicSkills.add(s);
       final def = s.toSkillDef();
-      if (!_skills.any((existing) => existing.name == s.name || existing.id == def.id)) {
+      if (!_skills.any(
+        (existing) => existing.name == s.name || existing.id == def.id,
+      )) {
         _skills.add(def);
       }
     }
@@ -729,7 +1031,6 @@ class PlaygroundController extends ChangeNotifier {
 
   // ── v1.3.0 Evaluations & Benchmarking ───────────────────────────
   EvalController get evalController => _evalController ??= EvalController();
-
 
   // ── Workflows Management ──
   List<PlaygroundWorkflow> get workflows => List.unmodifiable(_workflows);
@@ -804,7 +1105,6 @@ class PlaygroundController extends ChangeNotifier {
           required List<MCPTool> tools,
           String? systemPrompt,
         }) async {
-
           final combinedMessages = <ChatMessage>[];
           if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
             combinedMessages.add(
@@ -843,7 +1143,6 @@ class PlaygroundController extends ChangeNotifier {
           required List<MCPTool> tools,
           String? systemPrompt,
         }) {
-
           final controller = StreamController<LLMStreamChunk>();
 
           final combinedMessages = <ChatMessage>[];
@@ -912,13 +1211,60 @@ class PlaygroundController extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      final savedLlm = await _storage.loadLlmConfig();
-      // Only use saved config if the initial config was not explicitly provided
-      if (savedLlm != null && !_llmConfig.isConfigured) {
-        if (savedLlm.provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
-          _llmConfig = savedLlm.copyWith(provider: LlmProvider.none);
-        } else {
-          _llmConfig = savedLlm;
+      final savedStrategy = await _storage.loadToolStrategy();
+      if (savedStrategy != null) {
+        _toolDeliveryStrategy = savedStrategy.strategy;
+        _injectToolCallingRules = savedStrategy.injectRules;
+        _toolFilteringLlmSource = savedStrategy.filterSource;
+        _progressiveMcpDiscovery =
+            (_toolDeliveryStrategy == 'progressive' ||
+            _toolDeliveryStrategy == 'auto');
+      }
+
+      final savedProfiles = await _storage.loadLlmConfigs();
+      if (savedProfiles != null && savedProfiles.configs.isNotEmpty) {
+        if (_llmConfigs.isEmpty) {
+          _llmConfigs.addAll(
+            savedProfiles.configs.map((c) {
+              if (c.provider == LlmProvider.embedded &&
+                  !EmbeddedLlmRegistry.isAvailable) {
+                return c.copyWith(provider: LlmProvider.none);
+              }
+              return c;
+            }),
+          );
+          if (savedProfiles.selectedId != null &&
+              _llmConfigs.any(
+                (c) =>
+                    c.profileId == savedProfiles.selectedId ||
+                    c.id == savedProfiles.selectedId,
+              )) {
+            _selectedLlmId = savedProfiles.selectedId!;
+            _llmConfig = _llmConfigs.firstWhere(
+              (c) => c.profileId == _selectedLlmId || c.id == _selectedLlmId,
+            );
+          } else if (_llmConfigs.isNotEmpty) {
+            _selectedLlmId = _llmConfigs.first.profileId;
+            _llmConfig = _llmConfigs.first;
+          }
+        }
+      } else {
+        final savedLlm = await _storage.loadLlmConfig();
+        // Only use saved config if the initial config was not explicitly provided
+        if (savedLlm != null && !_llmConfig.isConfigured) {
+          final sanitized =
+              (savedLlm.provider == LlmProvider.embedded &&
+                  !EmbeddedLlmRegistry.isAvailable)
+              ? savedLlm.copyWith(provider: LlmProvider.none)
+              : savedLlm;
+          _llmConfig = sanitized;
+          if (_llmConfigs.isEmpty &&
+              (sanitized.isConfigured ||
+                  sanitized.model.isNotEmpty ||
+                  sanitized.provider != LlmProvider.none)) {
+            _llmConfigs.add(sanitized);
+            _selectedLlmId = sanitized.profileId;
+          }
         }
       }
       final savedServers = await _storage.loadServers();
@@ -948,6 +1294,13 @@ class PlaygroundController extends ChangeNotifier {
       final savedTools = await _storage.loadEnabledTools();
       _enabledToolNames.clear();
       _enabledToolNames.addAll(savedTools);
+      if (_progressiveMcpDiscovery) {
+        _enabledToolNames.remove('mcp_list_tools');
+        _enabledToolNames.remove('mcp_call_tool');
+        if (_enabledToolNames.isEmpty && _localTools.isNotEmpty) {
+          _enabledToolNames.addAll(_localTools.map((t) => t.name));
+        }
+      }
 
       final savedClients = await _storage.loadInitializedClients();
       _initializedClientIds.addAll(savedClients);
@@ -963,11 +1316,28 @@ class PlaygroundController extends ChangeNotifier {
   }
 
   Future<void> updateLlmConfig(LlmConfig config) async {
-    if (config.provider == LlmProvider.embedded && !EmbeddedLlmRegistry.isAvailable) {
+    if (config.provider == LlmProvider.embedded &&
+        !EmbeddedLlmRegistry.isAvailable) {
       config = config.copyWith(provider: LlmProvider.none);
     }
     _llmConfig = config;
+    final targetId = config.profileId;
+    final idx = _llmConfigs.indexWhere(
+      (c) =>
+          c.profileId == targetId || (config.id != null && c.id == config.id),
+    );
+    if (idx != -1) {
+      _llmConfigs[idx] = config;
+    } else if (config.isConfigured ||
+        config.model.isNotEmpty ||
+        config.provider != LlmProvider.none) {
+      _llmConfigs.add(config);
+      if (_selectedLlmId.isEmpty) {
+        _selectedLlmId = targetId;
+      }
+    }
     await _storage.saveLlmConfig(config);
+    await _storage.saveLlmConfigs(_llmConfigs, selectedId: _selectedLlmId);
     notifyListeners();
     unawaited(fetchActiveModelPrice());
   }
@@ -1112,7 +1482,9 @@ class PlaygroundController extends ChangeNotifier {
         await _storage.saveInitializedClients(_initializedClientIds);
       }
     } catch (e) {
-      debugPrint('[Playground] Failed to connect/discover tools for ${c.label}: $e');
+      debugPrint(
+        '[Playground] Failed to connect/discover tools for ${c.label}: $e',
+      );
     }
   }
 
@@ -1197,53 +1569,53 @@ class PlaygroundController extends ChangeNotifier {
             imagesOnly.add(att);
           }
         }
-            processed.add(
-              ChatMessage(
-                id: m.id,
-                role: m.role,
-                content: buffer.toString(),
-                timestamp: m.timestamp,
-                attachments: isMultiModal ? imagesOnly : null,
-                parts: isMultiModal ? m.parts : null,
-              ),
-            );
-          } else if (m.role == ChatRole.tool) {
-            final cleanedContent = _stripBase64AndBinary(m.content);
-            processed.add(
-              ChatMessage(
-                id: m.id,
-                role: m.role,
-                content: cleanedContent,
-                timestamp: m.timestamp,
-                toolName: m.toolName,
-                attachments: m.attachments,
-                parts: m.parts,
-              ),
-            );
-          } else {
-            processed.add(m);
-          }
-        }
-
-        if (_enableEpisodicMemory && processed.length > 20) {
-          final compressor = ContextCompressor(
-            tokenThreshold: 4000,
-            memoryStore: episodicMemoryStore,
-          );
-          if (compressor.shouldCompress(processed)) {
-            final compressionResult = await compressor.compress(
-              llmConfig: activeLlmConfig,
-              messages: processed,
-            );
-            _log(
-              '[EpisodicMemory] Context auto-compressed. Preserved raw turns in episodic memory store.',
-            );
-            return compressionResult.compressedMessages;
-          }
-        }
-
-        return processed;
+        processed.add(
+          ChatMessage(
+            id: m.id,
+            role: m.role,
+            content: buffer.toString(),
+            timestamp: m.timestamp,
+            attachments: isMultiModal ? imagesOnly : null,
+            parts: isMultiModal ? m.parts : null,
+          ),
+        );
+      } else if (m.role == ChatRole.tool) {
+        final cleanedContent = _stripBase64AndBinary(m.content);
+        processed.add(
+          ChatMessage(
+            id: m.id,
+            role: m.role,
+            content: cleanedContent,
+            timestamp: m.timestamp,
+            toolName: m.toolName,
+            attachments: m.attachments,
+            parts: m.parts,
+          ),
+        );
+      } else {
+        processed.add(m);
       }
+    }
+
+    if (_enableEpisodicMemory && processed.length > 20) {
+      final compressor = ContextCompressor(
+        tokenThreshold: 4000,
+        memoryStore: episodicMemoryStore,
+      );
+      if (compressor.shouldCompress(processed)) {
+        final compressionResult = await compressor.compress(
+          llmConfig: activeLlmConfig,
+          messages: processed,
+        );
+        _log(
+          '[EpisodicMemory] Context auto-compressed. Preserved raw turns in episodic memory store.',
+        );
+        return compressionResult.compressedMessages;
+      }
+    }
+
+    return processed;
+  }
 
   String _stripBase64AndBinary(String text) {
     var result = text;
@@ -1370,6 +1742,128 @@ class PlaygroundController extends ChangeNotifier {
           ..addAll(optParts);
       }
 
+      final trimmedInput = text.trim();
+
+      // ── Slash commands handling ────────────────────────────────────
+      if (trimmedInput == '/turn_limit' ||
+          trimmedInput.startsWith('/turn_limit ')) {
+        final arg = trimmedInput
+            .replaceFirst(RegExp(r'^/(turn_limit|turn-limit)'), '')
+            .trim();
+        if (arg.isEmpty) {
+          final display = _turnLimit <= 0 ? '0 (unlimited)' : '$_turnLimit';
+          _messages.add(
+            ChatMessage(
+              id: _uuid.v4(),
+              content:
+                  'Current turn limit: $display.\n\nUsage:\n- `/turn_limit 0` — Set to unlimited\n- `/turn_limit <number>` — Set turn limit\n- `/turn_limit` — Show current setting',
+              role: ChatRole.assistant,
+              timestamp: DateTime.now(),
+            ),
+          );
+        } else {
+          final val = int.tryParse(arg);
+          if (val == null || val < 0) {
+            _messages.add(
+              ChatMessage(
+                id: _uuid.v4(),
+                content:
+                    '⚠️ Invalid value: `$arg`. Please specify a positive number or 0 for unlimited.\n\nUsage: `/turn_limit 0` (unlimited) or `/turn_limit 10`',
+                role: ChatRole.assistant,
+                timestamp: DateTime.now(),
+              ),
+            );
+          } else {
+            _turnLimit = val;
+            final display = _turnLimit <= 0 ? '0 (unlimited)' : '$_turnLimit';
+            _messages.add(
+              ChatMessage(
+                id: _uuid.v4(),
+                content: 'Turn limit set to $display.',
+                role: ChatRole.assistant,
+                timestamp: DateTime.now(),
+              ),
+            );
+          }
+        }
+        notifyListeners();
+        return;
+      }
+
+      if (trimmedInput == '/max_tool_calls' ||
+          trimmedInput.startsWith('/max_tool_calls ') ||
+          trimmedInput == '/max_tool_iterations' ||
+          trimmedInput.startsWith('/max_tool_iterations ')) {
+        final arg = trimmedInput
+            .replaceFirst(
+              RegExp(
+                r'^/(max_tool_calls|max-tool-calls|max_tool_iterations|max-tool-iterations)',
+              ),
+              '',
+            )
+            .trim();
+        if (arg.isEmpty) {
+          final display = _maxToolIterations <= 0
+              ? '0 (unlimited)'
+              : '$_maxToolIterations';
+          _messages.add(
+            ChatMessage(
+              id: _uuid.v4(),
+              content:
+                  'Current max tool calls: $display.\n\nUsage:\n- `/max_tool_calls 0` — Set to unlimited\n- `/max_tool_calls <number>` — Set max tool calls\n- `/max_tool_calls` — Show current setting',
+              role: ChatRole.assistant,
+              timestamp: DateTime.now(),
+            ),
+          );
+        } else {
+          final val = int.tryParse(arg);
+          if (val == null || val < 0) {
+            _messages.add(
+              ChatMessage(
+                id: _uuid.v4(),
+                content:
+                    '⚠️ Invalid value: `$arg`. Please specify a positive number or 0 for unlimited.\n\nUsage: `/max_tool_calls 0` (unlimited) or `/max_tool_calls 30`',
+                role: ChatRole.assistant,
+                timestamp: DateTime.now(),
+              ),
+            );
+          } else {
+            _maxToolIterations = val;
+            final display = _maxToolIterations <= 0
+                ? '0 (unlimited)'
+                : '$_maxToolIterations';
+            _messages.add(
+              ChatMessage(
+                id: _uuid.v4(),
+                content: 'Max tool calls set to $display.',
+                role: ChatRole.assistant,
+                timestamp: DateTime.now(),
+              ),
+            );
+          }
+        }
+        notifyListeners();
+        return;
+      }
+
+      // Check session turn limit
+      final currentTurnCount = _messages
+          .where((m) => m.role == ChatRole.user)
+          .length;
+      if (_turnLimit > 0 && currentTurnCount >= _turnLimit) {
+        _messages.add(
+          ChatMessage(
+            id: _uuid.v4(),
+            content:
+                '⚠️ Session turn limit ($_turnLimit) reached. Use /turn_limit <n> to increase or /turn_limit 0 for unlimited.',
+            role: ChatRole.assistant,
+            timestamp: DateTime.now(),
+          ),
+        );
+        notifyListeners();
+        return;
+      }
+
       final subPrompts = parseSubPromptSteps(text);
       _log('Parsed ${subPrompts.length} sub-prompt steps.');
 
@@ -1421,6 +1915,7 @@ class PlaygroundController extends ChangeNotifier {
         _forcedNoToolHintNextTurn = null;
         _executedToolCallSignatures.clear();
         _executedToolCallIds.clear();
+        final loopGuard = ToolLoopGuard();
 
         // 1. Add User Message (first step uses attachments if any, subsequent steps don't)
         List<ChatContentPart>? initialParts;
@@ -1428,9 +1923,13 @@ class PlaygroundController extends ChangeNotifier {
           final staged = <ChatContentPart>[];
           if (prompt.trim().isNotEmpty) staged.add(TextPart(prompt));
 
-          final existingAttachmentBytes = processedAttachments
-                  ?.where((a) =>
-                      a.bytes != null && ImageOptimizer.isImageMime(a.mimeType))
+          final existingAttachmentBytes =
+              processedAttachments
+                  ?.where(
+                    (a) =>
+                        a.bytes != null &&
+                        ImageOptimizer.isImageMime(a.mimeType),
+                  )
                   .map((a) => a.bytes!.length)
                   .toSet() ??
               <int>{};
@@ -1465,40 +1964,59 @@ class PlaygroundController extends ChangeNotifier {
         final stepNewMsgs = <ChatMessage>[];
 
         // 3. Execution System Prompt
-        String systemPrompt = _systemPrompt.trim().isNotEmpty
-            ? _systemPrompt
-            : 'You are an agent equipped with tools. Focus on the user\'s task. '
-                  'Use the tool schemas precisely. If you decide to call a tool, generate the tool call block. '
-                  'Present final answers directly. Present code and logs inside clean formatting.';
-
-        // Append active skill instructions if present
-        if (_activeSkill != null && _activeSkill!.skillDef.trim().isNotEmpty) {
-          systemPrompt += '\n\n### Active Skill (${_activeSkill!.name}):\n${_activeSkill!.skillDef.trim()}';
+        String systemPrompt;
+        if (_chatMode) {
+          systemPrompt =
+              _systemPrompt.trim().isNotEmpty &&
+                  !_systemPrompt.contains('mcp_list_tools') &&
+                  !_systemPrompt.contains('equipped with tools')
+              ? _systemPrompt
+              : 'You are a helpful AI assistant. Answer user questions directly and conversationally without tools.';
+        } else {
+          systemPrompt = _systemPrompt.trim().isNotEmpty
+              ? _systemPrompt
+              : 'You are an agent equipped with tools. Focus on the user\'s task. '
+                    'Use the tool schemas precisely. If you decide to call a tool, generate the tool call block. '
+                    'Present final answers directly. Present code and logs inside clean formatting.';
         }
 
-        // Append active dynamic skill instructions if present
-        for (final skill in _dynamicSkills) {
-          if (_activeSkillNames.contains(skill.name) &&
-              (skill.systemPrompt?.trim().isNotEmpty ?? false)) {
+        if (!_chatMode) {
+          // Append active skill instructions if present
+          if (_activeSkill != null &&
+              _activeSkill!.skillDef.trim().isNotEmpty) {
             systemPrompt +=
-                '\n\n### Active Skill (${skill.name}):\n${skill.systemPrompt!.trim()}';
+                '\n\n### Active Skill (${_activeSkill!.name}):\n${_activeSkill!.skillDef.trim()}';
           }
-        }
-        if (_dynamicSkills.isNotEmpty) {
-          systemPrompt += '\n\nAvailable Dynamic Skills (call activate_skills to activate):\n';
-          for (final s in _dynamicSkills) {
-            final status = _activeSkillNames.contains(s.name) ? '[Active]' : '[Inactive]';
-            systemPrompt += '- ${s.name} $status: ${s.description}\n';
-          }
-        }
 
-        // Inject short instructions into the system prompt to guide tool execution and loop prevention
-        systemPrompt +=
-            '\n\n'
-            'Tool execution rules:\n'
-            '- Each tool execution result is returned in a JSON structure: {"tool": "name", "id": "unique_id", "tool_executed": true, "tool_result": ...}.\n'
-            '- Once a tool has been successfully executed (tool_executed is true), you must NEVER call that tool with the same "id" or parameters again.\n'
-            '- Instead, formulate your final response to the user using the result provided in tool_result.';
+          // Append active dynamic skill instructions if present
+          for (final skill in _dynamicSkills) {
+            if (_activeSkillNames.contains(skill.name) &&
+                (skill.systemPrompt?.trim().isNotEmpty ?? false)) {
+              systemPrompt +=
+                  '\n\n### Active Skill (${skill.name}):\n${skill.systemPrompt!.trim()}';
+            }
+          }
+          if (_dynamicSkills.isNotEmpty) {
+            systemPrompt +=
+                '\n\nAvailable Dynamic Skills (call activate_skills to activate):\n';
+            for (final s in _dynamicSkills) {
+              final status = _activeSkillNames.contains(s.name)
+                  ? '[Active]'
+                  : '[Inactive]';
+              systemPrompt += '- ${s.name} $status: ${s.description}\n';
+            }
+          }
+
+          // Inject short instructions into the system prompt to guide tool execution and loop prevention
+          if (_injectToolCallingRules) {
+            systemPrompt +=
+                '\n\n'
+                'Tool execution rules:\n'
+                '- Each tool execution result is returned in a JSON structure: {"tool": "name", "id": "unique_id", "tool_executed": true, "tool_result": ...}.\n'
+                '- Once a tool has been successfully executed (tool_executed is true), you must NEVER call that tool with the same "id" or parameters again.\n'
+                '- Instead, formulate your final response to the user using the result provided in tool_result.';
+          }
+        }
 
         // Filter step tools
         final stepEnabled = step.enabledToolNames;
@@ -1510,8 +2028,17 @@ class PlaygroundController extends ChangeNotifier {
         final List<MCPTool> allAvailableTools = [];
 
         if (_progressiveMcpDiscovery) {
-          final listTool = McpListToolsTool(mcpManager: _mcpManager, localTools: _localTools);
-          final callTool = McpCallToolTool(mcpManager: _mcpManager, localTools: _localTools);
+          final activeCatalogTools = _localTools
+              .where((t) => _enabledToolNames.contains(t.name))
+              .toList();
+          final listTool = McpListToolsTool(
+            mcpManager: _mcpManager,
+            localTools: activeCatalogTools,
+          );
+          final callTool = McpCallToolTool(
+            mcpManager: _mcpManager,
+            localTools: activeCatalogTools,
+          );
           allAvailableTools.add(listTool.toMCPTool());
           allAvailableTools.add(callTool.toMCPTool());
         } else {
@@ -1550,134 +2077,158 @@ class PlaygroundController extends ChangeNotifier {
         // Sub-Agent Delegation Tool
         final delegateTool = _enableSubAgents
             ? DelegateTaskTool(
-                runner: ({
-                  required String assignee,
-                  required String task,
-                  List<String>? enabledTools,
-                }) async {
-                  final subId = _uuid.v4();
-                  final subExec = SubAgentExecution(
-                    id: subId,
-                    task: task,
-                    depth: 1,
-                    startedAt: DateTime.now(),
-                  );
-                  _subAgents[subId] = subExec;
-                  _log('[SubAgent] Started: $task (assignee: $assignee)');
-                  notifyListeners();
-
-                  try {
-                    final subTools = enabledTools != null
-                        ? allAvailableTools
-                            .where((t) => enabledTools.contains(t.name))
-                            .toList()
-                        : allAvailableTools
-                            .where((t) => t.name != 'delegate_task')
-                            .toList();
-
-                    final subMessages = <ChatMessage>[
-                      ChatMessage.user(task),
-                    ];
-
-                    String resultText = '';
-                    int subIterations = 0;
-                    const maxSubIterations = 5;
-
-                    while (subIterations < maxSubIterations) {
-                      subIterations++;
-                      final subResponse = await LLMService.generate(
-                        config: activeLlmConfig,
-                        messages: subMessages,
-                        tools: subTools,
-                        systemPrompt:
-                            'You are an autonomous specialist sub-agent ($assignee) tasked with: $task\n'
-                            'You have access to specialized tools. You must actively execute the tools to inspect code, query telemetry, or audit dependencies. '
-                            'Do not just state your intent or give conversational preamble. Run the tools immediately, analyze their results, and provide the complete audit report.',
+                runner:
+                    ({
+                      required String assignee,
+                      required String task,
+                      List<String>? enabledTools,
+                      String? model,
+                    }) async {
+                      final subId = _uuid.v4();
+                      final subExec = SubAgentExecution(
+                        id: subId,
+                        task: task,
+                        depth: 1,
+                        startedAt: DateTime.now(),
                       );
+                      _subAgents[subId] = subExec;
+                      _log(
+                        '[SubAgent] Started: $task (assignee: $assignee, model: ${model ?? activeLlmConfig.model})',
+                      );
+                      notifyListeners();
 
-                      if (subResponse.toolCalls.isEmpty) {
-                        resultText = subResponse.text;
-                        break;
-                      }
+                      try {
+                        final subTools = enabledTools != null
+                            ? allAvailableTools
+                                  .where((t) => enabledTools.contains(t.name))
+                                  .toList()
+                            : allAvailableTools
+                                  .where((t) => t.name != 'delegate_task')
+                                  .toList();
 
-                      // Execute each tool call and feed results back to the sub-agent
-                      for (final call in subResponse.toolCalls) {
-                        subExec.addProgress('Executing tool ${call.name}...');
-                        notifyListeners();
+                        final subMessages = <ChatMessage>[
+                          ChatMessage.user(task),
+                        ];
 
-                        final localMatch = _localTools
-                            .where((t) => t.name == call.name)
-                            .toList();
-                        MCPToolResult toolRes;
-                        if (localMatch.isNotEmpty) {
-                          toolRes = await localMatch.first.execute(call.arguments);
-                        } else {
-                          toolRes = await _mcpManager.callTool(call.name, call.arguments);
+                        final subConfig = (model != null && model.isNotEmpty)
+                            ? activeLlmConfig.copyWith(model: model)
+                            : activeLlmConfig;
+
+                        String resultText = '';
+                        int subIterations = 0;
+                        const maxSubIterations = 5;
+
+                        while (subIterations < maxSubIterations) {
+                          subIterations++;
+                          final subResponse = await LLMService.generate(
+                            config: subConfig,
+                            messages: subMessages,
+                            tools: subTools,
+                            systemPrompt:
+                                'You are an autonomous specialist sub-agent ($assignee) tasked with: $task\n'
+                                'You have access to specialized tools. You must actively execute the tools to inspect code, query telemetry, or audit dependencies. '
+                                'Do not just state your intent or give conversational preamble. Run the tools immediately, analyze their results, and provide the complete audit report.',
+                          );
+
+                          if (subResponse.toolCalls.isEmpty) {
+                            resultText = subResponse.text;
+                            break;
+                          }
+
+                          // Execute each tool call and feed results back to the sub-agent
+                          for (final call in subResponse.toolCalls) {
+                            subExec.addProgress(
+                              'Executing tool ${call.name}...',
+                            );
+                            notifyListeners();
+
+                            final localMatch = _localTools
+                                .where((t) => t.name == call.name)
+                                .toList();
+                            MCPToolResult toolRes;
+                            if (localMatch.isNotEmpty) {
+                              toolRes = await localMatch.first.execute(
+                                call.arguments,
+                              );
+                            } else {
+                              toolRes = await _mcpManager.callTool(
+                                call.name,
+                                call.arguments,
+                              );
+                            }
+
+                            final textRes = toolRes.content
+                                .where((c) => c.type == 'text')
+                                .map((c) => c.text ?? '')
+                                .join('\n');
+
+                            subExec.addProgress(
+                              'Received output from ${call.name}',
+                            );
+                            notifyListeners();
+
+                            subMessages.add(
+                              ChatMessage(
+                                id: call.id,
+                                content: 'Calling tool: ${call.name}',
+                                role: ChatRole.assistant,
+                                type: MessageType.toolCall,
+                                toolName: call.name,
+                                toolArguments: call.arguments,
+                                timestamp: DateTime.now(),
+                              ),
+                            );
+                            subMessages.add(
+                              ChatMessage(
+                                id: call.id,
+                                role: ChatRole.tool,
+                                type: MessageType.toolResponse,
+                                toolName: call.name,
+                                content: textRes,
+                                timestamp: DateTime.now(),
+                              ),
+                            );
+                          }
                         }
 
-                        final textRes = toolRes.content
-                            .where((c) => c.type == 'text')
-                            .map((c) => c.text ?? '')
-                            .join('\n');
+                        if (resultText.isEmpty && subMessages.isNotEmpty) {
+                          resultText = subMessages.last.content;
+                        }
+                        if (resultText.isEmpty) {
+                          resultText = 'Completed task.';
+                        }
 
-                        subExec.addProgress('Received output from ${call.name}');
+                        subExec.complete(resultText);
+                        _log('[SubAgent] Completed: $task');
                         notifyListeners();
-
-                        subMessages.add(
-                          ChatMessage(
-                            id: call.id,
-                            content: 'Calling tool: ${call.name}',
-                            role: ChatRole.assistant,
-                            type: MessageType.toolCall,
-                            toolName: call.name,
-                            toolArguments: call.arguments,
-                            timestamp: DateTime.now(),
-                          ),
-                        );
-                        subMessages.add(
-                          ChatMessage(
-                            id: call.id,
-                            role: ChatRole.tool,
-                            type: MessageType.toolResponse,
-                            toolName: call.name,
-                            content: textRes,
-                            timestamp: DateTime.now(),
-                          ),
-                        );
+                        return resultText;
+                      } catch (e) {
+                        subExec.fail(e.toString());
+                        _log('[SubAgent] Failed: $e');
+                        notifyListeners();
+                        rethrow;
                       }
-                    }
-
-                    if (resultText.isEmpty && subMessages.isNotEmpty) {
-                      resultText = subMessages.last.content;
-                    }
-                    if (resultText.isEmpty) {
-                      resultText = 'Completed task.';
-                    }
-
-                    subExec.complete(resultText);
-                    _log('[SubAgent] Completed: $task');
-                    notifyListeners();
-                    return resultText;
-                  } catch (e) {
-                    subExec.fail(e.toString());
-                    _log('[SubAgent] Failed: $e');
-                    notifyListeners();
-                    rethrow;
-                  }
-                },
+                    },
               )
             : null;
 
-        if (activateTool != null) allAvailableTools.add(activateTool.toMCPTool());
-        if (deactivateTool != null) allAvailableTools.add(deactivateTool.toMCPTool());
+        if (activateTool != null) {
+          allAvailableTools.add(activateTool.toMCPTool());
+        }
+        if (deactivateTool != null) {
+          allAvailableTools.add(deactivateTool.toMCPTool());
+        }
         if (memoryTool != null) allAvailableTools.add(memoryTool.toMCPTool());
-        if (delegateTool != null) allAvailableTools.add(delegateTool.toMCPTool());
+        if (delegateTool != null) {
+          allAvailableTools.add(delegateTool.toMCPTool());
+        }
 
         final List<MCPTool> activeStepTools = allAvailableTools.where((t) {
           if (stepEnabled != null) {
             return stepEnabled.contains(t.name);
           }
-          if (_progressiveMcpDiscovery && (t.name == 'mcp_list_tools' || t.name == 'mcp_call_tool')) {
+          if (_progressiveMcpDiscovery &&
+              (t.name == 'mcp_list_tools' || t.name == 'mcp_call_tool')) {
             return true;
           }
           if (_enableEpisodicMemory && t.name == 'retrieve_memory') return true;
@@ -1725,7 +2276,8 @@ class PlaygroundController extends ChangeNotifier {
             break;
           }
 
-          if (_toolIterationCount >= _maxToolIterations) {
+          if (_maxToolIterations > 0 &&
+              _toolIterationCount >= _maxToolIterations) {
             final limitMsg = ChatMessage(
               id: _uuid.v4(),
               content:
@@ -1835,17 +2387,22 @@ class PlaygroundController extends ChangeNotifier {
           }
 
           if (response.toolCalls.isEmpty) {
-            if (response.text.isNotEmpty) {
-              final textMsg = ChatMessage(
-                id: _uuid.v4(),
-                content: response.text,
-                role: ChatRole.assistant,
-                timestamp: DateTime.now(),
-              );
-              _messages.add(textMsg);
-              stepNewMsgs.add(textMsg);
-              _log('Assistant Response: ${response.text}');
-            }
+            final replyText = response.text.trim().isNotEmpty
+                ? response.text
+                : (_chatMode
+                      ? 'I do not have access to real-time tools or capabilities in Direct Chat mode to determine that.'
+                      : (_toolIterationCount > 0
+                            ? 'Completed tool executions.'
+                            : 'The model returned an empty response.'));
+            final textMsg = ChatMessage(
+              id: _uuid.v4(),
+              content: replyText,
+              role: ChatRole.assistant,
+              timestamp: DateTime.now(),
+            );
+            _messages.add(textMsg);
+            stepNewMsgs.add(textMsg);
+            _log('Assistant Response: $replyText');
             continueLoop = false;
           } else {
             final call = response.toolCalls.first;
@@ -1854,6 +2411,35 @@ class PlaygroundController extends ChangeNotifier {
             );
 
             _toolIterationCount++;
+            final loopEval = loopGuard.evaluate(call.name, call.arguments);
+
+            if (loopEval.action == LoopAction.block) {
+              final blockText =
+                  loopEval.message ??
+                  '⛔ [EXECUTION BLOCKED]: Infinite tool loop detected. Tool "${call.name}" was invoked ${loopEval.repeatCount} times consecutively with identical parameters without making progress. Execution halted. Please analyze why this failed and summarize your answer to the user.';
+              _log(
+                '⛔ Loop guard blocked tool call: ${call.name} (${loopEval.repeatCount}x)',
+              );
+
+              final blockMsg = ChatMessage(
+                id: call.id,
+                content: blockText,
+                role: ChatRole.tool,
+                type: MessageType.toolResponse,
+                toolName: call.name,
+                toolResult: MCPToolResult.error(blockText),
+                timestamp: DateTime.now(),
+              );
+              _messages.add(blockMsg);
+              stepNewMsgs.add(blockMsg);
+              notifyListeners();
+
+              _forceNoToolCallsNextTurn = true;
+              _forcedNoToolHintNextTurn = blockText;
+              continueLoop = true;
+              continue;
+            }
+
             final toolSignature = '${call.name}|${jsonEncode(call.arguments)}';
             final hasDuplicateId = _executedToolCallIds.contains(call.id);
             final hasDuplicateSignature = _executedToolCallSignatures.contains(
@@ -1942,17 +2528,29 @@ class PlaygroundController extends ChangeNotifier {
                 .where((t) => t.name == call.name)
                 .toList();
 
+            final activeCatalogTools = _localTools
+                .where((t) => _enabledToolNames.contains(t.name))
+                .toList();
+
             if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
-              result = await McpListToolsTool(mcpManager: _mcpManager, localTools: _localTools).execute(call.arguments);
-            } else if (_progressiveMcpDiscovery && call.name == 'mcp_call_tool') {
-              result = await McpCallToolTool(mcpManager: _mcpManager, localTools: _localTools).execute(call.arguments);
+              result = await McpListToolsTool(
+                mcpManager: _mcpManager,
+                localTools: activeCatalogTools,
+              ).execute(call.arguments);
+            } else if (_progressiveMcpDiscovery &&
+                call.name == 'mcp_call_tool') {
+              result = await McpCallToolTool(
+                mcpManager: _mcpManager,
+                localTools: activeCatalogTools,
+              ).execute(call.arguments);
             } else if (memoryTool != null && call.name == 'retrieve_memory') {
               result = await memoryTool.execute(call.arguments);
             } else if (delegateTool != null && call.name == 'delegate_task') {
               result = await delegateTool.execute(call.arguments);
             } else if (activateTool != null && call.name == 'activate_skills') {
               result = await activateTool.execute(call.arguments);
-            } else if (deactivateTool != null && call.name == 'deactivate_skills') {
+            } else if (deactivateTool != null &&
+                call.name == 'deactivate_skills') {
               result = await deactivateTool.execute(call.arguments);
             } else if (localMatch.isNotEmpty) {
               result = await localMatch.first.execute(call.arguments);
@@ -1967,19 +2565,28 @@ class PlaygroundController extends ChangeNotifier {
 
             _log('Tool Result: $responseContentText');
 
+            String finalContentText = responseContentText;
+            if (loopEval.action == LoopAction.warn &&
+                loopEval.message != null) {
+              finalContentText = '$finalContentText\n\n${loopEval.message}';
+              _log(
+                '⚠️ Injected loop warning into tool response for ${call.name} (${loopEval.repeatCount}x)',
+              );
+            }
+
             final String finalContent;
             if (activeLlmConfig.provider == LlmProvider.ollama) {
               finalContent = jsonEncode({
                 'tool': call.name,
                 'id': call.id,
                 'tool_executed': true,
-                'tool_result': responseContentText.isNotEmpty
-                    ? responseContentText
+                'tool_result': finalContentText.isNotEmpty
+                    ? finalContentText
                     : 'Executed.',
               });
             } else {
-              finalContent = responseContentText.isNotEmpty
-                  ? responseContentText
+              finalContent = finalContentText.isNotEmpty
+                  ? finalContentText
                   : 'Executed.';
             }
 
@@ -2066,6 +2673,15 @@ class PlaygroundController extends ChangeNotifier {
           }
         }
       }
+
+      // Check session turns and trigger auto-rotation if max turns reached
+      final totalUserTurns = _messages
+          .where((m) => m.role == ChatRole.user)
+          .length;
+      if (_maxTurns > 0 && totalUserTurns >= _maxTurns) {
+        _log('[Session] Reached max turns ($_maxTurns). Rotating session...');
+        onSessionRotate?.call();
+      }
     } catch (e) {
       _errorMessage = 'Execution error: $e';
       _log('Execution error: $e');
@@ -2086,6 +2702,7 @@ class PlaygroundController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _mcpManager.removeListener(notifyListeners);
     _mcpManager.disconnectAll();
     _mcpManager.dispose();

@@ -105,6 +105,17 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
       widget.controller.addListener(_onExternalWrite);
       _rebuildFromController();
     }
+    if (old.chatMode != widget.chatMode && widget.chatMode) {
+      if (_entries.length > 1) {
+        while (_entries.length > 1) {
+          final last = _entries.removeLast();
+          last.controller.removeListener(_onEntryChanged);
+          last.dispose();
+        }
+        _activeTabIndex = 0;
+        _onEntryChanged();
+      }
+    }
     if (!listEquals(old.availableToolGroups, widget.availableToolGroups)) {
       if (widget.controller.text != _serialize()) {
         _rebuildFromController();
@@ -124,8 +135,13 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
     super.dispose();
   }
 
-  List<SubPromptEntry> _parse(String text) =>
-      parseSubPromptSteps(text).map(SubPromptEntry.fromStep).toList();
+  List<SubPromptEntry> _parse(String text) {
+    final steps = parseSubPromptSteps(text);
+    if (widget.chatMode && steps.length > 1) {
+      return [SubPromptEntry.fromStep(steps.first)];
+    }
+    return steps.map(SubPromptEntry.fromStep).toList();
+  }
 
   String _serialize() =>
       serializeSubPromptSteps(_entries.map((e) => e.toStep()).toList());
@@ -228,7 +244,8 @@ class _SubPromptListEditorState extends State<SubPromptListEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildTopTabBarWithActions(context, theme, activeIdx),
+        if (!widget.chatMode)
+          _buildTopTabBarWithActions(context, theme, activeIdx),
         _buildActiveStep(context, activeIdx),
       ],
     );

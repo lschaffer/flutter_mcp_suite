@@ -69,9 +69,14 @@ enum LlmProvider {
         return 'Embedded / Local GGUF (.gguf)';
     }
   }
+
+  /// Alias for [displayName] for consistency across UI packages.
+  String get label => displayName;
 }
 
 class LlmConfig {
+  final String? id;
+  final String? name;
   final LlmProvider provider;
   final String model;
   final String apiKey;
@@ -81,6 +86,8 @@ class LlmConfig {
   final double temperature;
   final int maxTokens;
   final int maxToolIterations;
+  final int maxTurns;
+  final int turnLimit;
   final double? topP;
   final int? topK;
   final double? repeatPenalty;
@@ -97,13 +104,17 @@ class LlmConfig {
   final bool useStreaming;
 
   const LlmConfig({
+    this.id,
+    this.name,
     required this.provider,
     required this.model,
     required this.apiKey,
     this.baseUrl = '',
     this.temperature = 0.2,
     this.maxTokens = 0,
-    this.maxToolIterations = 400,
+    this.maxToolIterations = 30,
+    this.maxTurns = 500,
+    this.turnLimit = 0,
     this.topP,
     this.topK,
     this.repeatPenalty,
@@ -118,6 +129,21 @@ class LlmConfig {
     this.useStreaming = false,
   });
 
+  /// Human-friendly display name, falling back to model name or provider label.
+  String get displayName =>
+      (name != null && name!.trim().isNotEmpty)
+          ? name!
+          : (model.isNotEmpty ? model : provider.displayName);
+
+  /// Unique profile identifier, defaulting to a generated ID if omitted.
+  String get profileId =>
+      (id != null && id!.isNotEmpty)
+          ? id!
+          : 'llm_${provider.name}_${model.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+
+  /// Alias for [maxToolIterations] (default 30, 0 = unlimited).
+  int get maxToolCalls => maxToolIterations;
+
   bool get isConfigured {
     if (provider == LlmProvider.none) return false;
     if (provider == LlmProvider.embedded) {
@@ -131,7 +157,17 @@ class LlmConfig {
     return apiKey.trim().isNotEmpty;
   }
 
+  /// Duplicates this configuration profile with a new ID and suggested copy name.
+  LlmConfig clone({String? newId, String? newName}) {
+    return copyWith(
+      id: newId ?? '${profileId}_copy_${DateTime.now().millisecondsSinceEpoch}',
+      name: newName ?? '$displayName (Copy)',
+    );
+  }
+
   LlmConfig copyWith({
+    String? id,
+    String? name,
     LlmProvider? provider,
     String? model,
     String? apiKey,
@@ -139,6 +175,9 @@ class LlmConfig {
     double? temperature,
     int? maxTokens,
     int? maxToolIterations,
+    int? maxToolCalls,
+    int? maxTurns,
+    int? turnLimit,
     double? topP,
     int? topK,
     double? repeatPenalty,
@@ -153,13 +192,17 @@ class LlmConfig {
     bool? useStreaming,
   }) {
     return LlmConfig(
+      id: id ?? this.id,
+      name: name ?? this.name,
       provider: provider ?? this.provider,
       model: model ?? this.model,
       apiKey: apiKey ?? this.apiKey,
       baseUrl: baseUrl ?? this.baseUrl,
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
-      maxToolIterations: maxToolIterations ?? this.maxToolIterations,
+      maxToolIterations: maxToolCalls ?? maxToolIterations ?? this.maxToolIterations,
+      maxTurns: maxTurns ?? this.maxTurns,
+      turnLimit: turnLimit ?? this.turnLimit,
       topP: topP ?? this.topP,
       topK: topK ?? this.topK,
       repeatPenalty: repeatPenalty ?? this.repeatPenalty,
@@ -177,6 +220,8 @@ class LlmConfig {
   }
 
   Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
+    if (name != null) 'name': name,
     'provider': provider.configKey,
     'model': model,
     'apiKey': apiKey,
@@ -184,6 +229,9 @@ class LlmConfig {
     'temperature': temperature,
     'maxTokens': maxTokens,
     'maxToolIterations': maxToolIterations,
+    'max_tool_calls': maxToolIterations,
+    'max_turns': maxTurns,
+    'turn_limit': turnLimit,
     if (topP != null) 'topP': topP,
     if (topK != null) 'topK': topK,
     if (repeatPenalty != null) 'repeatPenalty': repeatPenalty,
@@ -199,14 +247,32 @@ class LlmConfig {
   };
 
   factory LlmConfig.fromJson(Map<String, dynamic> json) {
+    final maxToolsVal =
+        json['max_tool_calls'] ??
+        json['max_tool_iterations'] ??
+        json['maxToolCalls'] ??
+        json['maxToolIterations'];
+    final maxTurnsVal = json['max_turns'] ?? json['maxTurns'];
+    final turnLimitVal = json['turn_limit'] ?? json['turnLimit'];
+
     return LlmConfig(
+      id: json['id'] as String?,
+      name: json['name'] as String?,
       provider: LlmProvider.fromConfigKey(json['provider'] as String?),
       model: json['model'] as String? ?? '',
-      apiKey: json['apiKey'] as String? ?? '',
-      baseUrl: json['baseUrl'] as String? ?? '',
+      apiKey: (json['apiKey'] ?? json['api_key']) as String? ?? '',
+      baseUrl: (json['baseUrl'] ?? json['base_url']) as String? ?? '',
       temperature: (json['temperature'] as num?)?.toDouble() ?? 0.2,
       maxTokens: json['maxTokens'] as int? ?? 0,
-      maxToolIterations: json['maxToolIterations'] as int? ?? 400,
+      maxToolIterations: maxToolsVal is int
+          ? maxToolsVal
+          : int.tryParse(maxToolsVal?.toString() ?? '') ?? 30,
+      maxTurns: maxTurnsVal is int
+          ? maxTurnsVal
+          : int.tryParse(maxTurnsVal?.toString() ?? '') ?? 500,
+      turnLimit: turnLimitVal is int
+          ? turnLimitVal
+          : int.tryParse(turnLimitVal?.toString() ?? '') ?? 0,
       topP: (json['topP'] as num?)?.toDouble(),
       topK: json['topK'] as int?,
       repeatPenalty: (json['repeatPenalty'] as num?)?.toDouble(),

@@ -68,7 +68,7 @@ void main() async {
   print('--- [3] Autonomous Sub-Agent Delegation (delegate_task) ---');
   final delegateTool = DelegateTaskTool(
     availableAssignees: ['clone', 'researcher', 'coder'],
-    runner: ({required String assignee, required String task, List<String>? enabledTools}) async {
+    runner: ({required String assignee, required String task, List<String>? enabledTools, String? model}) async {
       print('🤖 [Sub-Agent Runner] Delegated to "$assignee" (tools: ${enabledTools?.join(", ") ?? "all"}):');
       print('   Task: "$task"');
       return 'Sub-agent "$assignee" completed analysis. Found 3 critical performance bottlenecks.';

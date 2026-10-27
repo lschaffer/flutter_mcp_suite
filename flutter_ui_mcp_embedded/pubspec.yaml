@@ -1,6 +1,6 @@
 name: flutter_ui_mcp_embedded
 description: "Pluggable on-device embedded LLM engine for Flutter MCP Suite using llamadart (llama.cpp / WebGPU / WASM)."
-version: 1.4.1
+version: 1.5.0
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/flutter_ui_mcp_embedded
 
@@ -19,8 +19,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  dart_mcp_core: ^1.4.0
-  flutter_ui_mcp_core: ^1.4.2
+  dart_mcp_core: ^1.5.0
+  flutter_ui_mcp_core: ^1.5.0
   llamadart: ^0.16.2
 
 dev_dependencies:

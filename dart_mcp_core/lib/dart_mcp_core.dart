@@ -5,6 +5,8 @@
 // Models
 export 'src/models/models.dart';
 export 'src/models/skill_manifest.dart';
+export 'src/models/execution_limits.dart';
+export 'src/tools/tool_loop_guard.dart';
 
 // LLM
 export 'src/llm/llm_service.dart';
@@ -25,6 +27,7 @@ export 'src/agents/agent_plan.dart';
 export 'src/agents/delegate_task_tool.dart';
 export 'src/context/context_compressor.dart';
 export 'src/context/retrieve_memory_tool.dart';
+export 'src/memory/workflow_memory_store.dart';
 export 'src/utils/change_notifier.dart';
 
 // Skills

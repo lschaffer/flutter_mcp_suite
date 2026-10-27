@@ -5,7 +5,7 @@ import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../../playground_controller.dart';
 import 'remote_mcp_dialog.dart';
 import 'edit_mcp_dialog.dart';
-import 'llm_config_form.dart';
+import 'llm_profiles_tab.dart';
 import 'mcp_server_registry_tab.dart';
 import '../mcp_localizations.dart';
 import '../services/embedded_llm/embedded_llm_driver.dart';
@@ -54,7 +54,6 @@ class SettingsPanel extends StatefulWidget {
 }
 
 class _SettingsPanelState extends State<SettingsPanel> {
-  final _formKey = GlobalKey<FormState>();
   late LlmProvider _selectedProvider;
   final _modelCtrl = TextEditingController();
   final _apiKeyCtrl = TextEditingController();
@@ -63,9 +62,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
   late bool _chatMode;
 
   // Per-provider field cache — preserves model/apiKey/baseUrl when switching providers
-  final Map<LlmProvider, _ProviderFieldCache> _providerCache = {};
   final _tempCtrl = TextEditingController(text: '0.2');
   final _maxTokensCtrl = TextEditingController(text: '0');
+  final _maxToolCallsCtrl = TextEditingController(text: '30');
+  final _turnLimitCtrl = TextEditingController(text: '0');
   final _maxToolOutputSizeCtrl = TextEditingController(text: '2560000');
   final _tokenWarningThresholdCtrl = TextEditingController(text: '1500000');
   final _topKCtrl = TextEditingController();
@@ -73,17 +73,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
   final _repeatPenaltyCtrl = TextEditingController();
   final _seedCtrl = TextEditingController();
 
-  bool _isSlm = false;
-  bool _isMultiModal = true;
-  bool _thinking = false;
-  bool _useNativeToolCall = true;
-  bool _useSafeToolCall = false;
-  bool _useStreaming = false;
-
   @override
   void initState() {
     super.initState();
-    _systemPromptCtrl = TextEditingController(text: widget.controller.systemPrompt);
+    _systemPromptCtrl = TextEditingController(
+      text: widget.controller.systemPrompt,
+    );
     _chatMode = widget.controller.chatMode;
     widget.controller.addListener(_onControllerChange);
     _loadLlmValues();
@@ -131,6 +126,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
     if (_maxTokensCtrl.text != config.maxTokens.toString()) {
       _maxTokensCtrl.text = config.maxTokens.toString();
     }
+    if (_maxToolCallsCtrl.text != widget.controller.maxToolCalls.toString()) {
+      _maxToolCallsCtrl.text = widget.controller.maxToolCalls.toString();
+    }
+    if (_turnLimitCtrl.text != widget.controller.turnLimit.toString()) {
+      _turnLimitCtrl.text = widget.controller.turnLimit.toString();
+    }
     if (_maxToolOutputSizeCtrl.text != config.maxToolOutputSize.toString()) {
       _maxToolOutputSizeCtrl.text = config.maxToolOutputSize.toString();
     }
@@ -151,13 +152,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
       _seedCtrl.text = config.seed?.toString() ?? '';
     }
 
-    _isSlm = config.isSlm;
-    _isMultiModal = config.isMultiModal;
-    _thinking = config.thinking;
-    _useNativeToolCall = config.useNativeToolCall;
-    _useSafeToolCall = config.useSafeToolCall;
-    _useStreaming = config.useStreaming;
-
     if (_systemPromptCtrl.text != widget.controller.systemPrompt) {
       _systemPromptCtrl.text = widget.controller.systemPrompt;
     }
@@ -167,6 +161,23 @@ class _SettingsPanelState extends State<SettingsPanel> {
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChange);
+    // Auto-save LLM configuration if modified and valid
+    if (_selectedProvider != LlmProvider.none &&
+        _modelCtrl.text.trim().isNotEmpty) {
+      final current = widget.controller.llmConfig;
+      if (current.provider != _selectedProvider ||
+          current.model != _modelCtrl.text.trim() ||
+          current.apiKey != _apiKeyCtrl.text.trim() ||
+          current.baseUrl != _baseUrlCtrl.text.trim()) {
+        final updated = current.copyWith(
+          provider: _selectedProvider,
+          model: _modelCtrl.text.trim(),
+          apiKey: _apiKeyCtrl.text.trim(),
+          baseUrl: _baseUrlCtrl.text.trim(),
+        );
+        widget.controller.updateLlmConfig(updated);
+      }
+    }
     _systemPromptCtrl.dispose();
     _modelCtrl.dispose();
     _apiKeyCtrl.dispose();
@@ -179,46 +190,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
     _topPCtrl.dispose();
     _repeatPenaltyCtrl.dispose();
     _seedCtrl.dispose();
+    _maxToolCallsCtrl.dispose();
+    _turnLimitCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _saveLlmSettings() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final tempVal = double.tryParse(_tempCtrl.text.trim()) ?? 0.2;
-    final maxTokensVal = int.tryParse(_maxTokensCtrl.text.trim()) ?? 0;
-    final maxToolSizeVal =
-        int.tryParse(_maxToolOutputSizeCtrl.text.trim()) ?? 2560000;
-    final tokenWarningVal =
-        int.tryParse(_tokenWarningThresholdCtrl.text.trim()) ?? 1500000;
-
-    final updated = LlmConfig(
-      provider: _selectedProvider,
-      model: _modelCtrl.text.trim(),
-      apiKey: _apiKeyCtrl.text.trim(),
-      baseUrl: _baseUrlCtrl.text.trim(),
-      temperature: tempVal,
-      maxTokens: maxTokensVal,
-      maxToolOutputSize: maxToolSizeVal,
-      tokenWarningThreshold: tokenWarningVal,
-      topP: double.tryParse(_topPCtrl.text.trim()),
-      topK: int.tryParse(_topKCtrl.text.trim()),
-      repeatPenalty: double.tryParse(_repeatPenaltyCtrl.text.trim()),
-      seed: int.tryParse(_seedCtrl.text.trim()),
-      isSlm: _isSlm,
-      isMultiModal: _isMultiModal,
-      thinking: _thinking,
-      useNativeToolCall: _useNativeToolCall,
-      useSafeToolCall: _useSafeToolCall,
-      useStreaming: _useStreaming,
-    );
-
-    await widget.controller.updateLlmConfig(updated);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('LLM configuration saved successfully.')),
-      );
-    }
   }
 
   Future<void> _testMcpServerConnection(McpServerConfig server) async {
@@ -362,17 +336,18 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ),
-                body: SafeArea(child: Padding(padding: const EdgeInsets.all(8.0), child: buildToolsList())),
+                body: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: buildToolsList(),
+                  ),
+                ),
               ),
             );
           }
           return AlertDialog(
             title: Text('Tools from ${server.name}'),
-            content: SizedBox(
-              width: 480,
-              height: 450,
-              child: buildToolsList(),
-            ),
+            content: SizedBox(width: 480, height: 450, child: buildToolsList()),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -424,7 +399,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   children: [
                     const Icon(Icons.settings_outlined),
                     const SizedBox(width: 8),
-                    Text(l10n.get('playgroundSettings'), style: theme.textTheme.titleMedium),
+                    Text(
+                      l10n.get('playgroundSettings'),
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const Spacer(),
                     if (Navigator.of(context).canPop())
                       IconButton(
@@ -466,100 +444,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   children: [
                     // Tab 0: Agent & Tools
                     _buildAgentAndToolsTab(theme),
-                    // Tab 1: LLM Settings
-                    Form(
-                      key: _formKey,
-                      child: ListView(
-                        padding: const EdgeInsets.all(16.0),
-                        children: [
-                          Column(
-                            spacing: 12,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              LlmConfigForm(
-                                provider: _selectedProvider,
-                                onProviderChanged: (val) {
-                                  // Save current provider's fields before switching
-                                  _providerCache[_selectedProvider] =
-                                      _ProviderFieldCache(
-                                        model: _modelCtrl.text,
-                                        apiKey: _apiKeyCtrl.text,
-                                        baseUrl: _baseUrlCtrl.text,
-                                      );
-                                  // Restore or clear fields for the new provider
-                                  final cached = _providerCache[val];
-                                  if (cached != null) {
-                                    _modelCtrl.text = cached.model;
-                                    _apiKeyCtrl.text = cached.apiKey;
-                                    _baseUrlCtrl.text = cached.baseUrl;
-                                  } else {
-                                    _modelCtrl.clear();
-                                    _apiKeyCtrl.clear();
-                                    _baseUrlCtrl.clear();
-                                  }
-                                  setState(() {
-                                    _selectedProvider = val;
-                                  });
-                                },
-                                modelCtrl: _modelCtrl,
-                                apiKeyCtrl: _apiKeyCtrl,
-                                baseUrlCtrl: _baseUrlCtrl,
-                              ),
-                              if (_selectedProvider != LlmProvider.none) ...[
-                                const SizedBox(height: 12),
-                                ExpansionTile(
-                                  title: const Text(
-                                    'Advanced Hyperparameters & Flags',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  tilePadding: EdgeInsets.zero,
-                                  children: [
-                                    LlmAdvancedSettingsForm(
-                                      tempCtrl: _tempCtrl,
-                                      maxTokensCtrl: _maxTokensCtrl,
-                                      maxToolOutputSizeCtrl: _maxToolOutputSizeCtrl,
-                                      tokenWarningThresholdCtrl:
-                                          _tokenWarningThresholdCtrl,
-                                      topKCtrl: _topKCtrl,
-                                      topPCtrl: _topPCtrl,
-                                      repeatPenaltyCtrl: _repeatPenaltyCtrl,
-                                      seedCtrl: _seedCtrl,
-                                      thinking: _thinking,
-                                      onThinkingChanged: (val) =>
-                                          setState(() => _thinking = val),
-                                      isSlm: _isSlm,
-                                      onIsSlmChanged: (val) =>
-                                          setState(() => _isSlm = val),
-                                      isMultiModal: _isMultiModal,
-                                      onIsMultiModalChanged: (val) =>
-                                          setState(() => _isMultiModal = val),
-                                      useNativeToolCall: _useNativeToolCall,
-                                      onUseNativeToolCallChanged: (val) =>
-                                          setState(() => _useNativeToolCall = val),
-                                      useStreaming: _useStreaming,
-                                      onUseStreamingChanged: (val) =>
-                                          setState(() => _useStreaming = val),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed: _saveLlmSettings,
-                                    icon: const Icon(Icons.save_outlined, size: 16),
-                                    label: const Text('Save Settings'),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    // Tab 1: LLM Settings & Multi-Profiles
+                    LlmProfilesTab(controller: widget.controller),
                     // Tab 2: MCP Servers
                     ListView(
                       padding: const EdgeInsets.all(16.0),
@@ -602,28 +488,35 @@ class _SettingsPanelState extends State<SettingsPanel> {
                             final statusColor = server.isOnline == true
                                 ? Colors.green
                                 : (server.isOnline == false
-                                    ? Colors.red
-                                    : Colors.grey);
+                                      ? Colors.red
+                                      : Colors.grey);
                             final statusLabel = server.isOnline == true
                                 ? 'Online'
                                 : (server.isOnline == false
-                                    ? 'Offline'
-                                    : 'Unknown');
-                            final apiKeyStatus = (server.apiKey ?? '').trim().isNotEmpty
+                                      ? 'Offline'
+                                      : 'Unknown');
+                            final apiKeyStatus =
+                                (server.apiKey ?? '').trim().isNotEmpty
                                 ? 'API key configured'
                                 : 'API key missing';
 
                             return Card(
                               margin: const EdgeInsets.symmetric(vertical: 6),
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  16,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
                                         Tooltip(
-                                          message: 'Server Status: $statusLabel',
+                                          message:
+                                              'Server Status: $statusLabel',
                                           child: Icon(
                                             Icons.circle,
                                             size: 10,
@@ -635,34 +528,52 @@ class _SettingsPanelState extends State<SettingsPanel> {
                                           scale: 0.8,
                                           child: Switch(
                                             value: server.enabled,
-                                            onChanged: (val) => widget.controller
+                                            onChanged: (val) => widget
+                                                .controller
                                                 .toggleServer(server.id, val),
                                           ),
                                         ),
                                         const Spacer(),
                                         IconButton(
-                                          icon: const Icon(Icons.list_alt, size: 20),
-                                          tooltip: 'Discover Tools',
-                                          onPressed: () => _discoverServerTools(server),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.edit_outlined, size: 20),
-                                          tooltip: 'Edit Server',
-                                          onPressed: () => EditMcpServerDialog.show(
-                                            context,
-                                            server,
-                                            widget.controller,
+                                          icon: const Icon(
+                                            Icons.list_alt,
+                                            size: 20,
                                           ),
+                                          tooltip: 'Discover Tools',
+                                          onPressed: () =>
+                                              _discoverServerTools(server),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.wifi_tethering, size: 20),
+                                          icon: const Icon(
+                                            Icons.edit_outlined,
+                                            size: 20,
+                                          ),
+                                          tooltip: 'Edit Server',
+                                          onPressed: () =>
+                                              EditMcpServerDialog.show(
+                                                context,
+                                                server,
+                                                widget.controller,
+                                              ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.wifi_tethering,
+                                            size: 20,
+                                          ),
                                           tooltip: 'Test Connection',
-                                          onPressed: () => _testMcpServerConnection(server),
+                                          onPressed: () =>
+                                              _testMcpServerConnection(server),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red,
+                                            size: 20,
+                                          ),
                                           tooltip: 'Remove',
-                                          onPressed: () => widget.controller.removeServer(server.id),
+                                          onPressed: () => widget.controller
+                                              .removeServer(server.id),
                                         ),
                                       ],
                                     ),
@@ -677,7 +588,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
                                     const SizedBox(height: 6),
                                     Text(
                                       [
-                                        if (server.description != null && server.description!.trim().isNotEmpty)
+                                        if (server.description != null &&
+                                            server.description!
+                                                .trim()
+                                                .isNotEmpty)
                                           server.description!.trim(),
                                         '${server.url}${server.mcpEndpoint}',
                                         'Cloud MCP - $statusLabel',
@@ -685,7 +599,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
                                       ].join('\n'),
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                                        color: theme
+                                            .colorScheme
+                                            .onSurfaceVariant
+                                            .withValues(alpha: 0.8),
                                         height: 1.4,
                                       ),
                                     ),
@@ -734,13 +651,17 @@ class _SettingsPanelState extends State<SettingsPanel> {
                 Row(
                   children: [
                     Icon(
-                      _chatMode ? Icons.chat_bubble_outline : Icons.smart_toy_outlined,
+                      _chatMode
+                          ? Icons.chat_bubble_outline
+                          : Icons.smart_toy_outlined,
                       color: theme.colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Operation Mode',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -757,16 +678,22 @@ class _SettingsPanelState extends State<SettingsPanel> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
                           decoration: BoxDecoration(
                             color: !_chatMode
                                 ? theme.colorScheme.primaryContainer
-                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                : theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: !_chatMode
                                   ? theme.colorScheme.primary
-                                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                  : theme.colorScheme.outlineVariant.withValues(
+                                      alpha: 0.4,
+                                    ),
                               width: !_chatMode ? 1.5 : 1,
                             ),
                           ),
@@ -776,14 +703,18 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               Icon(
                                 Icons.smart_toy_outlined,
                                 size: 18,
-                                color: !_chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                                color: !_chatMode
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : null,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Agent Mode',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: !_chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                                  color: !_chatMode
+                                      ? theme.colorScheme.onPrimaryContainer
+                                      : null,
                                 ),
                               ),
                             ],
@@ -802,16 +733,22 @@ class _SettingsPanelState extends State<SettingsPanel> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
                           decoration: BoxDecoration(
                             color: _chatMode
                                 ? theme.colorScheme.primaryContainer
-                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                : theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: _chatMode
                                   ? theme.colorScheme.primary
-                                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                  : theme.colorScheme.outlineVariant.withValues(
+                                      alpha: 0.4,
+                                    ),
                               width: _chatMode ? 1.5 : 1,
                             ),
                           ),
@@ -821,14 +758,18 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               Icon(
                                 Icons.chat_bubble_outline,
                                 size: 18,
-                                color: _chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                                color: _chatMode
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : null,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Direct Chat',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: _chatMode ? theme.colorScheme.onPrimaryContainer : null,
+                                  color: _chatMode
+                                      ? theme.colorScheme.onPrimaryContainer
+                                      : null,
                                 ),
                               ),
                             ],
@@ -843,7 +784,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   _chatMode
                       ? 'Direct LLM conversation without tools or system prompt (fastest for simple queries).'
                       : 'Equipped with autonomous tools, memory, and persona guidelines.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -865,19 +808,27 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     Expanded(
                       child: Text(
                         'System Prompt / Persona',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (_systemPromptCtrl.text.isNotEmpty)
                       TextButton.icon(
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 4,
+                          ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         icon: const Icon(Icons.clear, size: 14),
-                        label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Clear',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         onPressed: () {
                           setState(() {
                             _systemPromptCtrl.clear();
@@ -896,27 +847,42 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     widget.controller.systemPrompt = val;
                   },
                   decoration: const InputDecoration(
-                    hintText: 'Enter instructions, persona details, or operational guidelines for the agent...',
+                    hintText:
+                        'Enter instructions, persona details, or operational guidelines for the agent...',
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.all(12),
                   ),
                 ),
-                if ((widget.showSystemPromptTemplates ?? widget.controller.showSystemPromptTemplates) &&
-                    (widget.systemPromptTemplates ?? widget.controller.systemPromptTemplates ?? kDefaultSystemPromptTemplates).isNotEmpty) ...[
+                if ((widget.showSystemPromptTemplates ??
+                        widget.controller.showSystemPromptTemplates) &&
+                    (widget.systemPromptTemplates ??
+                            widget.controller.systemPromptTemplates ??
+                            kDefaultSystemPromptTemplates)
+                        .isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
                     'Quick Persona Templates:',
-                    style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      for (final tpl in (widget.systemPromptTemplates ?? widget.controller.systemPromptTemplates ?? kDefaultSystemPromptTemplates))
+                      for (final tpl
+                          in (widget.systemPromptTemplates ??
+                              widget.controller.systemPromptTemplates ??
+                              kDefaultSystemPromptTemplates))
                         ActionChip(
-                          avatar: tpl.icon != null ? Icon(tpl.icon, size: 14) : null,
-                          label: Text(tpl.label, style: const TextStyle(fontSize: 11)),
+                          avatar: tpl.icon != null
+                              ? Icon(tpl.icon, size: 14)
+                              : null,
+                          label: Text(
+                            tpl.label,
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           onPressed: () {
                             setState(() {
                               _systemPromptCtrl.text = tpl.prompt;
@@ -931,163 +897,200 @@ class _SettingsPanelState extends State<SettingsPanel> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-
-        // Tools Selection Card
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.handyman_outlined, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
+        // Tools Selection Card (hidden in Direct Chat mode)
+        if (!_chatMode) ...[
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.handyman_outlined,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Tools ($activeCount / $totalTools Active)',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (totalTools > 0) ...[
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 4,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () {
+                            final allNames = <String>{
+                              ...localTools.map((t) => t.name),
+                              ...mcpTools.map((t) => t.name),
+                            };
+                            setState(() {
+                              widget.controller.updateEnabledTools(allNames);
+                            });
+                          },
+                          child: const Text(
+                            'Enable All',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 4,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              widget.controller.updateEnabledTools({});
+                            });
+                          },
+                          child: const Text(
+                            'Disable All',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (_chatMode) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
                       child: Text(
-                        'Tools ($activeCount / $totalTools Active)',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
+                        'Tools are bypassed while Direct Chat Mode is active.',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ),
-                    if (totalTools > 0) ...[
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ],
+                  const SizedBox(height: 8),
+                  if (totalTools == 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                        child: Text(
+                          hasConfiguredServers
+                              ? 'No tools discovered yet. Make sure configured MCP servers are enabled and connected in the MCP Servers tab.'
+                              : 'No local or remote tools registered yet. Connect remote MCP servers in the MCP Servers tab to equip the agent.',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        onPressed: () {
-                          final allNames = <String>{
-                            ...localTools.map((t) => t.name),
-                            ...mcpTools.map((t) => t.name),
-                          };
-                          setState(() {
-                            widget.controller.updateEnabledTools(allNames);
-                          });
-                        },
-                        child: const Text('Enable All', style: TextStyle(fontSize: 12)),
                       ),
-                      const SizedBox(width: 4),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    )
+                  else ...[
+                    if (localTools.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+                        child: Text(
+                          'Local Tools (${localTools.length})',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            widget.controller.updateEnabledTools({});
-                          });
-                        },
-                        child: const Text('Disable All', style: TextStyle(fontSize: 12)),
                       ),
+                      for (final tool in localTools)
+                        CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            tool.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          subtitle: Text(
+                            tool.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          value: widget.controller.enabledToolNames.contains(
+                            tool.name,
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              widget.controller.toggleToolEnabled(
+                                tool.name,
+                                val ?? false,
+                              );
+                            });
+                          },
+                        ),
+                    ],
+                    if (mcpTools.isNotEmpty) ...[
+                      const Divider(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
+                        child: Text(
+                          'MCP Server Tools (${mcpTools.length})',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ),
+                      for (final tool in mcpTools)
+                        CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            tool.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          subtitle: tool.description != null
+                              ? Text(
+                                  tool.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11),
+                                )
+                              : null,
+                          value: widget.controller.enabledToolNames.contains(
+                            tool.name,
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              widget.controller.toggleToolEnabled(
+                                tool.name,
+                                val ?? false,
+                              );
+                            });
+                          },
+                        ),
                     ],
                   ],
-                ),
-                if (_chatMode) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Text(
-                      'Tools are bypassed while Direct Chat Mode is active.',
-                      style: TextStyle(
-                        color: Colors.orange.shade700,
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
                 ],
-                const SizedBox(height: 8),
-                if (totalTools == 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    child: Center(
-                      child: Text(
-                        hasConfiguredServers
-                            ? 'No tools discovered yet. Make sure configured MCP servers are enabled and connected in the MCP Servers tab.'
-                            : 'No local or remote tools registered yet. Connect remote MCP servers in the MCP Servers tab to equip the agent.',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-                else ...[
-                  if (localTools.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
-                      child: Text(
-                        'Local Tools (${localTools.length})',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    for (final tool in localTools)
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          tool.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        subtitle: Text(
-                          tool.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        value: widget.controller.enabledToolNames.contains(tool.name),
-                        onChanged: (val) {
-                          setState(() {
-                            widget.controller.toggleToolEnabled(tool.name, val ?? false);
-                          });
-                        },
-                      ),
-                  ],
-                  if (mcpTools.isNotEmpty) ...[
-                    const Divider(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
-                      child: Text(
-                        'MCP Server Tools (${mcpTools.length})',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.secondary,
-                        ),
-                      ),
-                    ),
-                    for (final tool in mcpTools)
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          tool.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        subtitle: tool.description != null
-                            ? Text(
-                                tool.description!,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11),
-                              )
-                            : null,
-                        value: widget.controller.enabledToolNames.contains(tool.name),
-                        onChanged: (val) {
-                          setState(() {
-                            widget.controller.toggleToolEnabled(tool.name, val ?? false);
-                          });
-                        },
-                      ),
-                  ],
-                ],
-              ],
+              ),
             ),
           ),
-        ),
+        ],
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: () {
@@ -1106,17 +1109,4 @@ class _SettingsPanelState extends State<SettingsPanel> {
       ],
     );
   }
-}
-
-/// Holds per-provider model/apiKey/baseUrl so switching providers preserves previously entered data.
-class _ProviderFieldCache {
-  final String model;
-  final String apiKey;
-  final String baseUrl;
-
-  const _ProviderFieldCache({
-    required this.model,
-    required this.apiKey,
-    required this.baseUrl,
-  });
 }

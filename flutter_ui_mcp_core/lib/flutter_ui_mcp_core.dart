@@ -24,6 +24,7 @@ export 'src/widgets/chat_bubble.dart';
 export 'src/widgets/edit_mcp_dialog.dart';
 export 'src/widgets/initial_mcp_install_progress_dialog.dart';
 export 'src/widgets/llm_config_form.dart';
+export 'src/widgets/llm_profiles_tab.dart';
 export 'src/widgets/mcp_server_registry_tab.dart';
 export 'src/widgets/registered_tools_dialog.dart';
 export 'src/widgets/remote_mcp_dialog.dart';

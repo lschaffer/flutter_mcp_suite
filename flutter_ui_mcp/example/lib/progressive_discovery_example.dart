@@ -51,8 +51,9 @@ class ProgressiveDiscoveryExampleScreen extends StatelessWidget {
             'then call them via "mcp_call_tool".',
 
         initialEnabledTools: const [
-          'mcp_list_tools',
-          'mcp_call_tool',
+          'get_current_weather',
+          'get_weather_forecast',
+          'geocode_weather_city',
         ],
       ),
     );

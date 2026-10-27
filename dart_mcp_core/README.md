@@ -23,6 +23,10 @@ Ideal for building pure Dart CLI applications, background workers, backend servi
 - **Agent Evaluation Harness (`evals`)** — Anthropic-aligned evaluation suite with `EvalTask`, `EvalGrader` (`ExactMatchGrader`, `RegexGrader`, `ToolCallGrader`), `EvalRunner`, and `TrajectoryRecorder` for regression testing, pass@k metrics, and offline trajectory replay.
 - **Structured Agent Planning (`PlanState`, `PlanStep`, `WriteTodosTool`)** — Native task checklist planning and live progress tracking with reactive `AgentPlanEvent` streams.
 - **Agent Lifecycle Hooks (`AgentHook`)** — Security interceptors (`beforeToolCall`, `afterToolCall`, `beforeModelCall`, `afterModelCall`) with `ToolCallDecision` (`proceed`, `deny`, `modify`).
+- **Multi-LLM Configuration Profiles & Clones (`LlmConfig`)** — Named LLM configuration profiles with profile IDs, friendly labels, safe iteration defaults (`maxToolCalls: 30`), turn limits (`maxTurns`), and cloning utilities (`llmConfig.clone()`).
+- **Infinite Tool Loop Protection (`ToolLoopGuard`)** — Automatic repetition detection comparing canonical arguments; warns at 3 consecutive identical calls and blocks execution at 4+, preventing runaway token usage.
+- **Session Auto-Rotation & Execution Limits (`McpExecutionLimits`, `SessionRotator`)** — Manage conversational turn quotas and rotate JSON session files automatically before hitting token or file size thresholds.
+- **Shared Workflow Blackboard Memory (`WorkflowMemoryStore`)** — Structured key-value scratchpad (`store_memory`, `recall_memory`) for state passing across sub-agents and multi-step pipelines.
 - **Progressive MCP Tool Discovery (`McpListToolsTool`, `McpCallToolTool`)** — On-demand schema loading to support hundreds of tools without exhausting context windows.
 - **Model Context Protocol (MCP) Clients**
   - **Remote HTTP/SSE Transport** — Connection checking, Basic/Bearer authentication, automatic health monitoring, and reconnect loops.
@@ -55,7 +59,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dart_mcp_core: ^1.3.0
+  dart_mcp_core: ^1.5.0
 ```
 
 ### Basic Example (Pure Dart CLI)

@@ -51,6 +51,16 @@ Different examples and workflows require different LLM reasoning and structured 
 
 Watch dynamic GenUI in action rendering interactive surfaces across all showcase examples:
 
+### 🎛️ Unified GenUI Showcase Gallery & Feature Switcher
+Explore, switch, and interact with all 11 GenUI showcase scenarios directly from the top bar:
+
+![Unified GenUI Showcase Gallery](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_genui_mcp/flutter_genui_combined_menu.png)
+
+### 🏡 GenUI Smart Home Studio (Thermostat, Lighting & IoT)
+Interactive climate controls, lighting sliders, device status toggles, and energy breakdown charts:
+
+![GenUI Smart Home Studio](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_genui_mcp/flutter_genui_combined_smarthome.png)
+
 ### 💰 GenUI Model Cost & Architecture Optimizer
 ![GenUI Model Cost Optimizer](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_model_optimizer.png)
 
@@ -80,8 +90,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_genui_mcp: ^1.0.2
-  genui: ^0.10.3
+  flutter_genui_mcp: ^1.5.0
+  genui: ^0.10.4
 ```
 
 Then import:

@@ -6,6 +6,7 @@ typedef SubAgentRunner = Future<String> Function({
   required String assignee,
   required String task,
   List<String>? enabledTools,
+  String? model,
 });
 
 /// Local MCP tool allowing an agent to delegate an isolated sub-task to another
@@ -42,6 +43,11 @@ class DelegateTaskTool extends McpLocalTool {
             'description':
                 'Clear, detailed instructions and objective for the sub-agent to perform.',
           },
+          'model': {
+            'type': 'string',
+            'description':
+                'Optional model override for the delegated task (e.g. "qwen2.5-coder", "fast", "local").',
+          },
           'enabledTools': {
             'type': 'array',
             'items': {'type': 'string'},
@@ -56,6 +62,9 @@ class DelegateTaskTool extends McpLocalTool {
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final assignee = arguments['assignee'] as String? ?? 'clone';
     final task = arguments['task'] as String? ?? '';
+    final model = (arguments['model'] as String? ??
+            arguments['modelOverride'] as String?)
+        ?.trim();
     final enabledTools = (arguments['enabledTools'] as List?)?.cast<String>();
 
     if (task.trim().isEmpty) {
@@ -67,6 +76,7 @@ class DelegateTaskTool extends McpLocalTool {
         assignee: assignee,
         task: task,
         enabledTools: enabledTools,
+        model: (model != null && model.isNotEmpty) ? model : null,
       );
       return MCPToolResult.text(result);
     } catch (e) {

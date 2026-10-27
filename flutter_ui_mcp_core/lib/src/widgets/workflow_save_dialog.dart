@@ -51,27 +51,27 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
     super.dispose();
   }
 
-  List<SubPromptStep> _gatherPromptSteps() {
-    final steps = <SubPromptStep>[];
+  ({List<SubPromptStep> steps, int omittedPromptTurns, bool hasUnsent}) _gatherPromptInfo() {
+    final userMessages = widget.controller.messages
+        .where((m) => m.role == ChatRole.user && m.content.trim().isNotEmpty)
+        .toList();
 
-    // Collect user messages from chat history
-    for (final msg in widget.controller.messages) {
-      if (msg.role != ChatRole.user) continue;
-      final text = msg.content.trim();
-      if (text.isEmpty) continue;
+    String rawPrompt = '';
+    int omittedTurns = 0;
+    final hasUnsent = widget.unsentInput != null && widget.unsentInput!.trim().isNotEmpty;
 
-      final subSteps = parseSubPromptSteps(text);
-      for (final sub in subSteps) {
-        if (sub.text.trim().isNotEmpty) {
-          steps.add(sub);
-        }
-      }
+    if (hasUnsent) {
+      rawPrompt = widget.unsentInput!.trim();
+      omittedTurns = userMessages.length;
+    } else if (userMessages.isNotEmpty) {
+      rawPrompt = userMessages.last.content.trim();
+      omittedTurns = userMessages.length - 1;
     }
 
-    // Include the currently typed (unsent) prompt if present
-    if (widget.unsentInput != null && widget.unsentInput!.trim().isNotEmpty) {
-      final unsentSteps = parseSubPromptSteps(widget.unsentInput!.trim());
-      for (final sub in unsentSteps) {
+    final steps = <SubPromptStep>[];
+    if (rawPrompt.isNotEmpty) {
+      final subSteps = parseSubPromptSteps(rawPrompt);
+      for (final sub in subSteps) {
         if (sub.text.trim().isNotEmpty) {
           final currentTools = widget.controller.enabledToolNames.isEmpty
               ? null
@@ -98,7 +98,7 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
       );
     }
 
-    return steps;
+    return (steps: steps, omittedPromptTurns: omittedTurns, hasUnsent: hasUnsent);
   }
 
   Future<void> _handleSave() async {
@@ -118,14 +118,20 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
       final isUpdating = !_saveAsNew && _existingWorkflow != null;
       final workflowId = isUpdating ? _existingWorkflow!.id : const Uuid().v4();
 
-      final steps = _gatherPromptSteps();
+      final promptInfo = _gatherPromptInfo();
+      final steps = promptInfo.steps;
+      final promptText = steps
+          .map((s) => s.text)
+          .where((t) => t.isNotEmpty)
+          .join('\n++#++\n');
+
       final workflow = PlaygroundWorkflow(
         id: workflowId,
         name: name,
         description: _descriptionCtrl.text.trim(),
         steps: steps,
         systemPrompt: widget.controller.systemPrompt,
-        initialPrompt: widget.unsentInput?.trim() ?? '',
+        initialPrompt: promptText,
         useCustomLlm: widget.controller.customLlmConfig != null,
         customLlmConfig: widget.controller.customLlmConfig,
         enabledToolNames: widget.controller.enabledToolNames.toList(),
@@ -163,6 +169,9 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
     final isWide = MediaQuery.sizeOf(context).width >= 600;
 
     Widget buildForm() {
+      final promptInfo = _gatherPromptInfo();
+      final steps = promptInfo.steps;
+
       return SingleChildScrollView(
         padding: isWide ? EdgeInsets.zero : const EdgeInsets.all(16.0),
         child: Column(
@@ -175,6 +184,32 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
                 child: Text(
                   _errorMessage!,
                   style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+                ),
+              ),
+
+            if (promptInfo.omittedPromptTurns > 0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        promptInfo.hasUnsent
+                            ? 'Saving the current uncommitted prompt (${promptInfo.omittedPromptTurns} earlier conversation turn(s) omitted).'
+                            : 'Saving the most recent prompt turn (${promptInfo.omittedPromptTurns} earlier turn(s) omitted from workflow).',
+                        style: const TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -256,6 +291,74 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
             ),
             const SizedBox(height: 16),
 
+            // Prompt Steps Preview
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.terminal, size: 16, color: theme.colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Prompt to Save:',
+                        style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      if (steps.where((s) => s.text.isNotEmpty).length > 1)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${steps.where((s) => s.text.isNotEmpty).length} subprompts',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  for (int i = 0; i < steps.length; i++) ...[
+                    if (steps.length > 1)
+                      Text(
+                        'Subprompt ${i + 1}:',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    Text(
+                      steps[i].text.isNotEmpty ? steps[i].text : '(empty prompt)',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: steps[i].text.isEmpty
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                        fontStyle: steps[i].text.isEmpty ? FontStyle.italic : FontStyle.normal,
+                      ),
+                    ),
+                    if (i < steps.length - 1) const SizedBox(height: 6),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // Summary Info
             Container(
               padding: const EdgeInsets.all(10),
@@ -273,7 +376,7 @@ class _WorkflowSaveDialogState extends State<WorkflowSaveDialog> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '• ${_gatherPromptSteps().where((s) => s.text.isNotEmpty).length} prompt step(s)\n'
+                    '• ${steps.where((s) => s.text.isNotEmpty).length} prompt step(s)\n'
                     '• ${widget.controller.enabledToolNames.length} enabled tool(s)\n'
                     '• System prompt (${widget.controller.systemPrompt.trim().isNotEmpty ? 'custom' : 'default'})\n'
                     '${widget.controller.activeSkill != null ? '• Active skill: ${widget.controller.activeSkill!.name}' : ''}',

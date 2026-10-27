@@ -61,8 +61,20 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 
 ## 🎥 Demos & Visual Showcases
 
+### 🎛️ Unified Showcase Gallery & Feature Switcher
+Browse, switch, and test all agent showcases directly in the application header:
+
+![Unified Showcase Gallery](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_mcp/flutter_ui_combined_menu.png)
+
+### ⚡ Progressive MCP Tool Discovery (Dynamic On-Demand Schema Loading)
+Connect to expansive MCP server toolsets with 95% token savings using two-tiered discovery:
+
+![Progressive MCP Tool Discovery](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_mcp/flutter_ui_combined_progressive.png)
+
 ### 🤖 Autonomous Sub-Agent Delegation UI
-![Sub-Agent Orchestrator](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_subagents.png)
+Live hierarchical visualization of delegated sub-agent tasks spawned via `DelegateTaskTool` with status indicators, execution logs, and nested results:
+
+![Sub-Agent Orchestrator](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_mcp/flutter_ui_combined_subagents.png)
 
 ### 🧩 Dynamic Skills Dock
 ![Dynamic Skills Dock](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/flutter_ui_dynamic_skills.gif)
@@ -80,7 +92,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp: ^1.3.0
+  flutter_ui_mcp: ^1.5.0
 ```
 
 Then import:

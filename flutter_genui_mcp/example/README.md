@@ -1,11 +1,27 @@
-# GenUI Travel & Accommodation Planner Showcase
+# GenUI Unified Showcase Gallery & Travel Planner
 
-The primary example application for **`flutter_genui_mcp`**, demonstrating interactive generative UI powered by the `genui` (`A2UI`) protocol, local Dart MCP tools, and web search integration via SerpAPI.
+The primary showcase application for **`flutter_genui_mcp`**, demonstrating dynamic generative UI powered by the `genui` (`A2UI`) protocol, local Dart MCP tools, and web search integration.
 
 ---
 
-## ✨ Features
+## 🎨 Visual Preview
 
+### 🎛️ Unified GenUI Showcase Gallery
+Switch seamlessly between all 11 GenUI showcases directly from the top bar:
+
+![Unified GenUI Showcase Gallery](../../screenshots/example_ui/flutter_genui_mcp/flutter_genui_combined_menu.png)
+
+> [!TIP]
+> **Mobile Optimization**: On mobile displays (`< 700px`), tapping the feature dropdown opens an ergonomic fullscreen bottom-sheet picker with unclipped cards, feature tags, prompt previews, and a copyable example prompts dialog.
+
+### 🏡 Smart Home Studio Showcase
+![GenUI Smart Home Studio](../../screenshots/example_ui/flutter_genui_mcp/flutter_genui_combined_smarthome.png)
+
+---
+
+## ✨ Features Demonstrated
+
+- **11 Interactive Showcase Scenarios**: Switch between Travel, Weather, Smart Home, PC Hardware, Finance, Cloud Filesystem, File ETL, Data Studio, Model Optimizer, Benchmarks, and Agent Swarm.
 - **Interactive Stay & Trip Finder (`TravelSearchForm`)**: Live destination autocomplete, interactive date range picker, accommodation type chips (hotel, apartment, camping/glamping, resort, hostel), and budget style selectors.
 - **SerpAPI Travel Search Tool (`search_travel_destinations`)**: Searches the web for accommodations, verified star ratings, reviews, photos, addresses, pricing, and direct booking links. Curated fallback dataset is included when running without an API key.
 - **Rich Stay Cards (`AccommodationGrid`)**: High-res photo cards with amenity badges, rating stars, pricing tags, and external link launchers.

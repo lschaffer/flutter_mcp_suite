@@ -522,6 +522,256 @@ void main() {
       expect(find.text('Quick Persona Templates:'), findsNothing);
       expect(find.text('Coding Expert'), findsNothing);
     });
+
+    testWidgets('LlmProfilesTab renders multi-profiles, strategy panel, and hides embedded when unavailable', (tester) async {
+      final initialConfigs = [
+        const LlmConfig(
+          id: 'llm_mistral_1',
+          name: 'Mistral Primary',
+          provider: LlmProvider.mistral,
+          model: 'mistral-medium-latest',
+          apiKey: 'key1',
+        ),
+        const LlmConfig(
+          id: 'llm_mistral_2',
+          name: 'Mistral Codestral',
+          provider: LlmProvider.mistral,
+          model: 'codestral-latest',
+          apiKey: 'key2',
+        ),
+      ];
+
+      final controller = PlaygroundController(
+        initialLlmConfigs: initialConfigs,
+      );
+
+      expect(controller.llmConfigs.length, equals(2));
+      expect(controller.selectedLlmId, equals('llm_mistral_1'));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LlmProfilesTab(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Heading and Add LLM button
+      expect(find.text('Configured LLMs'), findsOneWidget);
+      expect(find.text('Add LLM'), findsOneWidget);
+
+      // Both profile cards rendered
+      expect(find.text('Mistral Primary'), findsOneWidget);
+      expect(find.text('Mistral Codestral'), findsOneWidget);
+      expect(find.text('Active / Primary'), findsOneWidget);
+
+      // Embedded tab should NOT be present when EmbeddedLlmRegistry is not available
+      expect(find.text('Embedded'), findsNothing);
+
+      // Global Tool Rules & Strategy card
+      expect(find.text('Global Tool Rules & Strategy'), findsOneWidget);
+
+      // Tap to expand strategy
+      await tester.tap(find.text('Global Tool Rules & Strategy'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Inject Tool Calling Rules'), findsOneWidget);
+      expect(find.text('Tool Delivery Strategy'), findsWidgets);
+
+      // Collapse strategy to bring cards into viewport
+      await tester.tap(find.text('Global Tool Rules & Strategy'));
+      await tester.pumpAndSettle();
+
+      // Tap Set Active on second profile
+      await tester.tap(find.text('Set Active'));
+      await tester.pumpAndSettle();
+
+      expect(controller.selectedLlmId, equals('llm_mistral_2'));
+    });
   });
+
+  group('WorkflowSaveDialog & Progressive Tool Selection Tests', () {
+    testWidgets('WorkflowSaveDialog saves only last prompt turn and displays omitted turns hint', (tester) async {
+      final controller = PlaygroundController();
+
+      final now = DateTime.now();
+      // Add conversation history with 3 turns
+      final messages = [
+        ChatMessage(
+          id: 'msg-1',
+          role: ChatRole.user,
+          content: 'Old Turn 1: Analyze codebase',
+          type: MessageType.text,
+          timestamp: now,
+        ),
+        ChatMessage(
+          id: 'msg-2',
+          role: ChatRole.assistant,
+          content: 'Analysis complete.',
+          type: MessageType.text,
+          timestamp: now,
+        ),
+        ChatMessage(
+          id: 'msg-3',
+          role: ChatRole.user,
+          content: 'Old Turn 2: Run linter',
+          type: MessageType.text,
+          timestamp: now,
+        ),
+        ChatMessage(
+          id: 'msg-4',
+          role: ChatRole.assistant,
+          content: 'Linting clean.',
+          type: MessageType.text,
+          timestamp: now,
+        ),
+        ChatMessage(
+          id: 'msg-5',
+          role: ChatRole.user,
+          content: 'Latest Step 1: Run unit tests\n++#++\nLatest Step 2: Deploy staging',
+          type: MessageType.text,
+          timestamp: now,
+        ),
+        ChatMessage(
+          id: 'msg-6',
+          role: ChatRole.assistant,
+          content: 'Tests passed.',
+          type: MessageType.text,
+          timestamp: now,
+        ),
+      ];
+      for (final m in messages) {
+        controller.addMessage(m);
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WorkflowSaveDialog(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Check hint about omitted earlier turns
+      expect(
+        find.text('Saving the most recent prompt turn (2 earlier turn(s) omitted from workflow).'),
+        findsOneWidget,
+      );
+
+      // Check subprompt badge and steps
+      expect(find.text('2 subprompts'), findsOneWidget);
+      expect(find.text('Subprompt 1:'), findsOneWidget);
+      expect(find.text('Latest Step 1: Run unit tests'), findsOneWidget);
+      expect(find.text('Subprompt 2:'), findsOneWidget);
+      expect(find.text('Latest Step 2: Deploy staging'), findsOneWidget);
+
+      // Ensure older turns are not in the prompt preview
+      expect(find.text('Old Turn 1: Analyze codebase'), findsNothing);
+      expect(find.text('Old Turn 2: Run linter'), findsNothing);
+    });
+
+    testWidgets('WorkflowSaveDialog prioritizes unsentInput over chat history', (tester) async {
+      final controller = PlaygroundController();
+
+      controller.addMessage(
+        ChatMessage(
+          id: 'msg-prev',
+          role: ChatRole.user,
+          content: 'Previous Turn Prompt',
+          type: MessageType.text,
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WorkflowSaveDialog(
+              controller: controller,
+              unsentInput: 'Draft Prompt: Check Kubernetes cluster',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Saving the current uncommitted prompt (1 earlier conversation turn(s) omitted).'),
+        findsOneWidget,
+      );
+      expect(find.text('Draft Prompt: Check Kubernetes cluster'), findsOneWidget);
+      expect(find.text('Previous Turn Prompt'), findsNothing);
+    });
+
+    test('Progressive discovery sanitizes meta-tools and enables catalog tools', () async {
+      final catalogTools = [
+        _SampleTool('tool_alpha'),
+        _SampleTool('tool_beta'),
+      ];
+
+      final storage = _TestStorageDelegate();
+      // Simulate stale storage with meta tools
+      await storage.saveEnabledTools({'mcp_list_tools', 'mcp_call_tool'});
+
+      final controller = PlaygroundController(
+        storageDelegate: storage,
+        progressiveMcpDiscovery: true,
+        customLocalTools: catalogTools,
+      );
+
+      // Await initialization post-load
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      // Meta-tools should have been stripped and catalog tools equipped
+      expect(controller.enabledToolNames.contains('mcp_list_tools'), isFalse);
+      expect(controller.enabledToolNames.contains('mcp_call_tool'), isFalse);
+      expect(controller.enabledToolNames.contains('tool_alpha'), isTrue);
+      expect(controller.enabledToolNames.contains('tool_beta'), isTrue);
+    });
+  });
+}
+
+class _TestStorageDelegate extends McpPlaygroundStorageDelegate {
+  Set<String> _tools = {};
+
+  @override
+  Future<void> saveLlmConfig(LlmConfig config) async {}
+  @override
+  Future<LlmConfig?> loadLlmConfig() async => null;
+  @override
+  Future<void> saveServers(List<McpServerConfig> servers) async {}
+  @override
+  Future<List<McpServerConfig>> loadServers() async => [];
+  @override
+  Future<void> saveSetups(List<SavedPlaygroundSetup> setups) async {}
+  @override
+  Future<List<SavedPlaygroundSetup>> loadSetups() async => [];
+
+  @override
+  Future<Set<String>> loadEnabledTools() async => _tools;
+
+  @override
+  Future<void> saveEnabledTools(Set<String> tools) async {
+    _tools = tools;
+  }
+}
+
+class _SampleTool extends McpLocalTool {
+  @override
+  final String name;
+  @override
+  final String description;
+  @override
+  final Map<String, dynamic> inputSchema;
+
+  _SampleTool(this.name)
+      : description = 'Tool $name',
+        inputSchema = const {'type': 'object'};
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async =>
+      MCPToolResult(content: [MCPContent(type: 'text', text: name)]);
 }
 

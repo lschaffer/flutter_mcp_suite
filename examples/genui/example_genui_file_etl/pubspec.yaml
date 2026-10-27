@@ -35,5 +35,4 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - ../../../.env
     - assets/sample_customer_orders.csv

@@ -1,3 +1,18 @@
+## 1.5.0
+
+* **Unified Showcase Gallery & Responsive Feature Selector**:
+  * Unified all standalone example showcases (Progressive Discovery, Sub-Agents Orchestration, Dynamic Skills, Episodic Memory, Multimodal Vision, Agent Eval, Embedded SLM, Diagnostics, Audio Notes, GitHub Triage) into the main example app with an interactive feature switcher.
+  * Desktop mode: expanded dropdown menu width (`menuWidth: 420`) preventing clipped or truncated labels.
+  * Mobile mode (`< 700px`): Fullscreen draggable modal bottom sheet (`_showFeaturePicker()`) with complete cards, badge chips, and prompt previews without clipping.
+  * Integrated "Example Prompts" dialog with copyable prompt chips for instant workflow testing.
+* **Safe State Management & Persistent Callback Guards**:
+  * Guarded `_onStateChange()` in `McpPlayground` with post-frame scheduling when notified during persistent build callbacks, eliminating `setState() called during build` assertions.
+* **Multi-LLM Profiles & Execution Limits**:
+  * Integrated multi-profile LLM management (`LlmProfilesTab`) supporting profile cloning, switching, and custom execution limits.
+* **Synchronized Core Upgrades**:
+  * Upgraded dependencies to `dart_mcp_core: ^1.5.0` and `flutter_ui_mcp_core: ^1.5.0`.
+  * Inherited infinite tool loop protection (`ToolLoopGuard`), turn quotas (`McpExecutionLimits`), and shared blackboard memory (`WorkflowMemoryStore`).
+
 ## 1.4.2
 
 * **Input Bar & Mobile UX Improvements**:
