@@ -1,3 +1,19 @@
+## 1.5.1
+
+* **Desktop Dialog Ergonomics**:
+  * Enlarged settings, skills, and configuration dialogs to 95% screen width and 95% height on desktop for expansive multi-tab viewability.
+* **Redesigned LLM Model Selector**:
+  * Model selector in the settings drawer is now permanently a searchable dropdown menu with an inline quick-refresh button (`Icons.refresh_rounded`).
+  * Auto-fetches remote models on initialization when an endpoint URL is set.
+  * Displays loading spinner and automatically initiates model discovery when opening search picker with an empty model catalog.
+  * Removed obsolete "Detect Foundry" button.
+* **Multi-Profile State Restoration on App Restart**:
+  * Fixed multi-profile persistence: all saved LLM profiles are preserved and reloaded on app restart or hot restart (`Shift+R`).
+* **Tool Schema Sanitization for Gemini**:
+  * Inherited tool parameter schema sanitization from `dart_mcp_core ^1.5.1`, dereferencing `$ref` pointers to eliminate HTTP 400 schema validation errors with Gemini 3.7 Flash and strict OpenAI-compatible models.
+* **Synchronized Core Upgrades**:
+  * Upgraded dependencies to `dart_mcp_core: ^1.5.1` and `flutter_ui_mcp_core: ^1.5.1`.
+
 ## 1.5.0
 
 * **Unified Showcase Gallery & Responsive Feature Selector**:
