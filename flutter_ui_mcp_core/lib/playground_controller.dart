@@ -1223,35 +1223,45 @@ class PlaygroundController extends ChangeNotifier {
 
       final savedProfiles = await _storage.loadLlmConfigs();
       if (savedProfiles != null && savedProfiles.configs.isNotEmpty) {
-        if (_llmConfigs.isEmpty) {
-          _llmConfigs.addAll(
-            savedProfiles.configs.map((c) {
-              if (c.provider == LlmProvider.embedded &&
-                  !EmbeddedLlmRegistry.isAvailable) {
-                return c.copyWith(provider: LlmProvider.none);
-              }
-              return c;
-            }),
+        // Collect any initial configs from constructor that are not present in saved profiles
+        final initialUnsaved = _llmConfigs.where(
+          (init) => !savedProfiles.configs.any(
+            (saved) =>
+                (init.id != null && init.id!.isNotEmpty && saved.id == init.id) ||
+                init.profileId == saved.profileId,
+          ),
+        ).toList();
+
+        _llmConfigs.clear();
+        _llmConfigs.addAll(
+          savedProfiles.configs.map((c) {
+            if (c.provider == LlmProvider.embedded &&
+                !EmbeddedLlmRegistry.isAvailable) {
+              return c.copyWith(provider: LlmProvider.none);
+            }
+            return c;
+          }),
+        );
+        _llmConfigs.addAll(initialUnsaved);
+
+        if (savedProfiles.selectedId != null &&
+            _llmConfigs.any(
+              (c) =>
+                  c.profileId == savedProfiles.selectedId ||
+                  c.id == savedProfiles.selectedId,
+            )) {
+          _selectedLlmId = savedProfiles.selectedId!;
+          _llmConfig = _llmConfigs.firstWhere(
+            (c) => c.profileId == _selectedLlmId || c.id == _selectedLlmId,
           );
-          if (savedProfiles.selectedId != null &&
-              _llmConfigs.any(
-                (c) =>
-                    c.profileId == savedProfiles.selectedId ||
-                    c.id == savedProfiles.selectedId,
-              )) {
-            _selectedLlmId = savedProfiles.selectedId!;
-            _llmConfig = _llmConfigs.firstWhere(
-              (c) => c.profileId == _selectedLlmId || c.id == _selectedLlmId,
-            );
-          } else if (_llmConfigs.isNotEmpty) {
-            _selectedLlmId = _llmConfigs.first.profileId;
-            _llmConfig = _llmConfigs.first;
-          }
+        } else if (_llmConfigs.isNotEmpty) {
+          _selectedLlmId = _llmConfigs.first.profileId;
+          _llmConfig = _llmConfigs.first;
         }
       } else {
         final savedLlm = await _storage.loadLlmConfig();
-        // Only use saved config if the initial config was not explicitly provided
-        if (savedLlm != null && !_llmConfig.isConfigured) {
+        // Only use saved config if the initial config was not explicitly provided or if saved is configured
+        if (savedLlm != null && (savedLlm.isConfigured || !_llmConfig.isConfigured)) {
           final sanitized =
               (savedLlm.provider == LlmProvider.embedded &&
                   !EmbeddedLlmRegistry.isAvailable)
@@ -1263,6 +1273,18 @@ class PlaygroundController extends ChangeNotifier {
                   sanitized.model.isNotEmpty ||
                   sanitized.provider != LlmProvider.none)) {
             _llmConfigs.add(sanitized);
+            _selectedLlmId = sanitized.profileId;
+          } else if (_llmConfigs.isNotEmpty && sanitized.isConfigured) {
+            final idx = _llmConfigs.indexWhere(
+              (c) =>
+                  c.profileId == sanitized.profileId ||
+                  (sanitized.id != null && c.id == sanitized.id),
+            );
+            if (idx != -1) {
+              _llmConfigs[idx] = sanitized;
+            } else {
+              _llmConfigs.add(sanitized);
+            }
             _selectedLlmId = sanitized.profileId;
           }
         }

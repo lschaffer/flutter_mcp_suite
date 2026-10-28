@@ -730,16 +730,70 @@ void main() {
       expect(controller.enabledToolNames.contains('tool_alpha'), isTrue);
       expect(controller.enabledToolNames.contains('tool_beta'), isTrue);
     });
+
+    test('PlaygroundController restores all saved profiles on app restart even when initialLlmConfig is passed', () async {
+      final storage = _TestStorageDelegate();
+      await storage.saveLlmConfigs([
+        const LlmConfig(
+          id: 'p1',
+          name: 'Primary Gemma',
+          provider: LlmProvider.openaiCompatible,
+          model: 'google/gemma-4-31B-it',
+          apiKey: '',
+          baseUrl: 'https://api.deepinfra.com/v1/openai',
+        ),
+        const LlmConfig(
+          id: 'p2',
+          name: 'Gemini Flash',
+          provider: LlmProvider.gemini,
+          model: 'gemini-3.7-flash',
+          apiKey: 'test-key',
+        ),
+      ], selectedId: 'p2');
+
+      // Now create controller simulating app restart (Shift+R) with only initial config
+      final controller = PlaygroundController(
+        storageDelegate: storage,
+        initialLlmConfig: const LlmConfig(
+          id: 'p1',
+          name: 'Primary Gemma',
+          provider: LlmProvider.openaiCompatible,
+          model: 'google/gemma-4-31B-it',
+          apiKey: '',
+        ),
+      );
+
+      // Wait for _initAndLoad to complete
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      expect(controller.llmConfigs.length, equals(2));
+      expect(controller.llmConfigs.any((c) => c.id == 'p1'), isTrue);
+      expect(controller.llmConfigs.any((c) => c.id == 'p2'), isTrue);
+      expect(controller.selectedLlmId, equals('p2'));
+      expect(controller.llmConfig.model, equals('gemini-3.7-flash'));
+    });
   });
 }
 
 class _TestStorageDelegate extends McpPlaygroundStorageDelegate {
   Set<String> _tools = {};
+  List<LlmConfig>? _savedConfigs;
+  String? _savedSelectedId;
 
   @override
   Future<void> saveLlmConfig(LlmConfig config) async {}
   @override
   Future<LlmConfig?> loadLlmConfig() async => null;
+  @override
+  Future<void> saveLlmConfigs(List<LlmConfig> configs, {String? selectedId}) async {
+    _savedConfigs = configs;
+    _savedSelectedId = selectedId;
+  }
+  @override
+  Future<({List<LlmConfig> configs, String? selectedId})?> loadLlmConfigs() async {
+    if (_savedConfigs == null) return null;
+    return (configs: _savedConfigs!, selectedId: _savedSelectedId);
+  }
   @override
   Future<void> saveServers(List<McpServerConfig> servers) async {}
   @override
