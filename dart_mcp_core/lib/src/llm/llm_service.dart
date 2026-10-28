@@ -245,6 +245,61 @@ class LLMService {
     return openAiMsgs;
   }
 
+  /// Cleans and sanitizes a tool input schema so that LLM providers (including Gemini,
+  /// OpenAI, Anthropic, DeepInfra, and Ollama) receive standard, self-contained JSON Schemas
+  /// without unresolved external `$ref` pointers (e.g. references to undefined schemas).
+  static Map<String, dynamic> sanitizeSchemaForLlm(Map<String, dynamic>? schema) {
+    if (schema == null) {
+      return {'type': 'object', 'properties': <String, dynamic>{}};
+    }
+    final result = <String, dynamic>{};
+
+    schema.forEach((key, val) {
+      if (key == r'$ref') {
+        final refStr = val.toString().toLowerCase();
+        if (refStr.contains('string')) {
+          result['type'] = 'string';
+        } else if (refStr.contains('number') ||
+            refStr.contains('integer') ||
+            refStr.contains('float') ||
+            refStr.contains('double')) {
+          result['type'] = 'number';
+        } else if (refStr.contains('bool')) {
+          result['type'] = 'boolean';
+        } else if (refStr.contains('array') || refStr.contains('list')) {
+          result['type'] = 'array';
+          result['items'] = {'type': 'string'};
+        } else {
+          result['type'] = 'object';
+        }
+        return;
+      }
+
+      if (val is Map<String, dynamic>) {
+        result[key] = sanitizeSchemaForLlm(val);
+      } else if (val is Map) {
+        result[key] = sanitizeSchemaForLlm(Map<String, dynamic>.from(val));
+      } else if (val is List) {
+        result[key] = val.map((item) {
+          if (item is Map<String, dynamic>) {
+            return sanitizeSchemaForLlm(item);
+          } else if (item is Map) {
+            return sanitizeSchemaForLlm(Map<String, dynamic>.from(item));
+          }
+          return item;
+        }).toList();
+      } else {
+        result[key] = val;
+      }
+    });
+
+    if (!result.containsKey('type') && result.containsKey('properties')) {
+      result['type'] = 'object';
+    }
+
+    return result;
+  }
+
   static Future<LLMResponse> _generateOpenAIWithClient(
     openai.OpenAIClient client,
     LlmConfig config,
@@ -261,7 +316,7 @@ class LLMService {
           openai.Tool.function(
             name: t.name,
             description: t.description ?? '',
-            parameters: t.inputSchema ?? {'type': 'object', 'properties': {}},
+            parameters: sanitizeSchemaForLlm(t.inputSchema),
           ),
         );
       }
@@ -429,7 +484,7 @@ class LLMService {
           openai.Tool.function(
             name: t.name,
             description: t.description ?? '',
-            parameters: t.inputSchema ?? {'type': 'object', 'properties': {}},
+            parameters: sanitizeSchemaForLlm(t.inputSchema),
           ),
         );
       }
@@ -613,7 +668,7 @@ class LLMService {
               name: t.name,
               description: t.description ?? '',
               inputSchema: anthropic.InputSchema.fromJson(
-                t.inputSchema ?? {'type': 'object', 'properties': {}},
+                sanitizeSchemaForLlm(t.inputSchema),
               ),
             ),
           ),
@@ -756,7 +811,7 @@ class LLMService {
               name: t.name,
               description: t.description ?? '',
               inputSchema: anthropic.InputSchema.fromJson(
-                t.inputSchema ?? {'type': 'object', 'properties': {}},
+                sanitizeSchemaForLlm(t.inputSchema),
               ),
             ),
           ),
@@ -1375,7 +1430,7 @@ class LLMService {
             function: ollama.ToolFunction(
               name: t.name,
               description: t.description ?? '',
-              parameters: t.inputSchema ?? {'type': 'object', 'properties': {}},
+              parameters: sanitizeSchemaForLlm(t.inputSchema),
             ),
           ),
         );

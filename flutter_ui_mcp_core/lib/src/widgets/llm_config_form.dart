@@ -34,7 +34,6 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
   bool _fetchingModels = false;
   bool _testingLlm = false;
   bool _loadingModel = false;
-  bool _manualModelEntry = false;
   List<String> _fetchedModels = [];
 
   ModelPriceInfo? _currentModelPrice;
@@ -461,7 +460,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
     }
   }
 
-  Future<void> _fetchAvailableModels() async {
+  Future<List<String>> _fetchAvailableModels() async {
     setState(() => _fetchingModels = true);
     try {
       final provider = widget.provider;
@@ -544,6 +543,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           }
         });
       }
+      return list;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -553,6 +553,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           ),
         );
       }
+      return _fetchedModels;
     } finally {
       if (mounted) {
         setState(() => _fetchingModels = false);
@@ -650,7 +651,6 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
               widget.onProviderChanged(val);
               setState(() {
                 _fetchedModels = [];
-                _manualModelEntry = false;
                 if (val == LlmProvider.gemini &&
                     widget.modelCtrl.text.isEmpty) {
                   widget.modelCtrl.text = 'gemini-2.5-flash';
@@ -687,23 +687,6 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
                 }
               },
             ),
-            if (defaultTargetPlatform == TargetPlatform.windows &&
-                widget.provider == LlmProvider.openaiCompatible) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  ActionChip(
-                    avatar: const Icon(Icons.bolt, size: 16),
-                    label: const Text('Detect Foundry (127.0.0.1:58101)', style: TextStyle(fontSize: 11)),
-                    onPressed: () async {
-                      final active = await getFoundryActiveUrl();
-                      widget.baseUrlCtrl.text = active ?? 'http://127.0.0.1:58101/v1';
-                      _fetchAvailableModels();
-                    },
-                  ),
-                ],
-              ),
-            ],
             const SizedBox(height: 12),
           ],
 
@@ -719,7 +702,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
           ),
           const SizedBox(height: 12),
 
-          // Model Selection: Searchable Dropdown with Textfield Fallback
+          // Model Selection: Always a Dropdown / Picker with Inline Reload
           Builder(
             builder: (context) {
               final defaultOpts = _getModelsForProvider(widget.provider);
@@ -730,83 +713,61 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
                       widget.baseUrlCtrl.text.contains('127.0.0.1') ||
                       widget.baseUrlCtrl.text.contains('localhost'));
 
-              Widget modelWidget;
-              if (models.isEmpty || _manualModelEntry) {
-                // Fallback: standard TextFormField
-                modelWidget = TextFormField(
-                  controller: widget.modelCtrl,
+              final hasSelection = widget.modelCtrl.text.trim().isNotEmpty;
+              final displayText = hasSelection
+                  ? widget.modelCtrl.text.trim()
+                  : 'Select or search model...';
+
+              final helperText = models.isNotEmpty
+                  ? '${models.length} models loaded. Tap to choose or search.'
+                  : 'Tap reload to fetch models from endpoint, or tap to search/enter custom name.';
+
+              final modelWidget = InkWell(
+                onTap: () => _openModelSearchPicker(context, models),
+                borderRadius: BorderRadius.circular(4),
+                child: InputDecorator(
                   decoration: InputDecoration(
                     labelText: 'Model Name',
-                    hintText: models.isEmpty
-                        ? 'Enter model name (e.g. gpt-4o, qwen2.5-coder)'
-                        : 'Enter custom model name',
                     border: const OutlineInputBorder(),
                     isDense: true,
-                    helperText: models.isEmpty
-                        ? 'No models loaded. Type name or tap "Fetch Available Models" below.'
-                        : null,
-                    suffixIcon: models.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.list_alt, size: 20),
-                            tooltip:
-                                'Choose from available models list (${models.length})',
-                            onPressed: () =>
-                                setState(() => _manualModelEntry = false),
-                          )
-                        : null,
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? 'Model name is required'
-                      : null,
-                );
-              } else {
-                // Searchable Dropdown Selector
-                final hasSelection = widget.modelCtrl.text.trim().isNotEmpty;
-                final displayText = hasSelection
-                    ? widget.modelCtrl.text
-                    : 'Select model (${models.length} available)...';
-
-                modelWidget = InkWell(
-                  onTap: () => _openModelSearchPicker(context, models),
-                  borderRadius: BorderRadius.circular(4),
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Model Name',
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_note, size: 20),
-                            tooltip: 'Enter custom model name manually',
-                            onPressed: () =>
-                                setState(() => _manualModelEntry = true),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.arrow_drop_down, size: 22),
-                            tooltip: 'Select model',
-                            onPressed: () =>
-                                _openModelSearchPicker(context, models),
-                          ),
-                        ],
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            hasSelection ? FontWeight.w600 : FontWeight.normal,
-                        color: hasSelection
-                            ? Theme.of(context).textTheme.bodyMedium?.color
-                            : Theme.of(context).hintColor,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    helperText: helperText,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: _fetchingModels
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.refresh_rounded, size: 20),
+                          tooltip: 'Fetch / Reload models from endpoint',
+                          onPressed: _fetchingModels ? null : _fetchAvailableModels,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_drop_down, size: 22),
+                          tooltip: 'Select model',
+                          onPressed: () =>
+                              _openModelSearchPicker(context, models),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }
+                  child: Text(
+                    displayText,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                          hasSelection ? FontWeight.w600 : FontWeight.normal,
+                      color: hasSelection
+                          ? Theme.of(context).textTheme.bodyMedium?.color
+                          : Theme.of(context).hintColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              );
 
               // Load button: ONLY shown for Windows local Foundry
               if (isFoundry) {
@@ -942,12 +903,14 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
             });
             Navigator.of(ctx).pop();
           },
+          onReload: _fetchAvailableModels,
           isMultimodalModel: _isMultimodalModel,
           getPriceForOption: _getPriceForOption,
           formatDropdownBadge: _formatDropdownBadge,
         ),
       );
     } else {
+      final size = MediaQuery.of(context).size;
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
@@ -955,7 +918,10 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 580),
+            constraints: BoxConstraints(
+              maxWidth: (size.width * 0.75).clamp(520.0, 850.0),
+              maxHeight: (size.height * 0.75).clamp(480.0, 750.0),
+            ),
             child: _ModelSearchPickerDialog(
               models: models,
               initialSelected: widget.modelCtrl.text,
@@ -965,6 +931,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
                 });
                 Navigator.of(ctx).pop();
               },
+              onReload: _fetchAvailableModels,
               isMultimodalModel: _isMultimodalModel,
               getPriceForOption: _getPriceForOption,
               formatDropdownBadge: _formatDropdownBadge,
@@ -980,6 +947,7 @@ class _ModelSearchPickerContent extends StatefulWidget {
   final List<String> models;
   final String initialSelected;
   final ValueChanged<String> onSelected;
+  final Future<List<String>> Function()? onReload;
   final bool Function(String) isMultimodalModel;
   final ModelPriceInfo? Function(String) getPriceForOption;
   final String? Function(ModelPriceInfo?) formatDropdownBadge;
@@ -989,6 +957,7 @@ class _ModelSearchPickerContent extends StatefulWidget {
     required this.models,
     required this.initialSelected,
     required this.onSelected,
+    this.onReload,
     required this.isMultimodalModel,
     required this.getPriceForOption,
     required this.formatDropdownBadge,
@@ -1002,7 +971,32 @@ class _ModelSearchPickerContent extends StatefulWidget {
 
 class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
   final TextEditingController _searchCtrl = TextEditingController();
+  late List<String> _currentModels;
+  bool _isReloading = false;
   String _filter = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentModels = List.from(widget.models);
+  }
+
+  Future<void> _handleReload() async {
+    if (widget.onReload == null || _isReloading) return;
+    setState(() => _isReloading = true);
+    try {
+      final updated = await widget.onReload!();
+      if (mounted) {
+        setState(() {
+          _currentModels = List.from(updated);
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isReloading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -1018,13 +1012,13 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
         isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
 
     final filtered = _filter.isEmpty
-        ? widget.models
-        : widget.models
+        ? _currentModels
+        : _currentModels
             .where((m) => m.toLowerCase().contains(_filter.toLowerCase()))
             .toList();
 
     final showCustomOption = _filter.trim().isNotEmpty &&
-        !widget.models.any(
+        !_currentModels.any(
           (m) => m.toLowerCase() == _filter.trim().toLowerCase(),
         );
 
@@ -1041,12 +1035,24 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Select Model (${widget.models.length} available)',
+                  'Select Model (${_currentModels.length} available)',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
+              if (widget.onReload != null)
+                IconButton(
+                  icon: _isReloading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 20),
+                  tooltip: 'Reload models from endpoint',
+                  onPressed: _isReloading ? null : _handleReload,
+                ),
               if (widget.onClose != null)
                 IconButton(
                   icon: const Icon(Icons.close, size: 20),
@@ -1116,10 +1122,50 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
         // Models list
         Flexible(
           child: filtered.isEmpty && !showCustomOption
-              ? const Padding(
-                  padding: EdgeInsets.all(24.0),
+              ? Padding(
+                  padding: const EdgeInsets.all(28.0),
                   child: Center(
-                    child: Text('No models found matching your search.'),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _currentModels.isEmpty
+                              ? Icons.cloud_download_outlined
+                              : Icons.search_off_rounded,
+                          size: 40,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _currentModels.isEmpty
+                              ? 'No models loaded yet'
+                              : 'No models found matching "${_filter.trim()}"',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _currentModels.isEmpty
+                              ? 'Tap reload to fetch models from the endpoint, or type a custom name in the search box above.'
+                              : 'You can type this name in the search bar and select "Use custom" to use it.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        if (_currentModels.isEmpty && widget.onReload != null) ...[
+                          const SizedBox(height: 16),
+                          FilledButton.tonalIcon(
+                            onPressed: _isReloading ? null : _handleReload,
+                            icon: _isReloading
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.refresh_rounded, size: 16),
+                            label: Text(_isReloading ? 'Fetching...' : 'Reload Models'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -1187,6 +1233,7 @@ class _ModelSearchPickerSheet extends StatelessWidget {
   final List<String> models;
   final String initialSelected;
   final ValueChanged<String> onSelected;
+  final Future<List<String>> Function()? onReload;
   final bool Function(String) isMultimodalModel;
   final ModelPriceInfo? Function(String) getPriceForOption;
   final String? Function(ModelPriceInfo?) formatDropdownBadge;
@@ -1195,6 +1242,7 @@ class _ModelSearchPickerSheet extends StatelessWidget {
     required this.models,
     required this.initialSelected,
     required this.onSelected,
+    this.onReload,
     required this.isMultimodalModel,
     required this.getPriceForOption,
     required this.formatDropdownBadge,
@@ -1219,6 +1267,7 @@ class _ModelSearchPickerSheet extends StatelessWidget {
           models: models,
           initialSelected: initialSelected,
           onSelected: onSelected,
+          onReload: onReload,
           isMultimodalModel: isMultimodalModel,
           getPriceForOption: getPriceForOption,
           formatDropdownBadge: formatDropdownBadge,
@@ -1233,6 +1282,7 @@ class _ModelSearchPickerDialog extends StatelessWidget {
   final List<String> models;
   final String initialSelected;
   final ValueChanged<String> onSelected;
+  final Future<List<String>> Function()? onReload;
   final bool Function(String) isMultimodalModel;
   final ModelPriceInfo? Function(String) getPriceForOption;
   final String? Function(ModelPriceInfo?) formatDropdownBadge;
@@ -1241,6 +1291,7 @@ class _ModelSearchPickerDialog extends StatelessWidget {
     required this.models,
     required this.initialSelected,
     required this.onSelected,
+    this.onReload,
     required this.isMultimodalModel,
     required this.getPriceForOption,
     required this.formatDropdownBadge,
@@ -1252,6 +1303,7 @@ class _ModelSearchPickerDialog extends StatelessWidget {
       models: models,
       initialSelected: initialSelected,
       onSelected: onSelected,
+      onReload: onReload,
       isMultimodalModel: isMultimodalModel,
       getPriceForOption: getPriceForOption,
       formatDropdownBadge: formatDropdownBadge,

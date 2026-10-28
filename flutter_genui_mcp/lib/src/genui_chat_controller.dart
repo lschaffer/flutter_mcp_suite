@@ -445,8 +445,9 @@ class McpGenuiChatController extends ChangeNotifier {
             mp.MCPTool(
               name: func.name,
               description: func.description,
-              inputSchema:
-                  Map<String, dynamic>.from(func.argumentSchema.value),
+              inputSchema: mp.LLMService.sanitizeSchemaForLlm(
+                Map<String, dynamic>.from(func.argumentSchema.value),
+              ),
             ),
         ];
         final iterationBuffer = StringBuffer();

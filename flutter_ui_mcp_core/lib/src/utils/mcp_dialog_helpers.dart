@@ -24,11 +24,11 @@ Future<void> showMcpSettingsDialog(
   List<SystemPromptTemplate>? systemPromptTemplates,
   bool? showSystemPromptTemplates,
 }) async {
-  final screenWidth = MediaQuery.of(context).size.width;
+  final size = MediaQuery.of(context).size;
   final isMobile = (!kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS)) ||
-      screenWidth < 700;
+      size.width < 700;
 
   if (customBuilder != null) {
     return showDialog(
@@ -60,16 +60,21 @@ Future<void> showMcpSettingsDialog(
   return showDialog(
     context: context,
     builder: (ctx) => Dialog(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: screenWidth * 0.85,
-          minWidth: 420,
-        ),
-        child: SettingsPanel(
-          controller: controller,
-          initialTabIndex: initialTab,
-          systemPromptTemplates: systemPromptTemplates,
-          showSystemPromptTemplates: showSystemPromptTemplates,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: size.width * 0.025,
+        vertical: size.height * 0.025,
+      ),
+      child: SizedBox(
+        width: size.width * 0.95,
+        height: size.height * 0.95,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SettingsPanel(
+            controller: controller,
+            initialTabIndex: initialTab,
+            systemPromptTemplates: systemPromptTemplates,
+            showSystemPromptTemplates: showSystemPromptTemplates,
+          ),
         ),
       ),
     ),

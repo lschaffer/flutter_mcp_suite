@@ -671,17 +671,18 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
             ),
           );
         }
+        final size = MediaQuery.of(ctx).size;
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: size.width * 0.025,
+            vertical: size.height * 0.025,
           ),
           child: SizedBox(
-            width: 820,
-            height: 720,
+            width: size.width * 0.95,
+            height: size.height * 0.95,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: SettingsPanel(
