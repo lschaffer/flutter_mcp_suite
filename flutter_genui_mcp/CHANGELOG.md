@@ -1,3 +1,14 @@
+## 1.5.1
+
+* **Desktop Dialog Ergonomics**:
+  * Enlarged GenUI settings dialog to 95% screen width and 95% height on desktop for consistent sizing across the suite.
+* **GenUI Tool Parameter Schema Sanitization**:
+  * Automatically dereferences and cleans tool parameter schemas via `LLMService.sanitizeSchemaForLlm`, preventing HTTP 400 schema validation errors with Gemini and strict OpenAI-compatible models.
+* **File ETL System Prompt & Dataset Resilience**:
+  * Added fallback sample customer orders dataset directly into the File ETL system prompt instructions, ensuring instant interactive data previews even when running without an attached file.
+* **Synchronized Core Upgrades**:
+  * Upgraded dependencies to `dart_mcp_core: ^1.5.1` and `flutter_ui_mcp_core: ^1.5.1`.
+
 ## 1.5.0
 
 * **Unified GenUI Showcase Gallery & Responsive Feature Selector**:

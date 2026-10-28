@@ -1,3 +1,17 @@
+## 1.5.1
+
+* **Desktop Dialog Ergonomics**:
+  * Enlarged settings and management dialogs to 95% screen width and 95% height on desktop (`mcpDesktopDialogWidth(context)` = 0.95, `mcpDesktopDialogHeight(context)` = 0.95) for expansive multi-tab viewability.
+* **Redesigned LLM Model Selector**:
+  * Permanently converted the model selector into a searchable dropdown menu with an inline quick-refresh button (`Icons.refresh_rounded`).
+  * Added auto-loading of remote models on form initialization when the endpoint URL is set.
+  * Added loading spinner and auto-fetch trigger when opening search picker with an empty model catalog.
+  * Removed obsolete "Detect Foundry" button.
+* **Multi-Profile State Restoration on App Restart**:
+  * Fixed multi-profile persistence: `PlaygroundController._initAndLoad()` now loads all saved profiles from storage, preventing loss of secondary profiles upon app restart or hot restart (`Shift+R`).
+* **International Localization Safety**:
+  * Exported `materialUiLocalizationsDelegates` and robust fallback locale resolution to guarantee zero `MaterialLocalizations` runtime errors on systems running non-English system locales.
+
 ## 1.5.0
 
 * **Multi-LLM Configuration Profiles & Manager (`LlmProfilesTab`)**:

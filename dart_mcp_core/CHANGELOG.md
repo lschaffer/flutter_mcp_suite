@@ -1,3 +1,9 @@
+## 1.5.1
+
+- **Tool Parameter Schema Sanitization (`LLMService.sanitizeSchemaForLlm`)**:
+  - Recursively resolves and inlines `$ref` pointers from `$defs` / `definitions`.
+  - Strips unsupported JSON schema properties (`$schema`, `default` on Gemini) to eliminate HTTP 400 schema validation errors on strict LLM providers such as Gemini 3.7 Flash and strict OpenAI-compatible endpoints.
+
 ## 1.5.0
 
 - **Multi-LLM Profiles & Configuration Schema (`LlmConfig`)**:
