@@ -90,6 +90,12 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
       }
     });
     _refreshCurrentPriceAsync();
+    if (_fetchedModels.isEmpty &&
+        (widget.baseUrlCtrl.text.trim().isNotEmpty ||
+            widget.apiKeyCtrl.text.trim().isNotEmpty ||
+            widget.provider == LlmProvider.ollama)) {
+      _fetchAvailableModels();
+    }
   }
 
   @override
@@ -461,6 +467,7 @@ class _LlmConfigFormState extends State<LlmConfigForm> {
   }
 
   Future<List<String>> _fetchAvailableModels() async {
+    if (_fetchingModels) return _fetchedModels;
     setState(() => _fetchingModels = true);
     try {
       final provider = widget.provider;
@@ -979,6 +986,13 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
   void initState() {
     super.initState();
     _currentModels = List.from(widget.models);
+    if (_currentModels.isEmpty && widget.onReload != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handleReload();
+        }
+      });
+    }
   }
 
   Future<void> _handleReload() async {
@@ -1035,7 +1049,9 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Select Model (${_currentModels.length} available)',
+                  _isReloading
+                      ? 'Select Model (Loading...)'
+                      : 'Select Model (${_currentModels.length} available)',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -1098,6 +1114,8 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
           ),
         ),
         const SizedBox(height: 6),
+        if (_isReloading && _currentModels.isNotEmpty)
+          const LinearProgressIndicator(minHeight: 2),
         const Divider(height: 1),
         // Custom model entry option if search text doesn't match list
         if (showCustomOption) ...[
@@ -1128,41 +1146,54 @@ class _ModelSearchPickerContentState extends State<_ModelSearchPickerContent> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          _currentModels.isEmpty
-                              ? Icons.cloud_download_outlined
-                              : Icons.search_off_rounded,
-                          size: 40,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _currentModels.isEmpty
-                              ? 'No models loaded yet'
-                              : 'No models found matching "${_filter.trim()}"',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _currentModels.isEmpty
-                              ? 'Tap reload to fetch models from the endpoint, or type a custom name in the search box above.'
-                              : 'You can type this name in the search bar and select "Use custom" to use it.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        if (_currentModels.isEmpty && widget.onReload != null) ...[
-                          const SizedBox(height: 16),
-                          FilledButton.tonalIcon(
-                            onPressed: _isReloading ? null : _handleReload,
-                            icon: _isReloading
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.refresh_rounded, size: 16),
-                            label: Text(_isReloading ? 'Fetching...' : 'Reload Models'),
+                        if (_isReloading) ...[
+                          const SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: CircularProgressIndicator(strokeWidth: 3),
                           ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Loading available models...',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Connecting to endpoint and fetching model catalog...',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ] else ...[
+                          Icon(
+                            _currentModels.isEmpty
+                                ? Icons.cloud_download_outlined
+                                : Icons.search_off_rounded,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _currentModels.isEmpty
+                                ? 'No models loaded yet'
+                                : 'No models found matching "${_filter.trim()}"',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _currentModels.isEmpty
+                                ? 'Tap reload to fetch models from the endpoint, or type a custom name in the search box above.'
+                                : 'You can type this name in the search bar and select "Use custom" to use it.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          if (_currentModels.isEmpty && widget.onReload != null) ...[
+                            const SizedBox(height: 16),
+                            FilledButton.tonalIcon(
+                              onPressed: _isReloading ? null : _handleReload,
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Reload Models'),
+                            ),
+                          ],
                         ],
                       ],
                     ),
