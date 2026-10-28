@@ -2155,8 +2155,26 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
             ),
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Surface(
-                surfaceContext: _genuiController!.contextFor(entry.surfaceId!),
+              child: Builder(
+                builder: (surfaceCtx) {
+                  Widget surfaceWidget = Surface(
+                    surfaceContext:
+                        _genuiController!.contextFor(entry.surfaceId!),
+                  );
+                  if (Localizations.of<MaterialLocalizations>(
+                          surfaceCtx, MaterialLocalizations) ==
+                      null) {
+                    surfaceWidget = Localizations(
+                      locale: const Locale('en', 'US'),
+                      delegates: const [
+                        DefaultMaterialLocalizations.delegate,
+                        DefaultWidgetsLocalizations.delegate,
+                      ],
+                      child: surfaceWidget,
+                    );
+                  }
+                  return surfaceWidget;
+                },
               ),
             ),
           );

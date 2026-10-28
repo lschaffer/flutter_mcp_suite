@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 import 'env_loader.dart';
 import 'genui_travel_example.dart';
@@ -233,6 +234,15 @@ class _GenuiShowcaseAppState extends State<GenuiShowcaseApp> {
       title: 'Flutter GenUI MCP - Feature Showcase',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''),
+        Locale('de', ''),
+      ],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(

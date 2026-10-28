@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 import 'env_loader.dart';
 
@@ -18,6 +19,15 @@ class GenuiFileEtlApp extends StatelessWidget {
       title: 'GenUI File ETL & Data Transformation Studio',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''),
+        Locale('de', ''),
+      ],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -410,7 +420,13 @@ class _SchemaTransformerWidget extends StatelessWidget {
               children: [
                 const Icon(Icons.schema, color: Colors.teal, size: 20),
                 const SizedBox(width: 8),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -495,15 +511,24 @@ class _DataPreviewTableWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.table_chart, color: Colors.teal, size: 20),
-                    const SizedBox(width: 8),
-                    Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.table_chart, color: Colors.teal, size: 20),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -572,7 +597,6 @@ class _ExportPipelineCardWidget extends StatefulWidget {
 
 class _ExportPipelineCardWidgetState extends State<_ExportPipelineCardWidget> {
   bool _copied = false;
-
   @override
   Widget build(BuildContext context) {
     final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
@@ -594,15 +618,24 @@ class _ExportPipelineCardWidgetState extends State<_ExportPipelineCardWidget> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.file_download, color: Colors.teal, size: 20),
-                    const SizedBox(width: 8),
-                    Text('Pipeline Deliverable ($format)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.file_download, color: Colors.teal, size: 20),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Pipeline Deliverable ($format)',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text('$count Exported', style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),

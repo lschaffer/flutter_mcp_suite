@@ -179,7 +179,26 @@ class _GenuiChatViewState extends State<GenuiChatView> {
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Surface(surfaceContext: widget.controller.contextFor(surfaceId)),
+        child: Builder(
+          builder: (surfaceCtx) {
+            Widget surfaceWidget = Surface(
+              surfaceContext: widget.controller.contextFor(surfaceId),
+            );
+            if (Localizations.of<MaterialLocalizations>(
+                    surfaceCtx, MaterialLocalizations) ==
+                null) {
+              surfaceWidget = Localizations(
+                locale: const Locale('en', 'US'),
+                delegates: const [
+                  DefaultMaterialLocalizations.delegate,
+                  DefaultWidgetsLocalizations.delegate,
+                ],
+                child: surfaceWidget,
+              );
+            }
+            return surfaceWidget;
+          },
+        ),
       ),
     );
   }

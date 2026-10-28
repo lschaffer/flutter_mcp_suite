@@ -1,6 +1,7 @@
 library;
 
-export 'package:material_ui/material_ui.dart';
+export 'package:material_ui/material_ui.dart'
+    hide GlobalMaterialLocalizations;
 
 export 'playground_controller.dart';
 export 'src/local_mcp_client.dart';
