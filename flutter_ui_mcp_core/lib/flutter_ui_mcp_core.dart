@@ -1,4 +1,5 @@
-library;
+import 'package:flutter/widgets.dart' show LocalizationsDelegate;
+import 'package:material_ui/material_ui.dart' as material_ui;
 
 export 'package:material_ui/material_ui.dart'
     hide GlobalMaterialLocalizations;
@@ -53,4 +54,13 @@ export 'src/services/clipboard_content_service.dart';
 export 'src/services/model_pricing_service.dart';
 export 'src/widgets/mcp_chat_input_bar.dart';
 export 'src/utils/mcp_dialog_helpers.dart';
+
+/// Localizations delegate for [material_ui] widgets supporting 79+ languages.
+typedef MaterialUiLocalizations = material_ui.GlobalMaterialLocalizations;
+
+/// The complete list of localizations delegates for [material_ui] widgets:
+/// [GlobalCupertinoLocalizations.delegate], [GlobalMaterialLocalizations.delegate], [GlobalWidgetsLocalizations.delegate].
+const List<LocalizationsDelegate<dynamic>> materialUiLocalizationsDelegates =
+    material_ui.GlobalMaterialLocalizations.delegates;
+
 

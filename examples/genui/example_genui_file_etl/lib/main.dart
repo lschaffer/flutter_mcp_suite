@@ -20,6 +20,7 @@ class GenuiFileEtlApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
       localizationsDelegates: const [
+        ...materialUiLocalizationsDelegates,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -27,7 +28,23 @@ class GenuiFileEtlApp extends StatelessWidget {
       supportedLocales: const [
         Locale('en', ''),
         Locale('de', ''),
+        Locale('es', ''),
+        Locale('fr', ''),
+        Locale('it', ''),
+        Locale('hu', ''),
+        Locale('ja', ''),
+        Locale('zh', ''),
       ],
+      localeResolutionCallback: (locale, supportedLocales) {
+        if (locale != null) {
+          for (final supported in supportedLocales) {
+            if (supported.languageCode == locale.languageCode) {
+              return supported;
+            }
+          }
+        }
+        return const Locale('en', '');
+      },
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
