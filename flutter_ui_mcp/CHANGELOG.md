@@ -1,3 +1,12 @@
+## 1.5.2
+
+* **Chat View Background Customization**:
+  * Added chatBackgroundDecoration, showEmptyChatState, and emptyChatBuilder properties to McpPlayground / FlutterUiMcpWidget and McpChatView.
+  * Enables displaying custom wallpaper image backgrounds in the chat message area, including clean image-only empty states without placeholder text.
+* **Synchronized Core Upgrades**:
+  * Re-exported McpChatView from lutter_ui_mcp_core.
+  * Bumped dependency to lutter_ui_mcp_core: ^1.5.2.
+
 ## 1.5.1
 
 * **Desktop Dialog Ergonomics**:

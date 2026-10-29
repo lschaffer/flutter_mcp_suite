@@ -15,7 +15,19 @@ class GenuiChatView extends StatefulWidget {
     required this.controller,
     this.title = 'GenUI Chat',
     this.inputHint = 'Message',
+    this.chatBackgroundDecoration,
+    this.showEmptyChatState = true,
+    this.emptyChatBuilder,
   });
+
+  /// Optional background decoration for the chat view.
+  final Decoration? chatBackgroundDecoration;
+
+  /// Whether to show the empty chat state. Defaults to true.
+  final bool showEmptyChatState;
+
+  /// Optional custom builder for the empty chat state.
+  final WidgetBuilder? emptyChatBuilder;
 
   /// The controller driving the conversation.
   final McpGenuiChatController controller;
@@ -76,21 +88,32 @@ class _GenuiChatViewState extends State<GenuiChatView> {
   }
 
   Widget _buildTranscript(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, _) {
-        final entries = widget.controller.entries;
-        final surfaceIds = widget.controller.activeSurfaceIds.toList();
-        return ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          children: [
-            for (final entry in entries) _buildEntry(context, entry),
-            for (final surfaceId in surfaceIds)
-              _buildSurface(context, surfaceId),
-          ],
-        );
-      },
+    return Container(
+      decoration: widget.chatBackgroundDecoration,
+      child: AnimatedBuilder(
+        animation: widget.controller,
+        builder: (context, _) {
+          final entries = widget.controller.entries;
+          final surfaceIds = widget.controller.activeSurfaceIds.toList();
+          if (entries.isEmpty && surfaceIds.isEmpty) {
+            if (widget.emptyChatBuilder != null) {
+              return widget.emptyChatBuilder!(context);
+            }
+            if (!widget.showEmptyChatState) {
+              return const SizedBox.expand();
+            }
+          }
+          return ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            children: [
+              for (final entry in entries) _buildEntry(context, entry),
+              for (final surfaceId in surfaceIds)
+                _buildSurface(context, surfaceId),
+            ],
+          );
+        },
+      ),
     );
   }
 

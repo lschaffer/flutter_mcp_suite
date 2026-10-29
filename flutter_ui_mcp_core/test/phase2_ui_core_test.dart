@@ -773,6 +773,103 @@ void main() {
       expect(controller.llmConfig.model, equals('gemini-3.7-flash'));
     });
   });
+
+  group('Chat View Background & Step Controls Tests', () {
+    test('PlaygroundController chat background state and setters notify listeners', () {
+      final controller = PlaygroundController();
+      int notifyCount = 0;
+      controller.addListener(() => notifyCount++);
+
+      expect(controller.chatBackgroundDecoration, isNull);
+      expect(controller.showEmptyChatState, isTrue);
+      expect(controller.emptyChatBuilder, isNull);
+
+      controller.setChatBackgroundDecoration(const BoxDecoration(color: Color(0xFF123456)));
+      expect(controller.chatBackgroundDecoration, isNotNull);
+      expect(notifyCount, equals(1));
+
+      controller.setShowEmptyChatState(false);
+      expect(controller.showEmptyChatState, isFalse);
+      expect(notifyCount, equals(2));
+
+      controller.setEmptyChatBuilder((context) => const SizedBox(key: Key('custom-empty')));
+      expect(controller.emptyChatBuilder, isNotNull);
+      expect(notifyCount, equals(3));
+    });
+
+    testWidgets('SubPromptListEditor does not render duplicated + Step button', (tester) async {
+      final controller = TextEditingController(text: 'Step 1 text');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SubPromptListEditor(
+              controller: controller,
+              chatMode: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Should show 'Step 1' header tab
+      expect(find.text('Step 1'), findsOneWidget);
+      // Should NOT show any '+ Step' or 'Add step' button in the tab row
+      expect(find.text('Step'), findsNothing);
+      expect(find.byTooltip('Add step'), findsNothing);
+      // Should show the single right-aligned + button
+      expect(find.byTooltip('Add step after this one'), findsOneWidget);
+    });
+
+    testWidgets('McpChatView supports custom background and empty state suppression', (tester) async {
+      final controller = PlaygroundController();
+      const testDecoration = BoxDecoration(color: Color(0xFF0A0E17));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: McpChatView(
+              controller: controller,
+              backgroundDecoration: testDecoration,
+              showEmptyState: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Empty state text should be suppressed
+      expect(find.text('Ready to assist'), findsNothing);
+      expect(find.text('Send a message to start the conversation.'), findsNothing);
+
+      // Verify Container with testDecoration exists
+      final containerFinder = find.byWidgetPredicate(
+        (widget) => widget is Container && widget.decoration == testDecoration,
+      );
+      expect(containerFinder, findsOneWidget);
+    });
+
+    testWidgets('McpChatView renders emptyChatBuilder when provided', (tester) async {
+      final controller = PlaygroundController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: McpChatView(
+              controller: controller,
+              emptyChatBuilder: (context) => const Center(
+                child: Text('Custom wallpaper image background', key: Key('custom-bg-text')),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('custom-bg-text')), findsOneWidget);
+      expect(find.text('Ready to assist'), findsNothing);
+    });
+  });
 }
 
 class _TestStorageDelegate extends McpPlaygroundStorageDelegate {

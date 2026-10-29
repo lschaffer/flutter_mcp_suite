@@ -1,3 +1,12 @@
+## 1.5.2
+
+* **GenUI Chat View Background Customization**:
+  * Added chatBackgroundDecoration, showEmptyChatState, and emptyChatBuilder properties to FlutterGenuiMcpWidget / GenuiMcpPlayground and GenuiChatView.
+  * Enables displaying custom wallpaper image backgrounds in the GenUI chat area, with optional suppression of default welcome text.
+* **Synchronized Core Upgrades**:
+  * Inherited multi-step tabs cleanup (removed duplicate + Step control) from flutter_ui_mcp_core.
+  * Bumped dependency to flutter_ui_mcp_core: ^1.5.2.
+
 ## 1.5.1
 
 * **Desktop Dialog Ergonomics**:

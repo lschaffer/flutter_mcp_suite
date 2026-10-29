@@ -127,7 +127,23 @@ class GenuiMcpPlayground extends StatefulWidget {
     this.showWorkflowActions = true,
     this.showDrawer = false,
     this.drawerBuilder,
+    this.chatBackgroundDecoration,
+    this.showEmptyChatState,
+    this.emptyChatBuilder,
   });
+
+  /// Optional custom decoration (e.g. background image or color) for the chat message view.
+  /// Falls back to [PlaygroundController.chatBackgroundDecoration] if null.
+  final Decoration? chatBackgroundDecoration;
+
+  /// Whether to display the default welcome/empty state widget when there are no messages.
+  /// Defaults to null (which falls back to [PlaygroundController.showEmptyChatState]).
+  /// Set to false to show only the background image/color without text.
+  final bool? showEmptyChatState;
+
+  /// Optional custom builder for the empty chat state when there are no messages.
+  /// Falls back to [PlaygroundController.emptyChatBuilder] if null.
+  final Widget Function(BuildContext context)? emptyChatBuilder;
 
   /// Whether to display the navigation drawer. Defaults to false.
   final bool showDrawer;
@@ -1919,25 +1935,41 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
     }
 
     final isGenerating = _genuiController!.isGenerating;
+    final bgDecoration = widget.chatBackgroundDecoration ??
+        _controller.chatBackgroundDecoration;
+    final showEmpty = widget.showEmptyChatState ??
+        _controller.showEmptyChatState;
+    final emptyBuilder = widget.emptyChatBuilder ??
+        _controller.emptyChatBuilder;
+
     return Column(
       children: [
         Expanded(
-          child: AnimatedBuilder(
-            animation: _genuiController!,
-            builder: (context, _) {
-              final entries = _genuiController!.entries;
-              if (entries.isEmpty) {
-                return _buildWelcomeWidget(theme);
-              }
-              return ListView(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.only(bottom: 24),
-                children: [
-                  for (final entry in entries)
-                    _buildGenuiEntry(context, entry, theme),
-                ],
-              );
-            },
+          child: Container(
+            decoration: bgDecoration,
+            child: AnimatedBuilder(
+              animation: _genuiController!,
+              builder: (context, _) {
+                final entries = _genuiController!.entries;
+                if (entries.isEmpty) {
+                  if (emptyBuilder != null) {
+                    return emptyBuilder(context);
+                  }
+                  if (!showEmpty) {
+                    return const SizedBox.expand();
+                  }
+                  return _buildWelcomeWidget(theme);
+                }
+                return ListView(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.only(bottom: 24),
+                  children: [
+                    for (final entry in entries)
+                      _buildGenuiEntry(context, entry, theme),
+                  ],
+                );
+              },
+            ),
           ),
         ),
         if (isGenerating)

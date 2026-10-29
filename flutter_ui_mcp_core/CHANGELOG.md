@@ -1,3 +1,14 @@
+## 1.5.2
+
+* **Chat View Background Customization**:
+  * Added chatBackgroundDecoration (Decoration?), showEmptyChatState (ool, default 	rue), and emptyChatBuilder to PlaygroundController.
+  * Added reactive setters setChatBackgroundDecoration(...), setShowEmptyChatState(...), and setEmptyChatBuilder(...) that notify listeners on change.
+  * Added convenience method setChatBackgroundImage(ImageProvider image, {BoxFit fit, Alignment alignment, ColorFilter? colorFilter, double opacity, bool showEmptyText}) to allow setting an image wallpaper background with zero empty-state text.
+* **Standalone McpChatView in Core**:
+  * Moved and exported McpChatView directly within lutter_ui_mcp_core with full background decoration and empty state customization support.
+* **Cleaned Multi-Step Tabs Controls**:
+  * Removed the duplicate + Step button in SubPromptListEditor's horizontal step tabs bar; step insertion is now handled exclusively by the right-aligned + action button.
+
 ## 1.5.1
 
 * **Desktop Dialog Ergonomics**:

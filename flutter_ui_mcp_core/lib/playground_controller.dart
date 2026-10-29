@@ -413,6 +413,57 @@ class PlaygroundController extends ChangeNotifier {
   Widget? Function(BuildContext context, ChatMessage message)?
   messageContentBuilder;
 
+  /// Optional decoration (e.g. background image, gradient, or color) for the chat/conversation view.
+  Decoration? chatBackgroundDecoration;
+
+  /// Whether to display the default welcome/empty state widget when there are no messages.
+  /// Defaults to true. Set to false to show a clean background (e.g. background image without text).
+  bool showEmptyChatState = true;
+
+  /// Optional custom builder for the empty chat state.
+  /// If provided, this overrides the default welcome/empty state widget.
+  Widget Function(BuildContext context)? emptyChatBuilder;
+
+  /// Updates the chat background decoration and notifies listeners.
+  void setChatBackgroundDecoration(Decoration? decoration) {
+    chatBackgroundDecoration = decoration;
+    notifyListeners();
+  }
+
+  /// Sets whether the empty chat state text/icon should be displayed and notifies listeners.
+  void setShowEmptyChatState(bool show) {
+    showEmptyChatState = show;
+    notifyListeners();
+  }
+
+  /// Sets a custom builder for the empty chat state and notifies listeners.
+  void setEmptyChatBuilder(Widget Function(BuildContext context)? builder) {
+    emptyChatBuilder = builder;
+    notifyListeners();
+  }
+
+  /// Convenience helper to set a chat background image with optional fitting, opacity, and text suppression.
+  void setChatBackgroundImage(
+    ImageProvider image, {
+    BoxFit fit = BoxFit.cover,
+    Alignment alignment = Alignment.center,
+    ColorFilter? colorFilter,
+    double opacity = 1.0,
+    bool showEmptyText = true,
+  }) {
+    chatBackgroundDecoration = BoxDecoration(
+      image: DecorationImage(
+        image: image,
+        fit: fit,
+        alignment: alignment,
+        colorFilter: colorFilter,
+        opacity: opacity,
+      ),
+    );
+    showEmptyChatState = showEmptyText;
+    notifyListeners();
+  }
+
   // ── Execution limits & Tool loop guard ────────────────────────────
   /// Maximum number of tool call iterations per user turn (default 30, 0 = unlimited).
   int _maxToolIterations = 30;

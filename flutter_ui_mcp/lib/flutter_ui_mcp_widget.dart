@@ -181,7 +181,23 @@ class McpPlayground extends StatefulWidget {
     this.inputTopWidgetBuilder,
     this.topBarBuilder,
     this.settingsDialogBuilder,
+    this.chatBackgroundDecoration,
+    this.showEmptyChatState,
+    this.emptyChatBuilder,
   });
+
+  /// Optional custom decoration (e.g. background image or color) for the chat message view.
+  /// Falls back to [PlaygroundController.chatBackgroundDecoration] if null.
+  final Decoration? chatBackgroundDecoration;
+
+  /// Whether to display the default welcome/empty state widget when there are no messages.
+  /// Defaults to null (which falls back to [PlaygroundController.showEmptyChatState]).
+  /// Set to false to show only the background image/color without text.
+  final bool? showEmptyChatState;
+
+  /// Optional custom builder for the empty chat state when there are no messages.
+  /// Falls back to [PlaygroundController.emptyChatBuilder] if null.
+  final Widget Function(BuildContext context)? emptyChatBuilder;
 
   /// Whether to display the navigation drawer. Defaults to false.
   final bool showDrawer;
@@ -1983,22 +1999,43 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
   // Conversation/Chat Area build
   Widget _buildConversationView(ThemeData theme) {
+    final bgDecoration = widget.chatBackgroundDecoration ??
+        _controller.chatBackgroundDecoration;
+    final showEmpty = widget.showEmptyChatState ??
+        _controller.showEmptyChatState;
+    final emptyBuilder = widget.emptyChatBuilder ??
+        _controller.emptyChatBuilder;
+
+    Widget conversationArea;
+    if (_controller.isLoading) {
+      conversationArea = const Center(child: CircularProgressIndicator());
+    } else if (_controller.messages.isEmpty) {
+      if (emptyBuilder != null) {
+        conversationArea = emptyBuilder(context);
+      } else if (!showEmpty) {
+        conversationArea = const SizedBox.expand();
+      } else {
+        conversationArea = _buildWelcomeWidget(theme);
+      }
+    } else {
+      conversationArea = ListView(
+        controller: _scrollCtrl,
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          for (final msg in _controller.messages)
+            ChatBubble(message: msg, controller: _controller),
+        ],
+      );
+    }
+
     return Column(
       children: [
         // --- Main Conversation Area ---
         Expanded(
-          child: _controller.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _controller.messages.isEmpty
-              ? _buildWelcomeWidget(theme)
-              : ListView(
-                  controller: _scrollCtrl,
-                  padding: const EdgeInsets.only(bottom: 24),
-                  children: [
-                    for (final msg in _controller.messages)
-                      ChatBubble(message: msg, controller: _controller),
-                  ],
-                ),
+          child: Container(
+            decoration: bgDecoration,
+            child: conversationArea,
+          ),
         ),
 
         // --- Action Indicators (Generating / Errors) ---

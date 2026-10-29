@@ -53,6 +53,7 @@ export 'src/widgets/eval_benchmark_dialog.dart';
 export 'src/services/clipboard_content_service.dart';
 export 'src/services/model_pricing_service.dart';
 export 'src/widgets/mcp_chat_input_bar.dart';
+export 'src/widgets/mcp_chat_view.dart';
 export 'src/utils/mcp_dialog_helpers.dart';
 
 /// Localizations delegate for [material_ui] widgets supporting 79+ languages.
