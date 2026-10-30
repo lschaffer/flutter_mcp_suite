@@ -948,6 +948,26 @@ class PlaygroundController extends ChangeNotifier {
   List<SkillDef> get skills => List.unmodifiable(_skills);
   SkillDef? get activeSkill => _activeSkill;
 
+  // ── Prompt & Input State ──
+  String? _pendingInputPrompt;
+  String? get pendingInputPrompt => _pendingInputPrompt;
+
+  String currentInputPrompt = '';
+
+  /// Sets a prompt to be populated into the chat input bar and notifies listeners.
+  void setInputPrompt(String prompt) {
+    _pendingInputPrompt = prompt;
+    currentInputPrompt = prompt;
+    notifyListeners();
+  }
+
+  /// Consumes and clears the pending input prompt.
+  String? consumePendingInputPrompt() {
+    final prompt = _pendingInputPrompt;
+    _pendingInputPrompt = null;
+    return prompt;
+  }
+
   void setActiveSkill(SkillDef? skill) {
     _activeSkill = skill;
     notifyListeners();

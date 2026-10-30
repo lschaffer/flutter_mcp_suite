@@ -184,6 +184,7 @@ class McpPlayground extends StatefulWidget {
     this.chatBackgroundDecoration,
     this.showEmptyChatState,
     this.emptyChatBuilder,
+    this.inputController,
   });
 
   /// Optional custom decoration (e.g. background image or color) for the chat message view.
@@ -198,6 +199,9 @@ class McpPlayground extends StatefulWidget {
   /// Optional custom builder for the empty chat state when there are no messages.
   /// Falls back to [PlaygroundController.emptyChatBuilder] if null.
   final Widget Function(BuildContext context)? emptyChatBuilder;
+
+  /// Optional external [TextEditingController] for the chat input field.
+  final TextEditingController? inputController;
 
   /// Whether to display the navigation drawer. Defaults to false.
   final bool showDrawer;
@@ -224,7 +228,8 @@ class _McpPlaygroundState extends State<McpPlayground> {
     return McpPlaygroundLocalizations.of(context);
   }
 
-  final _inputCtrl = TextEditingController();
+  late final TextEditingController _inputCtrl;
+  bool _ownsInputCtrl = false;
   final _scrollCtrl = ScrollController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final List<MessageAttachment> _attachments = [];
@@ -300,6 +305,22 @@ class _McpPlaygroundState extends State<McpPlayground> {
     _controller.messageContentBuilder = widget.messageContentBuilder;
     _controller.addListener(_onStateChange);
 
+    if (widget.inputController != null) {
+      _inputCtrl = widget.inputController!;
+      _ownsInputCtrl = false;
+    } else {
+      _inputCtrl = TextEditingController();
+      _ownsInputCtrl = true;
+    }
+    _inputCtrl.addListener(_onInputCtrlChanged);
+    if (_controller.pendingInputPrompt != null) {
+      final prompt = _controller.consumePendingInputPrompt();
+      if (prompt != null && prompt.isNotEmpty) {
+        _inputCtrl.text = prompt;
+        _inputCtrl.selection = TextSelection.collapsed(offset: prompt.length);
+      }
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.initialEnabledTools != null) {
         final tools = widget.initialEnabledTools!.toSet();
@@ -317,7 +338,19 @@ class _McpPlaygroundState extends State<McpPlayground> {
     });
   }
 
+  void _onInputCtrlChanged() {
+    _controller.currentInputPrompt = _inputCtrl.text;
+  }
+
   void _onStateChange() {
+    if (!mounted) return;
+    if (_controller.pendingInputPrompt != null) {
+      final prompt = _controller.consumePendingInputPrompt();
+      if (prompt != null) {
+        _inputCtrl.text = prompt;
+        _inputCtrl.selection = TextSelection.collapsed(offset: prompt.length);
+      }
+    }
     if (!mounted) return;
     try {
       final binding = WidgetsBinding.instance;
@@ -431,7 +464,10 @@ class _McpPlaygroundState extends State<McpPlayground> {
     if (widget.controller == null) {
       _controller.dispose();
     }
-    _inputCtrl.dispose();
+    _inputCtrl.removeListener(_onInputCtrlChanged);
+    if (_ownsInputCtrl) {
+      _inputCtrl.dispose();
+    }
     _scrollCtrl.dispose();
     _systemPromptCtrl.dispose();
     _initialPromptCtrl.dispose();
@@ -1148,9 +1184,14 @@ class _McpPlaygroundState extends State<McpPlayground> {
 
       _controller.updateEnabledTools(result.enabledToolNames.toSet());
 
-      if (result.activeSkillId != null) {
+      _controller.setInputPrompt(promptText);
+      if (result.activeSkillId != null || result.activeSkillName != null) {
         final match = _controller.skills
-            .where((s) => s.id == result.activeSkillId)
+            .where((s) =>
+                (result.activeSkillId != null && s.id == result.activeSkillId) ||
+                (result.activeSkillName != null &&
+                    s.name.trim().toLowerCase() ==
+                        result.activeSkillName!.trim().toLowerCase()))
             .toList();
         if (match.isNotEmpty) {
           _controller.setActiveSkill(match.first);
