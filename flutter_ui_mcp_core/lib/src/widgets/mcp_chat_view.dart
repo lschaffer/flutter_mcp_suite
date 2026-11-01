@@ -11,6 +11,7 @@ import '../utils/image_optimizer.dart';
 import '../utils/mime_utils.dart';
 import 'chat_bubble.dart';
 import 'mcp_chat_input_bar.dart';
+import 'pending_tool_approval_card.dart';
 
 /// Standalone, lightweight chat message view + input bar.
 ///
@@ -214,8 +215,9 @@ class _McpChatViewState extends State<McpChatView> {
     final emptyBuilder = widget.emptyChatBuilder ??
         widget.controller.emptyChatBuilder;
 
+    final pendingApproval = widget.controller.pendingToolApproval;
     Widget body;
-    if (messages.isEmpty) {
+    if (messages.isEmpty && pendingApproval == null) {
       if (emptyBuilder != null) {
         body = emptyBuilder(context);
       } else if (!showEmpty) {
@@ -224,17 +226,25 @@ class _McpChatViewState extends State<McpChatView> {
         body = _buildEmptyState(context);
       }
     } else {
+      final totalCount = messages.length + (pendingApproval != null ? 1 : 0);
       body = ListView.builder(
         controller: _scrollController,
         padding: widget.listPadding ??
             const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        itemCount: messages.length,
+        itemCount: totalCount,
         itemBuilder: (context, index) {
-          final msg = messages[index];
-          return ChatBubble(
-            message: msg,
-            controller: widget.controller,
-          );
+          if (index < messages.length) {
+            final msg = messages[index];
+            return ChatBubble(
+              message: msg,
+              controller: widget.controller,
+            );
+          } else {
+            return PendingToolApprovalCard(
+              approval: pendingApproval!,
+              onDecision: widget.controller.respondToToolApproval,
+            );
+          }
         },
       );
     }

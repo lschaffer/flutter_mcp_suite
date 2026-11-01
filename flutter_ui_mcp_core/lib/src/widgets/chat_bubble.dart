@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../../playground_controller.dart';
 import '../mcp_localizations.dart';
+import '../services/document_export_service.dart';
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
@@ -129,6 +130,78 @@ class ChatBubble extends StatelessWidget {
                       theme,
                       attachments: message.attachments,
                     ),
+                  if (!isUser && !isSystem && DocumentExportService.isExportableAnalysisOrPlan(message.content, mode: controller?.codingSubMode))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          PopupMenuButton<String>(
+                            tooltip: 'Export Plan / Analysis (PDF, Word, Markdown)',
+                            icon: const Icon(
+                              Icons.file_download_outlined,
+                              size: 18,
+                              color: Color(0xFFEA580C),
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                            itemBuilder: (ctx) => [
+                              const PopupMenuItem(
+                                value: 'pdf',
+                                height: 38,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 18),
+                                    SizedBox(width: 10),
+                                    Text('Export to PDF (.pdf)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'docx',
+                                height: 38,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.description, color: Colors.blueAccent, size: 18),
+                                    SizedBox(width: 10),
+                                    Text('Export to Word (.docx)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              const PopupMenuItem(
+                                value: 'md',
+                                height: 38,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.article_outlined, color: Colors.grey, size: 18),
+                                    SizedBox(width: 10),
+                                    Text('Export to Markdown (.md)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onSelected: (format) {
+                              DocumentExportService.exportDocument(
+                                context: context,
+                                markdownContent: message.content,
+                                format: format,
+                                workspaceDirectory: controller?.workspaceDirectory,
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.search, size: 18, color: Color(0xFFEA580C)),
+                            tooltip: 'View full screen',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                            onPressed: () => _showFullScreenOutput(context, message.content),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (showTypingIndicator)
                     const Padding(
                       padding: EdgeInsets.symmetric(
@@ -145,6 +218,8 @@ class ChatBubble extends StatelessWidget {
                       contentToShow,
                       theme,
                     ),
+                  if (!isUser && !isSystem && _extractOptions(message.content).isNotEmpty)
+                    _buildOptionButtons(context, _extractOptions(message.content)),
                   if (message.content.trim().isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Row(
@@ -300,6 +375,99 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
+    /// Extracts interactive choice options from text (e.g. [denied, accept], [yes, no], [y/n]).
+  List<String> _extractOptions(String text) {
+    if (text.isEmpty) return const [];
+
+    final bracketMatches = RegExp(r'\[([^\]\n]{2,120})\]').allMatches(text);
+    for (final match in bracketMatches.toList().reversed) {
+      final inside = match.group(1)?.trim() ?? '';
+
+      // Skip markdown links or citations like [foo](http...), [1], [L10-L20]
+      final endPos = match.end;
+      if (endPos < text.length && text[endPos] == '(') {
+        continue;
+      }
+      if (RegExp(r'^(https?://|file://|\d+$|L\d+)').hasMatch(inside)) {
+        continue;
+      }
+
+      final parts = inside.contains(',')
+          ? inside.split(',')
+          : (inside.contains('/') ? inside.split('/') : inside.split('|'));
+
+      final cleaned = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      if (cleaned.length >= 2 && cleaned.length <= 6) {
+        final hasKnownChoice = cleaned.any((p) {
+          final l = p.toLowerCase();
+          return l == 'accept' ||
+              l == 'denied' ||
+              l == 'deny' ||
+              l == 'approved' ||
+              l == 'approve' ||
+              l == 'reject' ||
+              l == 'yes' ||
+              l == 'no' ||
+              l == 'y' ||
+              l == 'n' ||
+              l == 'always' ||
+              l == 'deny-all';
+        });
+
+        final allShort = cleaned.every((p) => p.length <= 30 && !p.contains('{'));
+        if (hasKnownChoice || allShort) {
+          return cleaned;
+        }
+      }
+    }
+
+    return const [];
+  }
+
+  /// Renders interactive action buttons for multiple-choice questions matching Cline/Roo Code style.
+  Widget _buildOptionButtons(BuildContext context, List<String> options) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: options.map((opt) {
+          final lower = opt.toLowerCase();
+          final isAccept = lower.contains('accept') ||
+              lower.contains('approve') ||
+              lower == 'yes' ||
+              lower == 'y';
+          final isDeny = lower.contains('deni') ||
+              lower.contains('deny') ||
+              lower.contains('reject') ||
+              lower == 'no' ||
+              lower == 'n';
+
+          final color = isAccept
+              ? Colors.green.shade600
+              : (isDeny ? Colors.redAccent : const Color(0xFF0D9488));
+
+          return ActionChip(
+            label: Text(
+              opt,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+            side: BorderSide(color: color.withAlpha(140)),
+            backgroundColor: color.withAlpha(25),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            onPressed: () {
+              controller?.submitPrompt(opt);
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   void _showFullScreenOutput(BuildContext context, String text) {
     showDialog(
       context: context,
@@ -344,6 +512,56 @@ class ChatBubble extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
+                    if (DocumentExportService.isExportableAnalysisOrPlan(text)) ...[
+                      PopupMenuButton<String>(
+                        tooltip: 'Export Plan / Analysis (PDF, Word, Markdown)',
+                        icon: const Icon(Icons.file_download_outlined, color: Color(0xFFEA580C)),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(
+                            value: 'pdf',
+                            child: Row(
+                              children: [
+                                Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 18),
+                                SizedBox(width: 8),
+                                Text('Export to PDF (.pdf)'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'docx',
+                            child: Row(
+                              children: [
+                                Icon(Icons.description, color: Colors.blueAccent, size: 18),
+                                SizedBox(width: 8),
+                                Text('Export to Word (.docx)'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'md',
+                            child: Row(
+                              children: [
+                                Icon(Icons.article_outlined, color: Colors.grey, size: 18),
+                                SizedBox(width: 8),
+                                Text('Export to Markdown (.md)'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onSelected: (format) {
+                          DocumentExportService.exportDocument(
+                            context: context,
+                            markdownContent: text,
+                            format: format,
+                            workspaceDirectory: controller?.workspaceDirectory,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     IconButton(
                       icon: const Icon(Icons.copy),
                       onPressed: () {
@@ -846,6 +1064,32 @@ class ChatBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (message.toolResult?.isError == true &&
+              message.toolResult!.content.any((c) => (c.text ?? '').contains('REJECTED by user')))
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.red.withAlpha(35),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.redAccent.withAlpha(120)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.block, size: 14, color: Colors.redAccent),
+                  SizedBox(width: 6),
+                  Text(
+                    'Tool Denied by User',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (isHtml)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

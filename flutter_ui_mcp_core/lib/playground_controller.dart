@@ -17,6 +17,9 @@ import 'src/models/sub_agent_execution.dart';
 import 'src/eval/eval_controller.dart';
 import 'src/utils/image_optimizer.dart';
 import 'src/services/model_pricing_service.dart';
+import 'src/services/tool_permission_service.dart';
+import 'src/services/tool_permission_service.dart';
+import 'src/services/document_export_service.dart';
 
 /// Abstract delegate for storing and loading LLM configuration, server registry, and saved setups.
 abstract class McpPlaygroundStorageDelegate {
@@ -571,6 +574,85 @@ class PlaygroundController extends ChangeNotifier {
 
   /// Direct access to the internal [MultiMCPManager].
   MultiMCPManager get mcpManager => _mcpManager;
+
+  // ── Tool Permissions & Human-in-the-Loop ───────────────────────
+  ToolPermissionSettings _permissions = ToolPermissionSettings.load();
+
+  /// Tool permission settings controlling auto-approval per risk category.
+  ToolPermissionSettings get permissions => _permissions;
+  set permissions(ToolPermissionSettings p) {
+    _permissions = p;
+    notifyListeners();
+  }
+
+  PendingToolApproval? _pendingToolApproval;
+
+  /// Active tool call paused and waiting for human approval.
+  PendingToolApproval? get pendingToolApproval => _pendingToolApproval;
+
+  /// Submits the user's decision on a pending tool approval request.
+  void respondToToolApproval(ToolApprovalDecision decision) {
+    if (_pendingToolApproval != null && !_pendingToolApproval!.completer.isCompleted) {
+      _pendingToolApproval!.completer.complete(decision);
+    }
+  }
+
+  // ── Mode Policies & Workspace Directory ────────────────────────
+  String _codingSubMode = '/code';
+
+  /// Active working mode (/code, /plan, /ask, /rag).
+  String get codingSubMode => _codingSubMode;
+  set codingSubMode(String m) {
+    _codingSubMode = m;
+    notifyListeners();
+  }
+
+  String _workspaceDirectory = '';
+
+  /// Active workspace root directory.
+  String get workspaceDirectory => _workspaceDirectory;
+  set workspaceDirectory(String dir) {
+    _workspaceDirectory = dir;
+    notifyListeners();
+  }
+
+  /// Guards against modifying production source code in /plan mode.
+  /// Permits modifying planning and task files (*.md, tasks.md, implementation_plan.md).
+  MCPToolResult? checkPlanModeToolRestriction(
+    String toolName,
+    Map<String, dynamic> arguments,
+  ) {
+    if (_codingSubMode != '/plan') return null;
+    if (toolName == 'fs_write_file' ||
+        toolName == 'fs_replace_text' ||
+        toolName == 'fs_delete_file' ||
+        toolName == 'fs_delete' ||
+        toolName == 'fs_create_dir' ||
+        toolName == 'fs_move') {
+      final targetPath = (arguments['path'] ??
+              arguments['file_path'] ??
+              arguments['target'] ??
+              '')
+          .toString();
+      final lower = targetPath.toLowerCase();
+      final isPlanOrDocFile = lower.endsWith('.md') ||
+          lower.endsWith('.txt') ||
+          lower.endsWith('.json') ||
+          lower.endsWith('.yaml') ||
+          lower.endsWith('.yml') ||
+          lower.endsWith('tasks') ||
+          lower.endsWith('plan');
+      if (!isPlanOrDocFile && targetPath.isNotEmpty) {
+        final rejectNotice =
+            '⚠️ **Disallowed in /plan Mode**: Direct modification of source code file "$targetPath" is not allowed in /plan mode.\n'
+            'Please formulate your planned changes inside `tasks.md` or `implementation_plan.md`.\n'
+            'To implement code changes, please ask the user or switch to `/code` mode.';
+        _log('Blocked source code edit in /plan mode: $targetPath');
+        return MCPToolResult.error(rejectNotice);
+      }
+    }
+    return null;
+  }
 
   // ── Multi-LLM Profiles & Tool Execution Strategy ──────────────
   final List<LlmConfig> _llmConfigs = [];
@@ -1780,6 +1862,9 @@ class PlaygroundController extends ChangeNotifier {
   }
 
   /// Sends a message and triggers the agentic tool call loop.
+  /// Submits a user prompt, executing turns and tools.
+  void submitPrompt(String text) => sendMessage(text);
+
   Future<void> sendMessage(
     String text, {
     List<MessageAttachment>? attachments,
@@ -2238,16 +2323,58 @@ class PlaygroundController extends ChangeNotifier {
                             final localMatch = _localTools
                                 .where((t) => t.name == call.name)
                                 .toList();
-                            MCPToolResult toolRes;
-                            if (localMatch.isNotEmpty) {
-                              toolRes = await localMatch.first.execute(
-                                call.arguments,
-                              );
+                            MCPToolResult? toolRes;
+
+                            // 1. Plan Mode Guard
+                            final planGuard = checkPlanModeToolRestriction(call.name, call.arguments);
+                            if (planGuard != null) {
+                              toolRes = planGuard;
                             } else {
-                              toolRes = await _mcpManager.callTool(
-                                call.name,
-                                call.arguments,
-                              );
+                              // 2. Human-in-the-Loop Tool Permissions
+                              final explicitRisk = localMatch.isNotEmpty ? localMatch.first.riskLevel : null;
+                              final risk = ToolPermissionSettings.inferRiskLevel(call.name, explicitRisk);
+                              final isApproved = _permissions.isAutoApproved(risk);
+
+                              if (!isApproved) {
+                                subExec.addProgress('Waiting for approval for ${call.name}...');
+                                notifyListeners();
+
+                                final completer = Completer<ToolApprovalDecision>();
+                                final pending = PendingToolApproval(
+                                  id: const Uuid().v4(),
+                                  toolName: call.name,
+                                  arguments: call.arguments,
+                                  riskLevel: risk,
+                                  completer: completer,
+                                );
+                                _pendingToolApproval = pending;
+                                notifyListeners();
+
+                                final decision = await completer.future;
+                                _pendingToolApproval = null;
+                                notifyListeners();
+
+                                if (decision == ToolApprovalDecision.alwaysAccept) {
+                                  _permissions.setAutoApproved(risk, true);
+                                  _permissions.save();
+                                } else if (decision == ToolApprovalDecision.deny) {
+                                  final rejectMsg = 'Tool execution of "${call.name}" was REJECTED by user.';
+                                  toolRes = MCPToolResult.error(rejectMsg);
+                                }
+                              }
+
+                              if (toolRes == null) {
+                                if (localMatch.isNotEmpty) {
+                                  toolRes = await localMatch.first.execute(
+                                    call.arguments,
+                                  );
+                                } else {
+                                  toolRes = await _mcpManager.callTool(
+                                    call.name,
+                                    call.arguments,
+                                  );
+                                }
+                              }
                             }
 
                             final textRes = toolRes.content
@@ -2616,7 +2743,7 @@ class PlaygroundController extends ChangeNotifier {
             notifyListeners();
 
             _log('Executing Tool: ${call.name}');
-            MCPToolResult result;
+            MCPToolResult? result;
             final localMatch = _localTools
                 .where((t) => t.name == call.name)
                 .toList();
@@ -2625,33 +2752,77 @@ class PlaygroundController extends ChangeNotifier {
                 .where((t) => _enabledToolNames.contains(t.name))
                 .toList();
 
-            if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
-              result = await McpListToolsTool(
-                mcpManager: _mcpManager,
-                localTools: activeCatalogTools,
-              ).execute(call.arguments);
-            } else if (_progressiveMcpDiscovery &&
-                call.name == 'mcp_call_tool') {
-              result = await McpCallToolTool(
-                mcpManager: _mcpManager,
-                localTools: activeCatalogTools,
-              ).execute(call.arguments);
-            } else if (memoryTool != null && call.name == 'retrieve_memory') {
-              result = await memoryTool.execute(call.arguments);
-            } else if (delegateTool != null && call.name == 'delegate_task') {
-              result = await delegateTool.execute(call.arguments);
-            } else if (activateTool != null && call.name == 'activate_skills') {
-              result = await activateTool.execute(call.arguments);
-            } else if (deactivateTool != null &&
-                call.name == 'deactivate_skills') {
-              result = await deactivateTool.execute(call.arguments);
-            } else if (localMatch.isNotEmpty) {
-              result = await localMatch.first.execute(call.arguments);
-            } else {
-              result = await _mcpManager.callTool(call.name, call.arguments);
+            // 1. Plan Mode Guard: block source code modifications in /plan mode
+            final planGuard = checkPlanModeToolRestriction(call.name, call.arguments);
+            if (planGuard != null) {
+              result = planGuard;
             }
 
-            final String responseContentText = result.content
+            // 2. Human-in-the-Loop Tool Permissions
+            if (result == null) {
+              final explicitRisk = localMatch.isNotEmpty ? localMatch.first.riskLevel : null;
+              final risk = ToolPermissionSettings.inferRiskLevel(call.name, explicitRisk);
+              final isApproved = _permissions.isAutoApproved(risk);
+
+              if (!isApproved) {
+                _log('⚠️ Tool Approval Requested for: ${call.name} ($risk)');
+                final completer = Completer<ToolApprovalDecision>();
+                final pending = PendingToolApproval(
+                  id: const Uuid().v4(),
+                  toolName: call.name,
+                  arguments: call.arguments,
+                  riskLevel: risk,
+                  completer: completer,
+                );
+                _pendingToolApproval = pending;
+                notifyListeners();
+
+                final decision = await completer.future;
+                _pendingToolApproval = null;
+                notifyListeners();
+
+                if (decision == ToolApprovalDecision.alwaysAccept) {
+                  _permissions.setAutoApproved(risk, true);
+                  _permissions.save();
+                  _log('Auto-approval enabled for risk level: $risk');
+                } else if (decision == ToolApprovalDecision.deny) {
+                  final rejectMsg = 'Tool execution of "${call.name}" was REJECTED by user.';
+                  _log('❌ $rejectMsg');
+                  result = MCPToolResult.error(rejectMsg);
+                }
+              }
+            }
+
+            if (result == null) {
+              if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
+                result = await McpListToolsTool(
+                  mcpManager: _mcpManager,
+                  localTools: activeCatalogTools,
+                ).execute(call.arguments);
+              } else if (_progressiveMcpDiscovery &&
+                  call.name == 'mcp_call_tool') {
+                result = await McpCallToolTool(
+                  mcpManager: _mcpManager,
+                  localTools: activeCatalogTools,
+                ).execute(call.arguments);
+              } else if (memoryTool != null && call.name == 'retrieve_memory') {
+                result = await memoryTool.execute(call.arguments);
+              } else if (delegateTool != null && call.name == 'delegate_task') {
+                result = await delegateTool.execute(call.arguments);
+              } else if (activateTool != null && call.name == 'activate_skills') {
+                result = await activateTool.execute(call.arguments);
+              } else if (deactivateTool != null &&
+                  call.name == 'deactivate_skills') {
+                result = await deactivateTool.execute(call.arguments);
+              } else if (localMatch.isNotEmpty) {
+                result = await localMatch.first.execute(call.arguments);
+              } else {
+                result = await _mcpManager.callTool(call.name, call.arguments);
+              }
+            }
+
+            final finalResult = result;
+            final String responseContentText = finalResult.content
                 .where((c) => c.type == 'text')
                 .map((c) => c.text ?? '')
                 .join('\n');
@@ -2689,7 +2860,7 @@ class PlaygroundController extends ChangeNotifier {
               role: ChatRole.tool,
               type: MessageType.toolResponse,
               toolName: call.name,
-              toolResult: result,
+              toolResult: finalResult,
               timestamp: DateTime.now(),
             );
             _messages.add(resMsg);
