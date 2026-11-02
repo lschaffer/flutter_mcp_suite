@@ -355,6 +355,7 @@ This architectural document outlines the target design for migrating legacy poll
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isPlanMode = _controller.codingSubMode == '/plan';
 
     return Scaffold(
@@ -452,16 +453,17 @@ This architectural document outlines the target design for migrating legacy poll
           // Banner with Mode indicator and prompt helper chips
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isPlanMode
-                  ? Colors.amber.withAlpha(25)
-                  : Colors.teal.withAlpha(25),
+                  ? (isDark ? const Color(0xFF2E2405) : const Color(0xFFFEF3C7))
+                  : (isDark ? const Color(0xFF062C27) : const Color(0xFFCCFBF1)),
               border: Border(
                 bottom: BorderSide(
                   color: isPlanMode
-                      ? Colors.amber.withAlpha(80)
-                      : Colors.teal.withAlpha(80),
+                      ? (isDark ? const Color(0xFFD97706) : const Color(0xFFF59E0B))
+                      : (isDark ? const Color(0xFF0D9488) : const Color(0xFF14B8A6)),
+                  width: 1.2,
                 ),
               ),
             ),
@@ -473,19 +475,23 @@ This architectural document outlines the target design for migrating legacy poll
                     Icon(
                       isPlanMode ? Icons.shield : Icons.check_circle_outline,
                       size: 16,
-                      color: isPlanMode ? Colors.amber : Colors.teal,
+                      color: isPlanMode
+                          ? const Color(0xFFF59E0B)
+                          : (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488)),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isPlanMode
-                          ? 'Plan Mode Active: Code modifications (.dart, .py, etc.) are restricted to protect production files.'
-                          : 'Code Mode Active: Tools can write files directly, subject to HITL user confirmation.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isPlanMode
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurface,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isPlanMode
+                            ? 'Plan Mode Active: Code modifications (.dart, .py, etc.) are restricted to protect production files.'
+                            : 'Code Mode Active: Tools can write files directly, subject to HITL user confirmation.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isPlanMode
+                              ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
+                              : (isDark ? const Color(0xFF99F6E4) : const Color(0xFF115E59)),
+                        ),
                       ),
                     ),
                   ],
