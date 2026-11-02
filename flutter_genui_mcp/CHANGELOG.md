@@ -1,3 +1,8 @@
+## 1.5.3
+
+* **Synchronized Suite Upgrades**:
+  * Aligned dependencies with `dart_mcp_core: ^1.5.3` and `flutter_ui_mcp_core: ^1.5.3`.
+
 ## 1.5.2
 
 * **GenUI Chat View Background Customization**:

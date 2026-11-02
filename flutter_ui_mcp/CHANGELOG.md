@@ -1,3 +1,21 @@
+## 1.5.3
+
+* **Human-in-the-Loop Tool Approval Card Rendering**:
+  * Integrated `PendingToolApprovalCard` directly into `McpPlayground` / `FlutterUiMcpWidget` conversation view when a tool execution is paused for human confirmation.
+* **New Showcase Example: HITL Permissions & Document Export**:
+  * Added full interactive showcase (`hitl_permissions_export_example.dart`) demonstrating:
+    * Read, network, write, and execute local tools with distinct risk levels.
+    * Live permission settings sheet to toggle auto-approval per risk level.
+    * Real-time mode switching between `/plan` and `/code` with Plan Mode Guard blocking source code modifications.
+    * Direct document export to PDF, Word (.docx), and Markdown (.md).
+    * One-tap prompt injection buttons for testing HITL workflows.
+  * Registered in the main gallery menu (`FlutterMcpDemo.hitlPermissionsExport`) and as a quick-launch action in the app bar.
+* **External Input Controller & Active Skill Binding**:
+  * Added `inputController` parameter to `McpPlayground` for binding an external `TextEditingController`.
+  * Added `activeSkill` parameter to `McpPlayground` for reactive skill dock synchronization.
+* **Synchronized Core Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.3` and `flutter_ui_mcp_core: ^1.5.3`.
+
 ## 1.5.2
 
 * **Chat View Background Customization**:

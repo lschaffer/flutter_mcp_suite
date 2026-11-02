@@ -1,3 +1,9 @@
+## 1.5.3
+
+* **Suite Alignment & Tool Risk Category Harmonization**:
+  * Fully aligned with Flutter MCP Suite v1.5.3 human-in-the-loop tool permissions.
+  * Ensured `ToolRiskLevel` (`read`, `write`, `execute`, `network`) metadata propagates across `McpLocalTool`, `CodingTools`, `ProgressiveTools`, and agent workflows.
+
 ## 1.5.1
 
 - **Tool Parameter Schema Sanitization (`LLMService.sanitizeSchemaForLlm`)**:

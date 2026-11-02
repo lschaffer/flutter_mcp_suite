@@ -1,3 +1,24 @@
+## 1.5.3
+
+* **Human-in-the-Loop (HITL) Tool Permissions (`ToolPermissionService`, `ToolPermissionSettings`)**:
+  * Configurable auto-approval policies categorized across four risk levels: `read`, `network`, `write`, and `execute`.
+  * Added `PendingToolApprovalCard` interactive UI card displaying the requested tool name, color-coded risk badge, arguments preview, and three decision actions:
+    * **Accept**: Approves the single execution.
+    * **Always Allow**: Auto-approves the entire risk category for the session and persists preferences to `.tealkit/permissions.yaml`.
+    * **Deny**: Rejects execution and safely returns an execution refusal error to the LLM.
+  * Added `ToolPermissionSettings.inferRiskLevel(...)` heuristic classifier to deduce risk categories for tools lacking explicit risk designations.
+  * Added `pendingToolApproval` and `respondToToolApproval(...)` to `PlaygroundController`.
+* **Coding Sub-Mode & Plan Mode Protection Guard (`checkPlanModeToolRestriction`)**:
+  * Added `codingSubMode` property (`/plan`, `/code`, `/ask`, `/rag`) to `PlaygroundController`.
+  * In `/plan` mode, file-writing tools (`fs_write_file`, `fs_replace_text`, `fs_delete`, etc.) are prohibited from modifying source code files (`.dart`, `.py`, `.ts`, `.cpp`, etc.), shielding production repositories from premature or unapproved edits.
+  * Explicitly allows modifying documentation and planning files (`*.md`, `tasks.md`, `implementation_plan.md`, `*.json`, `*.yaml`).
+* **Document Export Engine (`DocumentExportService`, `ExportDocumentDialog`)**:
+  * Export structured plans, architecture documents, and technical analyses to **PDF** (`.pdf`), **Word** (`.docx`), and **Markdown** (`.md`).
+  * Features intelligent plan detection (`DocumentExportService.isExportableAnalysisOrPlan`) which automatically surfaces export buttons in `ChatBubble` message cards.
+  * Includes `ExportDocumentDialog` allowing interactive destination folder selection, filename customization, and format toggling with native system file-saver integration.
+* **External Input Prompt Injection (`PlaygroundController`)**:
+  * Added `setInputPrompt(String prompt)` and `consumePendingInputPrompt()` for programmatic injection of prompts into the chat input bar.
+
 ## 1.5.2
 
 * **Chat View Background Customization**:

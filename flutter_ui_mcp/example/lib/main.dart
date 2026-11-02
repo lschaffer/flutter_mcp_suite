@@ -6,6 +6,7 @@ import 'package:flutter_ui_mcp/flutter_ui_mcp.dart';
 import 'env_loader.dart';
 import 'example_local_tools.dart';
 import 'progressive_discovery_example.dart';
+import 'hitl_permissions_export_example.dart';
 
 // Standalone Flutter MCP Examples (imported with prefix aliases to avoid collisions)
 import 'package:example_progressive_tools/main.dart' as progressive_demo;
@@ -164,6 +165,19 @@ enum FlutterMcpDemo {
       'Run comprehensive device hardware diagnostic suite and show memory and battery stats.',
       'Inspect network connectivity, ping round-trip times, and active network interfaces.',
       'Profile UI frame rendering pipeline and report any frame drop or jank anomalies.',
+    ],
+  ),
+  hitlPermissionsExport(
+    id: 'hitl_permissions_export',
+    title: 'HITL Permissions & Document Export',
+    subtitle: 'Human-in-the-Loop tool approvals, Plan Mode code guard & PDF/DOCX/MD export',
+    icon: Icons.shield_rounded,
+    badge: 'v1.5.3',
+    examplePrompts: [
+      'Execute tool run_database_migration with migration_name: "V2__add_payments_table.sql" and dry_run: false.',
+      'Execute fs_write_file to update "tasks.md" with Phase 3 deployment checklist.',
+      'Execute fs_write_file on "lib/main.dart" with new auth middleware.',
+      'Generate a structured # Architecture Plan for real-time order processing with executive summary, components, and implementation tasks.',
     ],
   );
 
@@ -732,6 +746,8 @@ class ShowcaseGalleryShell extends StatelessWidget {
         return const github_triage_demo.GithubTriageScreen();
       case FlutterMcpDemo.deviceDiagnostics:
         return const device_diagnostics_demo.DiagnosticsPlaygroundScreen();
+      case FlutterMcpDemo.hitlPermissionsExport:
+        return const HitlPermissionsExportExampleScreen();
     }
   }
 }
@@ -1064,6 +1080,17 @@ class McpPlaygroundScreen extends StatelessWidget {
         'geocode_weather_city',
       ],
       customAppBarActions: [
+        IconButton(
+          icon: const Icon(Icons.shield_outlined),
+          tooltip: 'HITL Permissions & Export Demo',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const HitlPermissionsExportExampleScreen(),
+              ),
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.auto_awesome),
           tooltip: 'Progressive MCP Tool Discovery Demo',

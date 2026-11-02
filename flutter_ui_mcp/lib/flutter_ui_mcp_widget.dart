@@ -2050,7 +2050,7 @@ class _McpPlaygroundState extends State<McpPlayground> {
     Widget conversationArea;
     if (_controller.isLoading) {
       conversationArea = const Center(child: CircularProgressIndicator());
-    } else if (_controller.messages.isEmpty) {
+    } else if (_controller.messages.isEmpty && _controller.pendingToolApproval == null) {
       if (emptyBuilder != null) {
         conversationArea = emptyBuilder(context);
       } else if (!showEmpty) {
@@ -2065,6 +2065,11 @@ class _McpPlaygroundState extends State<McpPlayground> {
         children: [
           for (final msg in _controller.messages)
             ChatBubble(message: msg, controller: _controller),
+          if (_controller.pendingToolApproval != null)
+            PendingToolApprovalCard(
+              approval: _controller.pendingToolApproval!,
+              onDecision: _controller.respondToToolApproval,
+            ),
         ],
       );
     }
