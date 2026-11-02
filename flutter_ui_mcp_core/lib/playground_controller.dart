@@ -2484,9 +2484,9 @@ class PlaygroundController extends ChangeNotifier {
             _messages.add(
               ChatMessage(
                 id: _uuid.v4(),
-                content: 'Execution cancelled by user.',
-                role: ChatRole.system,
-                type: MessageType.log,
+                content: '⏹️ Generation stopped by user.',
+                role: ChatRole.assistant,
+                type: MessageType.text,
                 timestamp: DateTime.now(),
               ),
             );
@@ -2594,9 +2594,9 @@ class PlaygroundController extends ChangeNotifier {
             _messages.add(
               ChatMessage(
                 id: _uuid.v4(),
-                content: 'Execution cancelled by user.',
-                role: ChatRole.system,
-                type: MessageType.log,
+                content: '⏹️ Generation stopped by user.',
+                role: ChatRole.assistant,
+                type: MessageType.text,
                 timestamp: DateTime.now(),
               ),
             );
@@ -2792,31 +2792,33 @@ class PlaygroundController extends ChangeNotifier {
             }
 
             if (result == null) {
-              if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
-                result = await McpListToolsTool(
-                  mcpManager: _mcpManager,
-                  localTools: activeCatalogTools,
-                ).execute(call.arguments);
-              } else if (_progressiveMcpDiscovery &&
-                  call.name == 'mcp_call_tool') {
-                result = await McpCallToolTool(
-                  mcpManager: _mcpManager,
-                  localTools: activeCatalogTools,
-                ).execute(call.arguments);
-              } else if (memoryTool != null && call.name == 'retrieve_memory') {
-                result = await memoryTool.execute(call.arguments);
-              } else if (delegateTool != null && call.name == 'delegate_task') {
-                result = await delegateTool.execute(call.arguments);
-              } else if (activateTool != null && call.name == 'activate_skills') {
-                result = await activateTool.execute(call.arguments);
-              } else if (deactivateTool != null &&
-                  call.name == 'deactivate_skills') {
-                result = await deactivateTool.execute(call.arguments);
-              } else if (localMatch.isNotEmpty) {
-                result = await localMatch.first.execute(call.arguments);
-              } else {
-                result = await _mcpManager.callTool(call.name, call.arguments);
-              }
+              result = await _executeToolWithCancellation(() async {
+                if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
+                  return await McpListToolsTool(
+                    mcpManager: _mcpManager,
+                    localTools: activeCatalogTools,
+                  ).execute(call.arguments);
+                } else if (_progressiveMcpDiscovery &&
+                    call.name == 'mcp_call_tool') {
+                  return await McpCallToolTool(
+                    mcpManager: _mcpManager,
+                    localTools: activeCatalogTools,
+                  ).execute(call.arguments);
+                } else if (memoryTool != null && call.name == 'retrieve_memory') {
+                  return await memoryTool.execute(call.arguments);
+                } else if (delegateTool != null && call.name == 'delegate_task') {
+                  return await delegateTool.execute(call.arguments);
+                } else if (activateTool != null && call.name == 'activate_skills') {
+                  return await activateTool.execute(call.arguments);
+                } else if (deactivateTool != null &&
+                    call.name == 'deactivate_skills') {
+                  return await deactivateTool.execute(call.arguments);
+                } else if (localMatch.isNotEmpty) {
+                  return await localMatch.first.execute(call.arguments);
+                } else {
+                  return await _mcpManager.callTool(call.name, call.arguments);
+                }
+              });
             }
 
             final finalResult = result;
@@ -2950,9 +2952,9 @@ class PlaygroundController extends ChangeNotifier {
       _messages.add(
         ChatMessage(
           id: _uuid.v4(),
-          content: 'Error: $e',
-          role: ChatRole.system,
-          type: MessageType.log,
+          content: '⚠️ Execution error: $e',
+          role: ChatRole.assistant,
+          type: MessageType.text,
           timestamp: DateTime.now(),
         ),
       );
@@ -2960,6 +2962,27 @@ class PlaygroundController extends ChangeNotifier {
       _generating = false;
       notifyListeners();
     }
+  }
+
+  Future<MCPToolResult> _executeToolWithCancellation(
+    Future<MCPToolResult> Function() runTool,
+  ) async {
+    final completer = Completer<MCPToolResult>();
+    runTool().then((res) {
+      if (!completer.isCompleted) completer.complete(res);
+    }).catchError((err) {
+      if (!completer.isCompleted) {
+        completer.complete(MCPToolResult.error('Tool error: $err'));
+      }
+    });
+
+    while (!completer.isCompleted) {
+      if (_cancelRequested) {
+        return MCPToolResult.error('Execution cancelled by user.');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return completer.future;
   }
 
   @override
