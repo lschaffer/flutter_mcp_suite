@@ -61,6 +61,16 @@ An interactive AI Agent chat and execution widget for Flutter — connect to any
 
 ## 🎥 Demos & Visual Showcases
 
+### 🛡️ Human-in-the-Loop (HITL) Tool Permissions & Interactive Approval
+Pause high-risk tool executions (`write`, `execute`) for user confirmation with color-coded risk badges, syntax-highlighted parameters preview, and one-tap decisions (Accept, Deny, Always Allow):
+
+![Human-in-the-Loop Tool Permissions](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_mcp/flutter_ui_hitl_tool_approval.png)
+
+### 📄 Document Export Engine (PDF, Word, Markdown) & Plan Mode Guard
+Export structured architecture plans and technical analyses directly from chat bubbles to PDF, Word (`.docx`), or Markdown (`.md`) with automatic plan detection and `/plan` mode code protection:
+
+![Document Export & Plan Mode](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_ui_mcp/flutter_ui_document_export_plan.png)
+
 ### 🎛️ Unified Showcase Gallery & Feature Switcher
 Browse, switch, and test all agent showcases directly in the application header:
 
