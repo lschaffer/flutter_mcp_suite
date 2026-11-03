@@ -1,7 +1,7 @@
-## 1.5.4
+## 1.5.5
 
 * **Synchronized Suite Upgrades**:
-  * Bumped dependencies to `dart_mcp_core: ^1.5.4`, `flutter_ui_mcp_core: ^1.5.4`, and `anthropic_sdk_dart: ^9.0.1`.
+  * Bumped dependencies to `dart_mcp_core: ^1.5.5`, `flutter_ui_mcp_core: ^1.5.5`, and `anthropic_sdk_dart: ^9.0.1`.
   * Inherited full WASM/Web runtime compatibility improvements and FilePicker deprecation fixes.
 
 ## 1.5.3

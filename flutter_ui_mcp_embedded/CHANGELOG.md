@@ -1,8 +1,8 @@
-## 1.5.4
+## 1.5.5
 
 - **Dependency Upgrades**:
   - Upgraded `llamadart` to `^0.17.5`.
-  - Synchronized dependencies with `dart_mcp_core: ^1.5.4` and `flutter_ui_mcp_core: ^1.5.4`.
+  - Synchronized dependencies with `dart_mcp_core: ^1.5.5` and `flutter_ui_mcp_core: ^1.5.5`.
 
 ## 1.5.0
 

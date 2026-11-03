@@ -1,3 +1,8 @@
+## 1.5.5
+
+* **Synchronized Suite Upgrades**:
+  * Aligned dependencies with `dart_mcp_core: ^1.5.5` and `flutter_ui_mcp_core: ^1.5.5`.
+
 ## 1.5.4
 
 * **Synchronized Suite Upgrades**:

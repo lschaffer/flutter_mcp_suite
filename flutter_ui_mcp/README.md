@@ -102,7 +102,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp: ^1.5.4
+  flutter_ui_mcp: ^1.5.5
 ```
 
 Then import:

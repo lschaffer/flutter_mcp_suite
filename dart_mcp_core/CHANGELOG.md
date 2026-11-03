@@ -1,4 +1,4 @@
-## 1.5.4
+## 1.5.5
 
 - **Dependency Upgrades**:
   - Upgraded `anthropic_sdk_dart` to `^9.0.1`.

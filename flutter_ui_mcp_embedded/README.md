@@ -16,8 +16,8 @@ In your application's `pubspec.yaml`:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_ui_mcp: ^1.4.0
-  flutter_ui_mcp_embedded: ^1.4.0
+  flutter_ui_mcp: ^1.5.5
+  flutter_ui_mcp_embedded: ^1.5.5
 ```
 
 ### 2. Register the Driver
