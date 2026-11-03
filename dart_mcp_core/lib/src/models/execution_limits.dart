@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:universal_io/io.dart';
 import 'package:path/path.dart' as p;
 
 /// Configuration and runtime limits for MCP conversations, tool calls, and sessions.

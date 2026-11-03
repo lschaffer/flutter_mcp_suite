@@ -43,8 +43,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_ui_mcp_core: ^1.5.3
-  dart_mcp_core: ^1.5.3
+  flutter_ui_mcp_core: ^1.5.4
+  dart_mcp_core: ^1.5.4
 ```
 
 ---

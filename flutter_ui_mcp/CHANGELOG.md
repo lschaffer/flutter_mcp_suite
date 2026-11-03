@@ -1,3 +1,9 @@
+## 1.5.4
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.4`, `flutter_ui_mcp_core: ^1.5.4`, and `anthropic_sdk_dart: ^9.0.1`.
+  * Inherited full WASM/Web runtime compatibility improvements and FilePicker deprecation fixes.
+
 ## 1.5.3
 
 * **Human-in-the-Loop Tool Approval Card Rendering**:

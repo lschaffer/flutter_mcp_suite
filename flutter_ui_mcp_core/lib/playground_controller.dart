@@ -2791,8 +2791,7 @@ class PlaygroundController extends ChangeNotifier {
               }
             }
 
-            if (result == null) {
-              result = await _executeToolWithCancellation(() async {
+            result ??= await _executeToolWithCancellation(() async {
                 if (_progressiveMcpDiscovery && call.name == 'mcp_list_tools') {
                   return await McpListToolsTool(
                     mcpManager: _mcpManager,
@@ -2819,7 +2818,6 @@ class PlaygroundController extends ChangeNotifier {
                   return await _mcpManager.callTool(call.name, call.arguments);
                 }
               });
-            }
 
             final finalResult = result;
             final String responseContentText = finalResult.content

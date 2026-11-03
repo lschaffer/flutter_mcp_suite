@@ -738,8 +738,6 @@ class ChatBubble extends StatelessWidget {
 
       final savedUri = await FilePicker.saveFile(
         fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: [extension],
         bytes: bytes,
       );
 
@@ -765,14 +763,8 @@ class ChatBubble extends StatelessWidget {
     String fileName,
   ) async {
     try {
-      final extension = fileName.contains('.')
-          ? fileName.split('.').last
-          : 'bin';
-
       final savedUri = await FilePicker.saveFile(
         fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: [extension],
         bytes: bytes,
       );
 

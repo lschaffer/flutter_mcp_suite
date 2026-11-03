@@ -1,3 +1,10 @@
+## 1.5.4
+
+- **Dependency Upgrades**:
+  - Upgraded `anthropic_sdk_dart` to `^9.0.1`.
+- **WASM & Web Platform Compatibility**:
+  - Migrated `execution_limits.dart` (`SessionRotator`) from direct `dart:io` import to `universal_io`, restoring full WASM and Web runtime compatibility across the package suite.
+
 ## 1.5.3
 
 * **Suite Alignment & Tool Risk Category Harmonization**:

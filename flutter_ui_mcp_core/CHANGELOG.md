@@ -1,3 +1,12 @@
+## 1.5.4
+
+* **WASM & Web Platform Compatibility**:
+  * Eliminated direct `dart:io` imports across `tool_permission_service.dart` and `document_export_service.dart` by migrating to `universal_io`, restoring full Web & WASM runtime compatibility.
+* **Resolved FilePicker Static Analysis Deprecations**:
+  * Removed deprecated `type` and `allowedExtensions` arguments in `FilePicker.saveFile()` within `chat_bubble.dart` to prevent warnings on future file_picker releases and ensure a clean 50/50 static analysis score on pub.dev.
+* **Synchronized Suite Upgrades**:
+  * Bumped `dart_mcp_core` dependency to `^1.5.4` and `anthropic_sdk_dart` to `^9.0.1`.
+
 ## 1.5.3
 
 * **Human-in-the-Loop (HITL) Tool Permissions (`ToolPermissionService`, `ToolPermissionSettings`)**:

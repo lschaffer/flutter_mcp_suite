@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:universal_io/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import 'package:path/path.dart' as p;
