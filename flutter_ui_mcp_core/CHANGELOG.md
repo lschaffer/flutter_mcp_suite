@@ -1,3 +1,15 @@
+## 1.5.6
+
+* **Instant Generation Cancellation & Tool Loop Abortion**:
+  * Aborts active tool wait immediately upon user clicking stop (`stopGeneration` / `cancelGeneration`), halting the tool execution loop without delay.
+  * Automatically rejects/denies any pending tool approvals on cancellation.
+  * Prevents subsequent tool iterations or further LLM turns from executing after a user stop request.
+* **Workspace Directory Dynamic Rebinding**:
+  * Updating `PlaygroundController.workspaceDirectory` now immediately synchronizes all active `BaseCodingTool` instances to the new workspace path.
+  * Added `PlaygroundController.updateLocalTools(List<McpLocalTool> tools)` to dynamically refresh local tool collections.
+* **Synchronized Suite Upgrades**:
+  * Bumped `dart_mcp_core` dependency to `^1.5.6`.
+
 ## 1.5.5
 
 * **WASM & Web Platform Compatibility**:

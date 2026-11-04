@@ -9,7 +9,7 @@ import '../models/models.dart';
 
 /// Base tool helper providing working directory resolution and normalization.
 abstract class BaseCodingTool extends McpLocalTool {
-  final String workingDirectory;
+  String workingDirectory;
 
   BaseCodingTool({String? workingDirectory})
       : workingDirectory = workingDirectory ?? Directory.current.path;
@@ -119,8 +119,11 @@ class FsFindTool extends BaseCodingTool {
     final matches = <String>[];
 
     try {
-      final entities = dir.listSync(recursive: true, followLinks: false);
-      for (final entity in entities) {
+      await for (final entity in dir
+          .list(recursive: true, followLinks: false)
+          .handleError((_) {
+        // Silently skip inaccessible subdirectories (permission denied)
+      })) {
         final relative = p.relative(entity.path, from: workingDirectory).replaceAll(r'\', '/');
         final parts = relative.split('/');
         if (parts.any((segment) => ignoreDirs.contains(segment))) {
@@ -728,15 +731,21 @@ class FsListDirTool extends BaseCodingTool {
     }
 
     try {
-      final entities = dir.listSync(recursive: recursive, followLinks: false);
       final entries = <String>[];
 
-      for (final e in entities) {
+      await for (final e in dir
+          .list(recursive: recursive, followLinks: false)
+          .handleError((_) {
+        // Silently skip inaccessible entries
+      })) {
         final rel = p.relative(e.path, from: workingDirectory).replaceAll(r'\', '/');
         if (e is Directory) {
           entries.add('[DIR]  $rel/');
         } else if (e is File) {
-          final size = e.lengthSync();
+          int size = 0;
+          try {
+            size = await e.length();
+          } catch (_) {}
           entries.add('[FILE] $rel ($size bytes)');
         } else {
           entries.add('[OTHER] $rel');

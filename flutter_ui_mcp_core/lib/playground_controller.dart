@@ -611,6 +611,18 @@ class PlaygroundController extends ChangeNotifier {
   String get workspaceDirectory => _workspaceDirectory;
   set workspaceDirectory(String dir) {
     _workspaceDirectory = dir;
+    for (final tool in _localTools) {
+      if (tool is BaseCodingTool) {
+        tool.workingDirectory = dir;
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Updates or replaces the local tools catalog and preserves enabled tools.
+  void updateLocalTools(List<McpLocalTool> tools) {
+    _localTools.clear();
+    _localTools.addAll(tools);
     notifyListeners();
   }
 
@@ -891,6 +903,10 @@ class PlaygroundController extends ChangeNotifier {
   void cancelGeneration() {
     if (_generating) {
       _cancelRequested = true;
+      if (_pendingToolApproval != null) {
+        _pendingToolApproval!.completer.complete(ToolApprovalDecision.deny);
+        _pendingToolApproval = null;
+      }
       notifyListeners();
     }
   }
@@ -2819,6 +2835,22 @@ class PlaygroundController extends ChangeNotifier {
                 }
               });
 
+            if (_cancelRequested) {
+              _log('🛑 Tool execution cancelled by user. Terminating generation.');
+              final stopMsg = ChatMessage(
+                id: _uuid.v4(),
+                content: '⏹️ Generation stopped by user.',
+                role: ChatRole.assistant,
+                type: MessageType.text,
+                timestamp: DateTime.now(),
+              );
+              _messages.add(stopMsg);
+              stepNewMsgs.add(stopMsg);
+              notifyListeners();
+              continueLoop = false;
+              break;
+            }
+
             final finalResult = result;
             final String responseContentText = finalResult.content
                 .where((c) => c.type == 'text')
@@ -2958,6 +2990,7 @@ class PlaygroundController extends ChangeNotifier {
       );
     } finally {
       _generating = false;
+      _cancelRequested = false;
       notifyListeners();
     }
   }
@@ -2965,6 +2998,9 @@ class PlaygroundController extends ChangeNotifier {
   Future<MCPToolResult> _executeToolWithCancellation(
     Future<MCPToolResult> Function() runTool,
   ) async {
+    if (_cancelRequested) {
+      return MCPToolResult.error('Execution cancelled by user.');
+    }
     final completer = Completer<MCPToolResult>();
     runTool().then((res) {
       if (!completer.isCompleted) completer.complete(res);
@@ -2978,7 +3014,7 @@ class PlaygroundController extends ChangeNotifier {
       if (_cancelRequested) {
         return MCPToolResult.error('Execution cancelled by user.');
       }
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
     }
     return completer.future;
   }

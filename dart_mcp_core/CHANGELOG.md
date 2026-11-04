@@ -1,3 +1,12 @@
+## 1.5.6
+
+- **Asynchronous & Resilient Filesystem Scanning (`FsFindTool`, `FsListDirTool`)**:
+  - Migrated from blocking synchronous directory traversal (`dir.listSync`) to non-blocking async streams (`dir.list`) with error handling.
+  - Gracefully ignores inaccessible or permission-restricted subdirectories (e.g., Windows system folders) without throwing unhandled `PathAccessException`.
+  - Eliminates main-isolate thread freezes during deep filesystem searches.
+- **Dynamic Working Directory Reconfiguration (`BaseCodingTool`)**:
+  - Made `workingDirectory` reconfigurable on active tool instances to allow instantaneous workspace root switching without reconstructing tools.
+
 ## 1.5.5
 
 - **Dependency Upgrades**:

@@ -3,7 +3,7 @@ import '../mcp/local_tools.dart';
 import '../models/models.dart';
 
 abstract class BaseCodingTool extends McpLocalTool {
-  final String workingDirectory;
+  String workingDirectory;
   BaseCodingTool({String? workingDirectory}) : workingDirectory = workingDirectory ?? '';
   String resolvePath(String relativeOrAbsolutePath) => relativeOrAbsolutePath;
   String getCanonicalPath(String filePath) => filePath;

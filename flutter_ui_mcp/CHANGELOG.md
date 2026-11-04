@@ -1,3 +1,9 @@
+## 1.5.6
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.6` and `flutter_ui_mcp_core: ^1.5.6`.
+  * Inherited instantaneous stop cancellation and non-blocking directory traversal fixes.
+
 ## 1.5.5
 
 * **Synchronized Suite Upgrades**:
