@@ -1730,6 +1730,18 @@ class PlaygroundController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Loads external or restored messages into the conversation history.
+  void loadMessages(List<ChatMessage> messages, {bool clearExisting = true}) {
+    if (clearExisting) {
+      _messages.clear();
+      _subAgents.clear();
+      _pendingParts.clear();
+    }
+    _messages.addAll(messages);
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Future<List<ChatMessage>> _preprocessMessagesForLlm(
     List<ChatMessage> messages,
     bool isMultiModal,
