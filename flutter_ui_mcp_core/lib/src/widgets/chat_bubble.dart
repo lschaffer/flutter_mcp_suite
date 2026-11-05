@@ -375,17 +375,22 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-    /// Extracts interactive choice options from text (e.g. [denied, accept], [yes, no], [y/n]).
+  /// Extracts interactive choice options from text (e.g. [Accept, Deny], [Yes, No], [y/n]).
   List<String> _extractOptions(String text) {
     if (text.isEmpty) return const [];
 
-    final bracketMatches = RegExp(r'\[([^\]\n]{2,120})\]').allMatches(text);
+    // Strip code blocks and inline code spans so code arrays like `['/', 'login']` are never parsed
+    final sanitizedText = text
+        .replaceAll(RegExp(r'```[\s\S]*?```'), '')
+        .replaceAll(RegExp(r'`[^`\n]+`'), '');
+
+    final bracketMatches = RegExp(r'\[([^\]\n]{2,120})\]').allMatches(sanitizedText);
     for (final match in bracketMatches.toList().reversed) {
       final inside = match.group(1)?.trim() ?? '';
 
       // Skip markdown links or citations like [foo](http...), [1], [L10-L20]
       final endPos = match.end;
-      if (endPos < text.length && text[endPos] == '(') {
+      if (endPos < sanitizedText.length && sanitizedText[endPos] == '(') {
         continue;
       }
       if (RegExp(r'^(https?://|file://|\d+$|L\d+)').hasMatch(inside)) {
@@ -396,7 +401,19 @@ class ChatBubble extends StatelessWidget {
           ? inside.split(',')
           : (inside.contains('/') ? inside.split('/') : inside.split('|'));
 
-      final cleaned = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+      final cleaned = parts
+          .map((p) => p.trim())
+          .map((p) {
+            var s = p;
+            if ((s.startsWith("'") && s.endsWith("'")) ||
+                (s.startsWith('"') && s.endsWith('"'))) {
+              s = s.substring(1, s.length - 1).trim();
+            }
+            return s;
+          })
+          .where((p) => p.isNotEmpty)
+          .toList();
+
       if (cleaned.length >= 2 && cleaned.length <= 6) {
         final hasKnownChoice = cleaned.any((p) {
           final l = p.toLowerCase();
@@ -411,11 +428,22 @@ class ChatBubble extends StatelessWidget {
               l == 'y' ||
               l == 'n' ||
               l == 'always' ||
+              l == 'always allow' ||
+              l == 'cancel' ||
+              l == 'proceed' ||
+              l == 'continue' ||
               l == 'deny-all';
         });
 
-        final allShort = cleaned.every((p) => p.length <= 30 && !p.contains('{'));
-        if (hasKnownChoice || allShort) {
+        final prefixIdx = match.start;
+        final prefix = prefixIdx > 0 ? sanitizedText.substring(0, prefixIdx).trimRight() : '';
+        final isPromptContext = prefix.endsWith('?') || prefix.endsWith(':');
+
+        final allCleanWords = cleaned.every(
+          (p) => p.length <= 25 && !p.contains('{') && !p.contains(';') && !p.contains('('),
+        );
+
+        if ((hasKnownChoice || isPromptContext) && allCleanWords) {
           return cleaned;
         }
       }
@@ -423,7 +451,6 @@ class ChatBubble extends StatelessWidget {
 
     return const [];
   }
-
   /// Renders interactive action buttons for multiple-choice questions matching Cline/Roo Code style.
   Widget _buildOptionButtons(BuildContext context, List<String> options) {
     return Padding(
