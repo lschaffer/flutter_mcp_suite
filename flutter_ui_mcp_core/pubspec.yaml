@@ -29,6 +29,7 @@ dependencies:
   anthropic_sdk_dart: ^9.0.1
   ollama_dart: ^4.0.0
   flutter_markdown_plus: ^1.0.12
+  markdown: ^7.3.0
   file_picker: ^13.1.0
   googleai_dart: ^13.0.0
   url_launcher: ^6.3.2

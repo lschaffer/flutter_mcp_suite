@@ -4,6 +4,8 @@ import '../utils/html_preview/html_preview.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/markdown_style_sheet.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
@@ -1580,6 +1582,8 @@ class ChatBubble extends StatelessWidget {
         data: content,
         styleSheet: styleSheet,
         syntaxHighlighter: syntaxHighlighter,
+        extensionSet: md.ExtensionSet.gitHubFlavored,
+        onTapLink: (text, href, title) => _handleLinkTap(text, href, title),
       );
     }
 
@@ -1614,12 +1618,39 @@ class ChatBubble extends StatelessWidget {
             data: beforeText,
             styleSheet: styleSheet,
             syntaxHighlighter: syntaxHighlighter,
+            extensionSet: md.ExtensionSet.gitHubFlavored,
+            onTapLink: (text, href, title) => _handleLinkTap(text, href, title),
           ),
         embeddedWidget,
         if (afterText.trim().isNotEmpty)
           _buildMarkdownWithEmbeddedDataUris(context, afterText, theme),
       ],
     );
+  }
+
+  Future<void> _handleLinkTap(String text, String? href, String title) async {
+    var target = (href != null && href.trim().isNotEmpty) ? href.trim() : text.trim();
+    if (target.isEmpty) return;
+
+    if (!target.startsWith('http://') &&
+        !target.startsWith('https://') &&
+        !target.startsWith('mailto:') &&
+        !target.startsWith('file://')) {
+      target = 'https://$target';
+    }
+
+    final uri = Uri.tryParse(target);
+    if (uri != null) {
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+      try {
+        await launchUrl(uri);
+      } catch (_) {}
+    }
   }
 
   Widget _buildEmbeddedImage(

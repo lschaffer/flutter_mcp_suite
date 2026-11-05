@@ -1,5 +1,12 @@
 ## 1.5.6
 
+* **Clickable Markdown & Autolinked URLs**:
+  * Added onTapLink handler with fallback URL schemes to launch links in external browser.
+  * Configured md.ExtensionSet.gitHubFlavored so raw URLs in responses (e.g. https://orf.at/...) are automatically rendered as clickable hyperlinks.
+* **Sanitized Choice Option Chips**:
+  * Stripped code blocks and inline code spans before parsing interactive option buttons in ChatBubble, preventing programming arrays (such as Angular 
+outer.navigate(['/login'])) from rendering as false-positive action buttons.
+
 * **Instant Generation Cancellation & Tool Loop Abortion**:
   * Aborts active tool wait immediately upon user clicking stop (`stopGeneration` / `cancelGeneration`), halting the tool execution loop without delay.
   * Automatically rejects/denies any pending tool approvals on cancellation.
