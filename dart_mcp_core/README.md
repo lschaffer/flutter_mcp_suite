@@ -59,7 +59,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dart_mcp_core: ^1.5.6
+  dart_mcp_core: ^1.5.7
 ```
 
 ### Basic Example (Pure Dart CLI)

@@ -1,3 +1,8 @@
+## 1.5.7
+
+- **Synchronized Suite Upgrades**:
+  - Aligned package version with Flutter MCP Suite ecosystem (`1.5.7`).
+
 ## 1.5.6
 
 - **Asynchronous & Resilient Filesystem Scanning (`FsFindTool`, `FsListDirTool`)**:

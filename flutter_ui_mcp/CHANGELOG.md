@@ -1,3 +1,9 @@
+## 1.5.7
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.7` and `flutter_ui_mcp_core: ^1.5.7`.
+  * Inherited clickable markdown hyperlinks with GFM autolinking, sanitized option chips (eliminating false positives from code arrays), and `loadMessages` session restoration.
+
 ## 1.5.6
 
 * **Synchronized Suite Upgrades**:

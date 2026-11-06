@@ -1,11 +1,17 @@
-## 1.5.6
+## 1.5.7
 
 * **Clickable Markdown & Autolinked URLs**:
-  * Added onTapLink handler with fallback URL schemes to launch links in external browser.
-  * Configured md.ExtensionSet.gitHubFlavored so raw URLs in responses (e.g. https://orf.at/...) are automatically rendered as clickable hyperlinks.
+  * Added `onTapLink` handler with fallback URL schemes (`http`, `https`) to launch links reliably in the external browser via `url_launcher`.
+  * Configured `md.ExtensionSet.gitHubFlavored` with `markdown: ^7.3.0` so raw URLs in responses (e.g. `https://orf.at/...`) are automatically rendered as clickable hyperlinks.
 * **Sanitized Choice Option Chips**:
-  * Stripped code blocks and inline code spans before parsing interactive option buttons in ChatBubble, preventing programming arrays (such as Angular 
-outer.navigate(['/login'])) from rendering as false-positive action buttons.
+  * Stripped code blocks (fenced and indented) and inline code spans before parsing interactive option buttons in `ChatBubble`.
+  * Prevents programming arrays and code constructs (such as Angular `router.navigate(['/login'])`) from rendering as false-positive choice action buttons.
+* **Session History Restoration (`PlaygroundController.loadMessages`)**:
+  * Added `PlaygroundController.loadMessages(List<ChatMessage> messages, {bool clearExisting = true})` to easily restore historical conversation transcripts and persist session state across app restarts or multi-chat views.
+* **Synchronized Suite Upgrades**:
+  * Bumped `dart_mcp_core` dependency to `^1.5.7`.
+
+## 1.5.6
 
 * **Instant Generation Cancellation & Tool Loop Abortion**:
   * Aborts active tool wait immediately upon user clicking stop (`stopGeneration` / `cancelGeneration`), halting the tool execution loop without delay.
