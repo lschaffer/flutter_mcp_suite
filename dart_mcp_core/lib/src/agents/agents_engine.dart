@@ -1628,12 +1628,16 @@ class McpAgentEngine {
               }
             }
 
-            // Execute tool
+                        // Execute tool
             MCPToolResult result;
-            if (localMatch.isNotEmpty) {
-              result = await localMatch.first.execute(toolArgs);
-            } else {
-              result = await mcpManager.callTool(call.name, toolArgs);
+            try {
+              if (localMatch.isNotEmpty) {
+                result = await localMatch.first.execute(toolArgs);
+              } else {
+                result = await mcpManager.callTool(call.name, toolArgs);
+              }
+            } catch (e) {
+              result = MCPToolResult.error('Tool execution error for "${call.name}": $e');
             }
 
             // Agent Hook interceptor (afterToolCall)
