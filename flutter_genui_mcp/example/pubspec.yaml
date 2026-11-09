@@ -20,7 +20,6 @@ dependencies:
     path: shared_tools
   http: ^1.6.0
   fl_chart: ^1.2.0
-  genui: ^0.10.4
   json_schema_builder: ^0.1.7
   image: ^4.8.0
   file_picker: ^13.1.0
@@ -58,6 +57,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  a2ui_core: ^0.5.0
 
 flutter:
   uses-material-design: true

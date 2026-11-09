@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -323,19 +324,21 @@ final modelComparisonSchema = S.object(
   required: ['models'],
 );
 
-final modelComparisonItem = CatalogItem(
+final modelComparisonItem = ComponentImplementation(
   name: 'ModelComparisonMatrix',
-  dataSchema: modelComparisonSchema,
-  widgetBuilder: (itemContext) => _ModelComparisonWidget(itemContext: itemContext),
+  schema: modelComparisonSchema,
+  builder: (context, node, props, buildChild) =>
+      _ModelComparisonWidget(node: node, props: props),
 );
 
 class _ModelComparisonWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _ModelComparisonWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ModelComparisonWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Model Pricing & Context Matrix';
     final subtitle = data['subtitle']?.toString();
     final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -522,19 +525,21 @@ final costChartSchema = S.object(
   required: ['series'],
 );
 
-final costChartItem = CatalogItem(
+final costChartItem = ComponentImplementation(
   name: 'CostProjectionChart',
-  dataSchema: costChartSchema,
-  widgetBuilder: (itemContext) => _CostProjectionChartWidget(itemContext: itemContext),
+  schema: costChartSchema,
+  builder: (context, node, props, buildChild) =>
+      _CostProjectionChartWidget(node: node, props: props),
 );
 
 class _CostProjectionChartWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _CostProjectionChartWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _CostProjectionChartWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Monthly Cost Scaling Projection';
     final subtitle = data['subtitle']?.toString();
     final currency = data['currency']?.toString() ?? '\$';
@@ -707,19 +712,21 @@ final modelRoutingSchema = S.object(
   required: ['strategy_title', 'tiers'],
 );
 
-final modelRoutingItem = CatalogItem(
+final modelRoutingItem = ComponentImplementation(
   name: 'ModelRoutingCard',
-  dataSchema: modelRoutingSchema,
-  widgetBuilder: (itemContext) => _ModelRoutingCardWidget(itemContext: itemContext),
+  schema: modelRoutingSchema,
+  builder: (context, node, props, buildChild) =>
+      _ModelRoutingCardWidget(node: node, props: props),
 );
 
 class _ModelRoutingCardWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _ModelRoutingCardWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ModelRoutingCardWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['strategy_title']?.toString() ?? 'Architecture Routing Recommendation';
     final summary = data['summary']?.toString();
     final spend = data['projected_monthly_spend']?.toString() ?? '';
@@ -845,19 +852,21 @@ final budgetBannerSchema = S.object(
   required: ['budget_limit', 'projected_spend', 'status', 'recommendation'],
 );
 
-final budgetBannerItem = CatalogItem(
+final budgetBannerItem = ComponentImplementation(
   name: 'BudgetThresholdBanner',
-  dataSchema: budgetBannerSchema,
-  widgetBuilder: (itemContext) => _BudgetThresholdBannerWidget(itemContext: itemContext),
+  schema: budgetBannerSchema,
+  builder: (context, node, props, buildChild) =>
+      _BudgetThresholdBannerWidget(node: node, props: props),
 );
 
 class _BudgetThresholdBannerWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _BudgetThresholdBannerWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _BudgetThresholdBannerWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final limit = data['budget_limit']?.toString() ?? '';
     final spend = data['projected_spend']?.toString() ?? '';
     final status = data['status']?.toString() ?? 'within_budget';
@@ -921,8 +930,11 @@ class ModelOptimizerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [
+    final catalog = basicCatalog(openUrl: launchUrl).copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
         modelComparisonItem,
         costChartItem,
         modelRoutingItem,

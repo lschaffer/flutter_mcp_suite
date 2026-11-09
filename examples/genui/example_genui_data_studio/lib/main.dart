@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -146,19 +147,21 @@ final kpiGridSchema = S.object(
   required: ['kpis'],
 );
 
-final kpiGridItem = CatalogItem(
+final kpiGridItem = ComponentImplementation(
   name: 'MetricKpiGrid',
-  dataSchema: kpiGridSchema,
-  widgetBuilder: (itemContext) => _MetricKpiGridWidget(itemContext: itemContext),
+  schema: kpiGridSchema,
+  builder: (context, node, props, buildChild) =>
+      _MetricKpiGridWidget(node: node, props: props),
 );
 
 class _MetricKpiGridWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _MetricKpiGridWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _MetricKpiGridWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final list = (data['kpis'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
 
@@ -232,19 +235,21 @@ final dataTableSchema = S.object(
   required: ['columns', 'rows'],
 );
 
-final dataTableItem = CatalogItem(
+final dataTableItem = ComponentImplementation(
   name: 'InteractiveDataTable',
-  dataSchema: dataTableSchema,
-  widgetBuilder: (itemContext) => _InteractiveDataTableWidget(itemContext: itemContext),
+  schema: dataTableSchema,
+  builder: (context, node, props, buildChild) =>
+      _InteractiveDataTableWidget(node: node, props: props),
 );
 
 class _InteractiveDataTableWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _InteractiveDataTableWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _InteractiveDataTableWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Dataset Table';
     final columns = (data['columns'] as List?)?.cast<String>() ?? [];
     final rows = (data['rows'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -301,19 +306,21 @@ final trendChartSchema = S.object(
   required: ['points'],
 );
 
-final trendChartItem = CatalogItem(
+final trendChartItem = ComponentImplementation(
   name: 'TrendChart',
-  dataSchema: trendChartSchema,
-  widgetBuilder: (itemContext) => _TrendChartWidget(itemContext: itemContext),
+  schema: trendChartSchema,
+  builder: (context, node, props, buildChild) =>
+      _TrendChartWidget(node: node, props: props),
 );
 
 class _TrendChartWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _TrendChartWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _TrendChartWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Trend Analysis';
     final points = (data['points'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
@@ -399,8 +406,15 @@ class DataStudioScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [kpiGridItem, dataTableItem, trendChartItem],
+    final catalog = basicCatalog(openUrl: launchUrl).copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
+        kpiGridItem,
+        dataTableItem,
+        trendChartItem,
+      ],
     );
 
     // Load initial LLM configuration if configured in .env

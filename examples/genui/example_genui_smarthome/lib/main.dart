@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -163,15 +164,17 @@ final thermostatSchema = S.object(
   required: ['room', 'current_temp', 'target_temp'],
 );
 
-final thermostatItem = CatalogItem(
+final thermostatItem = ComponentImplementation(
   name: 'ThermostatCard',
-  dataSchema: thermostatSchema,
-  widgetBuilder: (itemContext) => _ThermostatCardWidget(itemContext: itemContext),
+  schema: thermostatSchema,
+  builder: (context, node, props, buildChild) =>
+      _ThermostatCardWidget(node: node, props: props),
 );
 
 class _ThermostatCardWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _ThermostatCardWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ThermostatCardWidget({required this.node, required this.props});
 
   @override
   State<_ThermostatCardWidget> createState() => _ThermostatCardWidgetState();
@@ -183,13 +186,13 @@ class _ThermostatCardWidgetState extends State<_ThermostatCardWidget> {
   @override
   void initState() {
     super.initState();
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = widget.props;
     _targetTemp = (data['target_temp'] as num?)?.toDouble() ?? 22.0;
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = widget.props;
     final room = data['room']?.toString() ?? 'Room';
     final current = (data['current_temp'] as num?)?.toDouble() ?? 21.0;
     final mode = data['mode']?.toString() ?? 'Auto';
@@ -298,15 +301,17 @@ final deviceGridSchema = S.object(
   required: ['devices'],
 );
 
-final deviceGridItem = CatalogItem(
+final deviceGridItem = ComponentImplementation(
   name: 'DeviceGrid',
-  dataSchema: deviceGridSchema,
-  widgetBuilder: (itemContext) => _DeviceGridWidget(itemContext: itemContext),
+  schema: deviceGridSchema,
+  builder: (context, node, props, buildChild) =>
+      _DeviceGridWidget(node: node, props: props),
 );
 
 class _DeviceGridWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _DeviceGridWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _DeviceGridWidget({required this.node, required this.props});
 
   @override
   State<_DeviceGridWidget> createState() => _DeviceGridWidgetState();
@@ -317,7 +322,7 @@ class _DeviceGridWidgetState extends State<_DeviceGridWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = widget.props;
     final list = (data['devices'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
 
@@ -402,19 +407,21 @@ final energyChartSchema = S.object(
   required: ['breakdown'],
 );
 
-final energyChartItem = CatalogItem(
+final energyChartItem = ComponentImplementation(
   name: 'EnergyChart',
-  dataSchema: energyChartSchema,
-  widgetBuilder: (itemContext) => _EnergyChartWidget(itemContext: itemContext),
+  schema: energyChartSchema,
+  builder: (context, node, props, buildChild) =>
+      _EnergyChartWidget(node: node, props: props),
 );
 
 class _EnergyChartWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _EnergyChartWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _EnergyChartWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final list = (data['breakdown'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final total = (data['total_kwh'] as num?)?.toDouble() ?? 0.0;
     final theme = Theme.of(context);
@@ -506,8 +513,15 @@ class SmartHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [thermostatItem, deviceGridItem, energyChartItem],
+    final catalog = basicCatalog(openUrl: launchUrl).copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
+        thermostatItem,
+        deviceGridItem,
+        energyChartItem,
+      ],
     );
 
     // Load initial LLM configuration if configured in .env

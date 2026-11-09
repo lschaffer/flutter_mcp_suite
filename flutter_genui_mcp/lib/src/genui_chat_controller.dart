@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:a2ui_agent/a2ui_agent.dart' as a2ui_agent;
 import 'package:a2ui_core/a2ui_core.dart' as a2ui_core;
-import 'package:genui/genui.dart';
+import 'package:a2ui_flutter/a2ui_flutter.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart' as mp;
 import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
 
@@ -51,26 +52,27 @@ class GenuiChatEntry {
 }
 
 /// A [ChangeNotifier] that bridges [`mcp_playground_dart`](https://pub.dev/packages/mcp_playground_dart)'s
-/// [mp.LLMService] to a GenUI conversation pipeline.
+/// [mp.LLMService] to an A2UI conversation pipeline.
 ///
-/// It wires together a GenUI [SurfaceController], an [A2uiTransportAdapter] and
-/// a [Conversation]. The transport's `onSend` callback routes each outgoing
-/// message through [mp.LLMService.generateStream], streams the raw text chunks
-/// back into GenUI (which parses embedded A2UI JSON), and executes any local
-/// [mp.McpLocalTool] calls requested by the model in an agent loop.
+/// It prompts the model for the catalog with `package:a2ui_agent`, routes each
+/// outgoing message through [mp.LLMService.generateStream], reads the A2UI JSON
+/// in the streamed reply, renders it with an A2UI
+/// [a2ui_core.MessageProcessor], and executes any local [mp.McpLocalTool]
+/// calls requested by the model in an agent loop. Actions on the rendered
+/// surfaces are sent back to the model.
 class McpGenuiChatController extends ChangeNotifier {
   /// Creates a [McpGenuiChatController].
   ///
   /// Either [catalog] or [catalogJson] / [catalogItems] may be used to define
   /// the widgets the model is allowed to generate. When none are provided a
-  /// default catalog with standard GenUI widgets is created.
+  /// default catalog with the A2UI v0.9 basic widgets is created.
   McpGenuiChatController({
     required this._llmConfig,
     List<mp.McpLocalTool> tools = const [],
-    Catalog? catalog,
+    CatalogImplementation? catalog,
     List<GenuiCatalogItemDefinition>? catalogItems,
     String? catalogJson,
-    List<ClientFunction>? clientFunctions,
+    List<a2ui_core.FunctionImplementation>? clientFunctions,
     this._systemPrompt,
     this.maxToolIterations = 10,
     this._playgroundController,
@@ -78,22 +80,30 @@ class McpGenuiChatController extends ChangeNotifier {
        _catalog =
            catalog != null
                ? (clientFunctions != null
-                   ? catalog.copyWith(newFunctions: clientFunctions)
+                   ? catalog.derive(
+                       catalogId: catalog.id,
+                       addFunctions: clientFunctions,
+                       instructions: catalog.instructions,
+                     )
                    : catalog)
                : buildGenuiCatalog(
                  catalogJson: catalogJson,
                  catalogItems: catalogItems,
                  clientFunctions: clientFunctions,
                ) {
-    _transport = A2uiTransportAdapter(onSend: _handleSend);
-    _surfaceController = SurfaceController(catalogs: [_catalog]);
-    _conversation = Conversation(
-      controller: _surfaceController,
-      transport: _transport,
+    _processor = a2ui_core.MessageProcessor<ComponentImplementation>(
+      catalogs: [_catalog],
+      // A surface streams in over several messages, which the strict checks
+      // would reject.
+      validationConfig: a2ui_core.ValidationConfig.relaxed,
+      // Report a rejected message on processor.model.onError instead of
+      // throwing, and apply the other messages of a batch.
+      reportErrorsOnly: true,
     );
-    _surfaceSubscription = _surfaceController.surfaceUpdates.listen((_) {
-      _syncSurfaces();
-    });
+    _subscriptions = [
+      _processor.model.onSurfaceCreated.subscribe((_) => _syncSurfaces()),
+      _processor.model.onAction.subscribe(_handleAction),
+    ];
   }
 
   final PlaygroundController? _playgroundController;
@@ -119,13 +129,28 @@ class McpGenuiChatController extends ChangeNotifier {
 
   final List<mp.McpLocalTool> _tools;
   final String? _systemPrompt;
-  final Catalog _catalog;
+  final CatalogImplementation _catalog;
   final int maxToolIterations;
 
-  late final A2uiTransportAdapter _transport;
-  late final SurfaceController _surfaceController;
-  late final Conversation _conversation;
-  StreamSubscription? _surfaceSubscription;
+  late final a2ui_core.MessageProcessor<ComponentImplementation> _processor;
+  late final List<a2ui_core.Subscription> _subscriptions;
+
+  // Prompts the model for the catalog and reads the A2UI JSON in its replies.
+  late final a2ui_agent.A2uiRequestProcessor _agent =
+      a2ui_agent.A2uiGenerator(
+        catalogs: [a2ui_agent.CatalogConfig(_catalog)],
+        inferenceFormatFactory: const a2ui_agent.DirectJsonFormatFactory(
+          // The model creates surfaces and fills them, as genui's chat prompt
+          // allowed.
+          allowedMessages: ['createSurface', 'updateComponents'],
+          // Render whole components, as genui did.
+          bufferIncompleteComponents: true,
+        ),
+      ).createProcessor(
+        a2ui_core.A2uiRendererCapabilities.forCatalogIds([
+          _catalog.id,
+        ], version: a2ui_core.A2uiProtocolVersion.v0_9),
+      );
 
   final List<GenuiChatEntry> _entries = [];
   final List<mp.ChatMessage> _history = [];
@@ -137,7 +162,7 @@ class McpGenuiChatController extends ChangeNotifier {
 
   void _syncSurfaces() {
     var added = false;
-    for (final sId in _surfaceController.activeSurfaceIds) {
+    for (final sId in activeSurfaceIds) {
       if (_knownSurfaces.add(sId)) {
         _entries.add(
           GenuiChatEntry(
@@ -188,11 +213,10 @@ class McpGenuiChatController extends ChangeNotifier {
             if (decoded.containsKey('createSurface')) {
               final cs = decoded['createSurface'];
               if (cs is Map<String, dynamic> && !cs.containsKey('catalogId')) {
-                cs['catalogId'] = _catalog.catalogId;
+                cs['catalogId'] = _catalog.id;
               }
             }
-            final msg = a2ui_core.A2uiMessage.fromJson(decoded);
-            _surfaceController.handleMessage(msg);
+            _processor.processMessages(decoded);
           } else if (decoded.containsKey('component')) {
             _applyDirectComponent(decoded);
           }
@@ -220,42 +244,36 @@ class McpGenuiChatController extends ChangeNotifier {
     compProps.remove('component');
 
     try {
-      _surfaceController.handleMessage(
-        a2ui_core.A2uiMessage.fromJson({
-          'version': 'v0.9',
-          'createSurface': {
-            'surfaceId': surfaceId,
-            'catalogId': _catalog.catalogId,
-          },
-        }),
-      );
+      _processor.processMessages({
+        'version': 'v0.9',
+        'createSurface': {
+          'surfaceId': surfaceId,
+          'catalogId': _catalog.id,
+        },
+      });
 
-      _surfaceController.handleMessage(
-        a2ui_core.A2uiMessage.fromJson({
-          'version': 'v0.9',
-          'updateComponents': {
-            'surfaceId': surfaceId,
-            'components': [
-              {
-                'id': compId,
-                'component': compName,
-                ...compProps,
-              },
-            ],
-          },
-        }),
-      );
+      _processor.processMessages({
+        'version': 'v0.9',
+        'updateComponents': {
+          'surfaceId': surfaceId,
+          'components': [
+            {
+              'id': compId,
+              'component': compName,
+              ...compProps,
+            },
+          ],
+        },
+      });
     } catch (_) {}
   }
 
-  /// The GenUI [SurfaceController] backing this chat.
-  SurfaceController get surfaceController => _surfaceController;
+  /// The A2UI [a2ui_core.MessageProcessor] that renders the model's surfaces.
+  a2ui_core.MessageProcessor<ComponentImplementation> get processor =>
+      _processor;
 
-  /// The GenUI [Conversation] facade.
-  Conversation get conversation => _conversation;
-
-  /// The [Catalog] in use.
-  Catalog get catalog => _catalog;
+  /// The [CatalogImplementation] in use.
+  CatalogImplementation get catalog => _catalog;
 
   bool _cancelled = false;
 
@@ -274,12 +292,16 @@ class McpGenuiChatController extends ChangeNotifier {
   /// The chat transcript entries (user + assistant text).
   List<GenuiChatEntry> get entries => List.unmodifiable(_entries);
 
-  /// The IDs of the currently active GenUI surfaces.
-  Iterable<String> get activeSurfaceIds => _surfaceController.activeSurfaceIds;
+  /// The IDs of the currently active GenUI surfaces, in the order they were
+  /// created.
+  Iterable<String> get activeSurfaceIds =>
+      _processor.model.allSurfaces.map((surface) => surface.id);
 
-  /// Returns the [SurfaceContext] for [surfaceId].
-  SurfaceContext contextFor(String surfaceId) =>
-      _surfaceController.contextFor(surfaceId);
+  /// Returns the surface with [surfaceId], to render with an [A2uiSurface], or
+  /// null if there is none.
+  a2ui_core.SurfaceModel<ComponentImplementation>? contextFor(
+    String surfaceId,
+  ) => _processor.model.getSurface(surfaceId);
 
   /// Sends a user message into the conversation.
   void sendMessage(String text, {List<mp.MessageAttachment>? attachments}) {
@@ -309,10 +331,19 @@ class McpGenuiChatController extends ChangeNotifier {
     );
     notifyListeners();
 
-    _conversation.sendRequest(ChatMessage.user(entryText));
+    unawaited(_handleSend((text: entryText, action: null)));
   }
 
-  Future<void> _handleSend(ChatMessage message) async {
+  /// Sends an action on a surface to the model.
+  void _handleAction(a2ui_core.A2uiRendererAction action) {
+    final context =
+        jsonDecode(jsonEncode(action.context)) as Map<String, dynamic>;
+    unawaited(
+      _handleSend((text: '', action: (name: action.name, context: context))),
+    );
+  }
+
+  Future<void> _handleSend(_Turn message) async {
     if (_isGenerating) return;
     _isGenerating = true;
     _cancelled = false;
@@ -390,7 +421,7 @@ class McpGenuiChatController extends ChangeNotifier {
     );
     _playgroundController?.addMessage(userMsg);
 
-    final actionInfo = _extractUserAction(message);
+    final actionInfo = message.action;
     if (actionInfo != null) {
       mp.McpLocalTool? directTool;
       for (final t in _tools) {
@@ -441,7 +472,7 @@ class McpGenuiChatController extends ChangeNotifier {
         mp.LLMResponse? finalResponse;
         final mcpTools = <mp.MCPTool>[
           ..._tools.map((t) => t.toMCPTool()),
-          for (final func in _catalog.functions)
+          for (final func in _catalog.functions.values)
             mp.MCPTool(
               name: func.name,
               description: func.description,
@@ -452,6 +483,12 @@ class McpGenuiChatController extends ChangeNotifier {
         ];
         final iterationBuffer = StringBuffer();
         final iterationEntryId = _newId();
+        final reply = _ReplyReader(
+          _agent.openContinuingStream(),
+          (message) => _processor.processMessages(
+            a2ui_core.AgentToRendererMessagePayload.of(message),
+          ),
+        );
 
         await for (final chunk in mp.LLMService.generateStream(
           config: llmConfig,
@@ -462,11 +499,9 @@ class McpGenuiChatController extends ChangeNotifier {
           if (_cancelled) break;
           if (chunk.textDelta.isNotEmpty) {
             iterationBuffer.write(chunk.textDelta);
-            _transport.addChunk(chunk.textDelta);
+            reply.feed(chunk.textDelta);
             _syncSurfaces();
-            final cleanText = _sanitizeAssistantText(
-              iterationBuffer.toString(),
-            );
+            final cleanText = _sanitizeAssistantText(reply.text);
             if (cleanText.isNotEmpty) {
               _upsertEntry(
                 iterationEntryId,
@@ -485,8 +520,10 @@ class McpGenuiChatController extends ChangeNotifier {
 
         if (_cancelled) break;
 
+        reply.close();
         final rawIterationText = iterationBuffer.toString();
-        _parseAndApplyA2uiBlocks(rawIterationText);
+        // A2UI JSON the model wrote outside the A2UI blocks.
+        _parseAndApplyA2uiBlocks(reply.text);
         _syncSurfaces();
         if (rawIterationText.isNotEmpty) {
           final assistantMsg = mp.ChatMessage(
@@ -499,7 +536,7 @@ class McpGenuiChatController extends ChangeNotifier {
           _playgroundController?.addMessage(assistantMsg);
         }
 
-        final cleanText = _sanitizeAssistantText(rawIterationText);
+        final cleanText = _sanitizeAssistantText(reply.text);
         if (cleanText.isNotEmpty) {
           _upsertEntry(
             iterationEntryId,
@@ -574,29 +611,21 @@ class McpGenuiChatController extends ChangeNotifier {
       }
     }
 
-    for (final func in _catalog.functions) {
+    for (final func in _catalog.functions.values) {
       final matchesName = func.name == call.name ||
           func.name.toLowerCase() ==
               call.name.toLowerCase().replaceAll('_', '');
       if (matchesName) {
         try {
-          final dataModel = _surfaceController.activeSurfaceIds.isNotEmpty
-              ? _surfaceController
-                  .contextFor(_surfaceController.activeSurfaceIds.first)
-                  .dataModel
-              : InMemoryDataModel();
-          final context = DataContext(
-            dataModel,
-            DataPath('/'),
-            functions: _catalog.functions,
-          );
+          final surfaces = _processor.model.allSurfaces;
+          final dataModel = surfaces.isNotEmpty
+              ? surfaces.first.dataModel
+              : a2ui_core.DataModel();
+          final context = a2ui_core.DataContext(dataModel, _catalog.invoke, '/');
 
-          final Object? result;
-          if (func is SynchronousClientFunction) {
-            result = func.executeSync(call.arguments, context);
-          } else {
-            result = await func.execute(call.arguments, context).first;
-          }
+          var result = func.execute(call.arguments, context);
+          if (result is Future) result = await result;
+          if (result is a2ui_core.ReadonlySignal) result = result.value;
 
           return mp.MCPToolResult(
             content: [
@@ -653,15 +682,12 @@ class McpGenuiChatController extends ChangeNotifier {
         if (normalizedOp == 'createSurface') {
           final body = a2uiPayload['createSurface'] as Map<String, dynamic>?;
           if (body != null && !body.containsKey('catalogId')) {
-            body['catalogId'] = _catalog.catalogId;
+            body['catalogId'] = _catalog.id;
           }
         }
         try {
-          final msg = a2ui_core.A2uiMessage.fromJson(a2uiPayload);
-          _surfaceController.handleMessage(msg);
+          _processor.processMessages(a2uiPayload);
         } catch (_) {}
-        final a2uiJson = jsonEncode(a2uiPayload);
-        _transport.addChunk('\n$a2uiJson\n');
         _syncSurfaces();
         return mp.MCPToolResult(
           content: [
@@ -702,7 +728,7 @@ class McpGenuiChatController extends ChangeNotifier {
 
     final extra = _systemPrompt;
     final buffer = StringBuffer(
-      PromptBuilder.chat(catalog: _catalog).systemPromptJoined(),
+      [..._chatInstructions(_catalog.id), _agent.promptSnippet].join('\n\n'),
     );
     if (extra != null && extra.trim().isNotEmpty) {
       buffer.writeln('\n\n### Additional instructions');
@@ -715,7 +741,7 @@ class McpGenuiChatController extends ChangeNotifier {
     }
     final allTools = <mp.MCPTool>[
       ..._tools.map((t) => t.toMCPTool()),
-      for (final func in _catalog.functions)
+      for (final func in _catalog.functions.values)
         mp.MCPTool(
           name: func.name,
           description: func.description,
@@ -759,53 +785,14 @@ class McpGenuiChatController extends ChangeNotifier {
     return cleaned.trim();
   }
 
-  /// Extracts user action name and context parameters from a GenUI [ChatMessage].
-  ({String name, Map<String, dynamic> context})? _extractUserAction(
-    ChatMessage message,
-  ) {
-    for (final part in message.parts) {
-      if (part is DataPart &&
-          part.mimeType == UiPartConstants.interactionMimeType) {
-        try {
-          final outer =
-              jsonDecode(utf8.decode(part.bytes)) as Map<String, Object?>;
-          final interactionStr = outer['interaction'] is String
-              ? outer['interaction'] as String
-              : null;
-          final decoded = interactionStr != null
-              ? jsonDecode(interactionStr) as Map<String, Object?>
-              : outer;
-          final action = decoded['action'] is Map<String, Object?>
-              ? decoded['action'] as Map<String, Object?>
-              : decoded;
-          final name =
-              action['name']?.toString() ?? decoded['name']?.toString();
-          final rawContext = action['context'] is Map<String, Object?>
-              ? action['context'] as Map<String, Object?>
-              : (decoded['context'] is Map<String, Object?>
-                    ? decoded['context'] as Map<String, Object?>
-                    : null);
-          if (name != null && name.isNotEmpty) {
-            final Map<String, dynamic> cleanContext = {};
-            if (rawContext != null) {
-              rawContext.forEach((k, v) => cleanContext[k] = v);
-            }
-            return (name: name, context: cleanContext);
-          }
-        } catch (_) {}
-      }
-    }
-    return null;
-  }
-
-  /// Converts an incoming GenUI [ChatMessage] into a prompt string for the LLM.
-  String _messageToPrompt(ChatMessage message) {
+  /// Converts an outgoing [_Turn] into a prompt string for the LLM.
+  String _messageToPrompt(_Turn message) {
     final buffer = StringBuffer();
     if (message.text.trim().isNotEmpty) {
       buffer.writeln(message.text);
     }
 
-    final action = _extractUserAction(message);
+    final action = message.action;
     if (action != null) {
       final context = action.context;
       final explicitMsg = context['message']?.toString() ??
@@ -836,11 +823,11 @@ class McpGenuiChatController extends ChangeNotifier {
   }
 
   /// Extracts structured summary for displaying form/action parameters in the user chat bubble.
-  String _messageToDisplayJson(ChatMessage message) {
+  String _messageToDisplayJson(_Turn message) {
     if (message.text.trim().isNotEmpty) {
       return message.text.trim();
     }
-    final action = _extractUserAction(message);
+    final action = message.action;
     if (action != null) {
       final context = action.context;
       final userSummary = context['userSummary']?.toString() ??
@@ -895,10 +882,77 @@ class McpGenuiChatController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _surfaceSubscription?.cancel();
-    _conversation.dispose();
-    _transport.dispose();
-    _surfaceController.dispose();
+    for (final subscription in _subscriptions) {
+      subscription.unsubscribe();
+    }
+    _processor.dispose();
     super.dispose();
+  }
+}
+
+/// A user turn the controller sends to the model: the text the user wrote, or
+/// an action on a surface with its resolved context.
+typedef _Turn = ({
+  String text,
+  ({String name, Map<String, dynamic> context})? action,
+});
+
+/// What genui's `PromptBuilder.chat` told the model besides the A2UI format,
+/// which `package:a2ui_agent`'s prompt snippet now describes.
+List<String> _chatInstructions(String catalogId) => [
+  'The active catalog ID is: "$catalogId". '
+      'You must use this catalog ID when creating surfaces.',
+  'IMPORTANT: DO NOT update or modify surfaces created in previous turns. '
+      'If the UI needs to change, you MUST create a NEW surface with a new '
+      'unique `surfaceId`. You may only use `updateComponents` to populate '
+      'the components of a freshly created surface.',
+];
+
+/// Reads one streamed reply of the model: renders the A2UI messages in its
+/// A2UI blocks as they arrive, and keeps the text outside them.
+class _ReplyReader {
+  _ReplyReader(this._stream, this._render);
+
+  final a2ui_agent.ContinuingResponseStream _stream;
+  final void Function(a2ui_core.AgentToRendererMessage message) _render;
+  final StringBuffer _text = StringBuffer();
+  bool _ended = false;
+  bool _afterBlock = false;
+
+  /// The text of the reply so far, outside its A2UI blocks. The text on the
+  /// two sides of a block is separated by a blank line.
+  String get text => _text.toString();
+
+  /// Reads the next [chunk] of the reply.
+  void feed(String chunk) => _read(() => _stream.feed(chunk));
+
+  /// Reads what the reply held back after its last chunk.
+  void close() => _read(_stream.close);
+
+  void _read(List<a2ui_agent.StreamPart> Function() read) {
+    if (_ended) return;
+    List<a2ui_agent.StreamPart> parts;
+    try {
+      parts = read();
+    } on a2ui_core.A2uiError catch (error) {
+      // The rest of the reply cannot be read; keep what came before the error.
+      _ended = true;
+      parts = error.partialResults;
+    }
+    for (final part in parts) {
+      switch (part) {
+        case a2ui_agent.TextPart(:final text):
+          if (_afterBlock && _text.isNotEmpty) _text.write('\n\n');
+          _afterBlock = false;
+          _text.write(text);
+        case a2ui_agent.A2uiPart(:final a2ui):
+          _afterBlock = true;
+          a2ui.forEach(_render);
+        case a2ui_agent.ErrorPart():
+          // A block that cannot be read or that the catalog rejects. It is
+          // dropped, as genui dropped such blocks.
+          _afterBlock = true;
+      }
+    }
   }
 }

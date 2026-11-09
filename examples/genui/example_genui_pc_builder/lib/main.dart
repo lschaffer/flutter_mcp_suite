@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
-import 'package:genui/genui.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -462,10 +463,11 @@ final pcBuildFormSchema = S.object(
   },
 );
 
-final pcBuildFormItem = CatalogItem(
+final pcBuildFormItem = ComponentImplementation(
   name: 'PcBuildForm',
-  dataSchema: pcBuildFormSchema,
-  widgetBuilder: (ctx) => _PcBuildFormWidget(itemContext: ctx),
+  schema: pcBuildFormSchema,
+  builder: (context, node, props, buildChild) =>
+      _PcBuildFormWidget(node: node, props: props),
 );
 
 final productCatalogGridSchema = S.object(
@@ -495,10 +497,11 @@ final productCatalogGridSchema = S.object(
   required: ['items'],
 );
 
-final productCatalogGridItem = CatalogItem(
+final productCatalogGridItem = ComponentImplementation(
   name: 'ProductCatalogGrid',
-  dataSchema: productCatalogGridSchema,
-  widgetBuilder: (ctx) => _ProductCatalogGridWidget(itemContext: ctx),
+  schema: productCatalogGridSchema,
+  builder: (context, node, props, buildChild) =>
+      _ProductCatalogGridWidget(node: node, props: props),
 );
 
 final pcOrderSummarySchema = S.object(
@@ -527,10 +530,11 @@ final pcOrderSummarySchema = S.object(
   required: ['items'],
 );
 
-final pcOrderSummaryItem = CatalogItem(
+final pcOrderSummaryItem = ComponentImplementation(
   name: 'PcOrderSummaryCard',
-  dataSchema: pcOrderSummarySchema,
-  widgetBuilder: (ctx) => _PcOrderSummaryWidget(itemContext: ctx),
+  schema: pcOrderSummarySchema,
+  builder: (context, node, props, buildChild) =>
+      _PcOrderSummaryWidget(node: node, props: props),
 );
 
 final orderReceiptSchema = S.object(
@@ -547,16 +551,20 @@ final orderReceiptSchema = S.object(
   required: ['orderId', 'total'],
 );
 
-final orderReceiptItem = CatalogItem(
+final orderReceiptItem = ComponentImplementation(
   name: 'OrderReceiptCard',
-  dataSchema: orderReceiptSchema,
-  widgetBuilder: (ctx) => _OrderReceiptWidget(itemContext: ctx),
+  schema: orderReceiptSchema,
+  builder: (context, node, props, buildChild) =>
+      _OrderReceiptWidget(node: node, props: props),
 );
 
-Catalog buildPcBuilderGenuiCatalog() {
-  final base = BasicCatalogItems.asNoAssetCatalog();
+CatalogImplementation buildPcBuilderGenuiCatalog() {
+  final base = basicCatalog(openUrl: launchUrl);
   return base.copyWith(
-    newItems: [
+    components: [
+      ...BasicComponents.all.where(
+        (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+      ),
       pcBuildFormItem,
       productCatalogGridItem,
       pcOrderSummaryItem,
@@ -570,8 +578,9 @@ Catalog buildPcBuilderGenuiCatalog() {
 // ═══════════════════════════════════════════════════════════════
 
 class _PcBuildFormWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _PcBuildFormWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _PcBuildFormWidget({required this.node, required this.props});
 
   @override
   State<_PcBuildFormWidget> createState() => _PcBuildFormWidgetState();
@@ -593,9 +602,7 @@ class _PcBuildFormWidgetState extends State<_PcBuildFormWidget> {
   @override
   void initState() {
     super.initState();
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     if (data['defaultBudget'] is num) {
       _budget = (data['defaultBudget'] as num).toDouble();
     }
@@ -604,11 +611,10 @@ class _PcBuildFormWidgetState extends State<_PcBuildFormWidget> {
   void _submit() {
     setState(() => _isSubmitting = true);
 
-    widget.itemContext.dispatchEvent(
-      UserActionEvent(
-        name: 'start_pc_build',
-        sourceComponentId: widget.itemContext.id,
-        context: <String, Object?>{
+    unawaited(widget.node.context?.dispatchAction({
+      'event': {
+        'name': 'start_pc_build',
+        'context': <String, Object?>{
           'useCase': _useCase,
           'targetBudget': _budget.toInt(),
           'platform': _platform,
@@ -617,15 +623,13 @@ class _PcBuildFormWidgetState extends State<_PcBuildFormWidget> {
           'userSummary':
               'Build Request: $_useCase | Budget: \$${_budget.toInt()} | Platform: $_platform',
         },
-      ),
-    );
+      },
+    }));
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     final theme = Theme.of(context);
     final title = data['title']?.toString() ?? 'Custom PC Rig Builder';
     final subtitle =
@@ -799,14 +803,13 @@ class _PcBuildFormWidgetState extends State<_PcBuildFormWidget> {
 }
 
 class _ProductCatalogGridWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _ProductCatalogGridWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ProductCatalogGridWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(
-      (itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(props);
     final theme = Theme.of(context);
     final title = data['title']?.toString() ?? 'Store Products';
     final category = data['category']?.toString();
@@ -861,11 +864,10 @@ class _ProductCatalogGridWidget extends StatelessWidget {
                 return _HardwareProductCard(
                   item: item,
                   onSelect: () {
-                    itemContext.dispatchEvent(
-                      UserActionEvent(
-                        name: 'select_hardware_item',
-                        sourceComponentId: itemContext.id,
-                        context: <String, Object?>{
+                    unawaited(node.context?.dispatchAction({
+                      'event': {
+                        'name': 'select_hardware_item',
+                        'context': <String, Object?>{
                           'action': 'add_to_build',
                           'itemId': item.id,
                           'name': item.name,
@@ -876,8 +878,8 @@ class _ProductCatalogGridWidget extends StatelessWidget {
                           'userSummary':
                               'Selected: ${item.name} (\$${item.price.toStringAsFixed(2)})',
                         },
-                      ),
-                    );
+                      },
+                    }));
                   },
                 );
               },
@@ -1024,8 +1026,9 @@ class _HardwareProductCard extends StatelessWidget {
 }
 
 class _PcOrderSummaryWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _PcOrderSummaryWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _PcOrderSummaryWidget({required this.node, required this.props});
 
   @override
   State<_PcOrderSummaryWidget> createState() => _PcOrderSummaryWidgetState();
@@ -1040,9 +1043,7 @@ class _PcOrderSummaryWidgetState extends State<_PcOrderSummaryWidget> {
   @override
   void initState() {
     super.initState();
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     _nameCtrl = TextEditingController(
       text: data['customerName']?.toString() ?? '',
     );
@@ -1087,11 +1088,10 @@ class _PcOrderSummaryWidgetState extends State<_PcOrderSummaryWidget> {
       if (mounted) setState(() => _isSubmitting = false);
     });
 
-    widget.itemContext.dispatchEvent(
-      UserActionEvent(
-        name: 'submit_final_order',
-        sourceComponentId: widget.itemContext.id,
-        context: <String, Object?>{
+    unawaited(widget.node.context?.dispatchAction({
+      'event': {
+        'name': 'submit_final_order',
+        'context': <String, Object?>{
           'customerName': name,
           'email': email,
           'shippingAddress': address,
@@ -1108,15 +1108,13 @@ class _PcOrderSummaryWidgetState extends State<_PcOrderSummaryWidget> {
           'userSummary':
               'Placed Order: ${itemIds.length} parts | Total: \$${total.toStringAsFixed(2)} | Recipient: $name',
         },
-      ),
-    );
+      },
+    }));
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     final theme = Theme.of(context);
     final title = data['title']?.toString() ?? 'PC Build Order Summary';
     final rawItems = (data['items'] as List?) ?? [];
@@ -1391,14 +1389,13 @@ class _PriceRow extends StatelessWidget {
 }
 
 class _OrderReceiptWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _OrderReceiptWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _OrderReceiptWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(
-      (itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(props);
     final theme = Theme.of(context);
     final orderId = data['orderId']?.toString() ?? 'ORD-PC-SUCCESS';
     final customer = data['customerName']?.toString() ?? 'Valued Customer';
