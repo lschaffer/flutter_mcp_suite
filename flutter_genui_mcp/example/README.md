@@ -1,6 +1,6 @@
 # GenUI Unified Showcase Gallery & Travel Planner
 
-The primary showcase application for **`flutter_genui_mcp`**, demonstrating dynamic generative UI powered by the `genui` (`A2UI`) protocol, local Dart MCP tools, and web search integration.
+The primary showcase application for **`flutter_genui_mcp`**, demonstrating dynamic generative UI powered by the A2UI protocol (rendered with `a2ui_flutter`), local Dart MCP tools, and web search integration.
 
 ---
 

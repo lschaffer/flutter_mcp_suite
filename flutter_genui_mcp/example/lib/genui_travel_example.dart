@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/rendering.dart';
-import 'package:genui/genui.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -557,10 +557,11 @@ final travelSearchFormSchema = S.object(
   },
 );
 
-final travelSearchFormItem = CatalogItem(
+final travelSearchFormItem = ComponentImplementation(
   name: 'TravelSearchForm',
-  dataSchema: travelSearchFormSchema,
-  widgetBuilder: (ctx) => _TravelSearchFormWidget(itemContext: ctx),
+  schema: travelSearchFormSchema,
+  builder: (context, node, props, buildChild) =>
+      _TravelSearchFormWidget(node: node, props: props),
 );
 
 final accommodationGridSchema = S.object(
@@ -590,10 +591,11 @@ final accommodationGridSchema = S.object(
   required: ['items'],
 );
 
-final accommodationGridItem = CatalogItem(
+final accommodationGridItem = ComponentImplementation(
   name: 'AccommodationGrid',
-  dataSchema: accommodationGridSchema,
-  widgetBuilder: (ctx) => _AccommodationGridWidget(itemContext: ctx),
+  schema: accommodationGridSchema,
+  builder: (context, node, props, buildChild) =>
+      _AccommodationGridWidget(node: node, props: props),
 );
 
 final travelItineraryCardSchema = S.object(
@@ -624,17 +626,19 @@ final travelItineraryCardSchema = S.object(
   required: ['days'],
 );
 
-final travelItineraryCardItem = CatalogItem(
+final travelItineraryCardItem = ComponentImplementation(
   name: 'TravelItineraryCard',
-  dataSchema: travelItineraryCardSchema,
-  widgetBuilder: (ctx) => _TravelItineraryCardWidget(itemContext: ctx),
+  schema: travelItineraryCardSchema,
+  builder: (context, node, props, buildChild) =>
+      _TravelItineraryCardWidget(node: node, props: props),
 );
 
 /// Interactive Travel Planning Form Widget
 class _TravelSearchFormWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
 
-  const _TravelSearchFormWidget({required this.itemContext});
+  const _TravelSearchFormWidget({required this.node, required this.props});
 
   @override
   State<_TravelSearchFormWidget> createState() =>
@@ -660,9 +664,7 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
   @override
   void initState() {
     super.initState();
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     final defaultDest =
         data['defaultDestination']?.toString() ?? 'Kyoto, Japan';
     _destinationCtrl = TextEditingController(text: defaultDest);
@@ -702,27 +704,26 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
 
     final query = 'best $_accommodationType in $dest from $startStr to $endStr';
 
-    widget.itemContext.dispatchEvent(
-      UserActionEvent(
-        name: 'search_travel_destinations',
-        sourceComponentId: widget.itemContext.id,
-        context: <String, Object?>{
-          'query': query,
-          'destination': dest,
-          'accommodationType': _accommodationType,
-          'budget': _budget,
-          'startDate': startStr,
-          'endDate': endStr,
+    unawaited(
+      widget.node.context?.dispatchAction({
+        'event': {
+          'name': 'search_travel_destinations',
+          'context': <String, Object?>{
+            'query': query,
+            'destination': dest,
+            'accommodationType': _accommodationType,
+            'budget': _budget,
+            'startDate': startStr,
+            'endDate': endStr,
+          },
         },
-      ),
+      }),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -955,13 +956,14 @@ class _TravelSearchFormWidgetState extends State<_TravelSearchFormWidget> {
 
 /// Rich Accommodation Grid Widget
 class _AccommodationGridWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
 
-  const _AccommodationGridWidget({required this.itemContext});
+  const _AccommodationGridWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from((itemContext.data as Map?) ?? {});
+    final data = Map<String, Object?>.from(props);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final title = data['title']?.toString() ?? 'Recommended Accommodations';
@@ -1199,9 +1201,10 @@ class _AccommodationGridWidget extends StatelessWidget {
 
 /// Interactive Travel Itinerary Timeline & Export Card
 class _TravelItineraryCardWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
 
-  const _TravelItineraryCardWidget({required this.itemContext});
+  const _TravelItineraryCardWidget({required this.node, required this.props});
 
   @override
   State<_TravelItineraryCardWidget> createState() =>
@@ -1235,9 +1238,7 @@ class _TravelItineraryCardWidgetState
       );
 
       final jpgBytes = img.encodeJpg(imgObj, quality: 92);
-      final data = Map<String, Object?>.from(
-        (widget.itemContext.data as Map?) ?? {},
-      );
+      final data = Map<String, Object?>.from(widget.props);
       final dest = (data['destination']?.toString() ?? 'Travel_Plan')
           .replaceAll(RegExp(r'\W+'), '_');
       final fileName = 'Itinerary_$dest.jpg';
@@ -1268,9 +1269,7 @@ class _TravelItineraryCardWidgetState
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(
-      (widget.itemContext.data as Map?) ?? {},
-    );
+    final data = Map<String, Object?>.from(widget.props);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final title = data['title']?.toString() ?? 'Trip Itinerary';
@@ -1440,10 +1439,13 @@ class _TravelItineraryCardWidgetState
 // 3. Catalog Builder & System Prompt
 // ═══════════════════════════════════════════════════════════════
 
-Catalog buildTravelGenuiCatalog() {
-  final base = BasicCatalogItems.asNoAssetCatalog();
+CatalogImplementation buildTravelGenuiCatalog() {
+  final base = basicCatalog(openUrl: launchUrl);
   return base.copyWith(
-    newItems: [
+    components: [
+      ...BasicComponents.all.where(
+        (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+      ),
       travelSearchFormItem,
       accommodationGridItem,
       travelItineraryCardItem,

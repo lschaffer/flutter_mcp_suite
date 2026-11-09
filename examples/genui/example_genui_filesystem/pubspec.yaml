@@ -17,7 +17,7 @@ dependencies:
     path: ../../../flutter_ui_mcp_core
   dart_mcp_core:
     path: ../../../dart_mcp_core
-  genui: ^0.10.3
+  url_launcher: ^6.3.2
   json_schema_builder: ^0.1.7
   path: ^1.9.1
   path_provider: ^2.1.6

@@ -1,13 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/rendering.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:genui/genui.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'env_loader.dart';
 
@@ -230,16 +231,19 @@ final weatherFormSchema = S.object(
   },
 );
 
-final weatherFormItem = CatalogItem(
+final weatherFormItem = ComponentImplementation(
   name: 'WeatherForm',
-  dataSchema: weatherFormSchema,
-  widgetBuilder: (itemContext) => _WeatherFormWidget(itemContext: itemContext),
+  schema: weatherFormSchema,
+  builder: (context, node, props, buildChild) =>
+      _WeatherFormWidget(node: node, props: props),
 );
 
 class _WeatherFormWidget extends StatefulWidget {
-  const _WeatherFormWidget({required this.itemContext});
+  const _WeatherFormWidget({required this.node, required this.props});
 
-  final CatalogItemContext itemContext;
+  final ComponentNode<ComponentImplementation> node;
+
+  final ComponentProps props;
 
   @override
   State<_WeatherFormWidget> createState() => _WeatherFormWidgetState();
@@ -264,17 +268,16 @@ class _WeatherFormWidgetState extends State<_WeatherFormWidget> {
       );
       return;
     }
-    widget.itemContext.dispatchEvent(
-      UserActionEvent(
-        name: 'get_weather_forecast',
-        sourceComponentId: widget.itemContext.id,
-        context: <String, Object?>{
+    unawaited(widget.node.context?.dispatchAction({
+      'event': {
+        'name': 'get_weather_forecast',
+        'context': <String, Object?>{
           'city': city,
           'hours': _durationHours[_duration] ?? 24,
           'channels': _channels.toList(),
         },
-      ),
-    );
+      },
+    }));
   }
 
   @override
@@ -362,16 +365,18 @@ final weatherChartSchema = S.object(
   required: ['title', 'times', 'channels'],
 );
 
-final weatherChartItem = CatalogItem(
+final weatherChartItem = ComponentImplementation(
   name: 'WeatherChart',
-  dataSchema: weatherChartSchema,
-  widgetBuilder: (itemContext) => _WeatherChartWidget(itemContext: itemContext),
+  schema: weatherChartSchema,
+  builder: (context, node, props, buildChild) =>
+      _WeatherChartWidget(node: node, props: props),
 );
 
 class _WeatherChartWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
 
-  const _WeatherChartWidget({required this.itemContext});
+  const _WeatherChartWidget({required this.node, required this.props});
 
   @override
   State<_WeatherChartWidget> createState() => _WeatherChartWidgetState();
@@ -453,7 +458,7 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(widget.itemContext.data as Map);
+    final data = Map<String, Object?>.from(widget.props);
     final title = data['title']?.toString() ?? 'Weather forecast';
     final times = (data['times'] as List?)?.cast<String>() ?? const <String>[];
     final rawChannels = (data['channels'] as List?) ?? const [];
@@ -1068,9 +1073,17 @@ double _bottomInterval(int length) {
 
 /// Builds a GenUI catalog with the basic widgets plus the weather form and
 /// weather chart items.
-Catalog buildWeatherGenuiCatalog() {
-  final base = BasicCatalogItems.asNoAssetCatalog();
-  return base.copyWith(newItems: [weatherFormItem, weatherChartItem]);
+CatalogImplementation buildWeatherGenuiCatalog() {
+  final base = basicCatalog(openUrl: launchUrl);
+  return base.copyWith(
+    components: [
+      ...BasicComponents.all.where(
+        (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+      ),
+      weatherFormItem,
+      weatherChartItem,
+    ],
+  );
 }
 
 /// The system prompt instructing the model how to use weather GenUI widgets, tools, and build/attachment analysis.

@@ -1,22 +1,26 @@
 library;
 
-export 'package:genui/genui.dart'
+export 'package:a2ui_core/a2ui_core.dart'
     show
-        Catalog,
-        CatalogItem,
-        CatalogItemContext,
-        CatalogWidgetBuilder,
-        BasicCatalogItems,
-        ClientFunction,
-        SynchronousClientFunction,
-        ClientFunctionReturnType,
-        ExecutionContext,
+        A2uiReturnType,
+        BasicCatalog,
+        CancellationSignal,
+        CommonSchemas,
+        ComponentNode,
         DataContext,
-        DataPath,
         DataModel,
-        InMemoryDataModel,
-        BasicFunctions,
-        JsonMap;
+        FunctionImplementation,
+        SurfaceModel;
+export 'package:a2ui_flutter/a2ui_flutter.dart'
+    show
+        A2uiSurface,
+        CatalogImplementation,
+        ChildWidgetBuilder,
+        ComponentImplementation,
+        ComponentProps,
+        ComponentWidgetBuilder;
+export 'package:a2ui_flutter/v0_9/basic_catalog.dart'
+    show BasicComponents, basicCatalog;
 export 'package:json_schema_builder/json_schema_builder.dart' show Schema, S;
 export 'package:dart_mcp_core/dart_mcp_core.dart'
     hide

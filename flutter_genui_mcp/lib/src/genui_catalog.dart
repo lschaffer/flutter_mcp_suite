@@ -1,13 +1,17 @@
 import 'dart:convert';
 
+import 'package:a2ui_core/a2ui_core.dart';
+import 'package:a2ui_flutter/a2ui_flutter.dart';
+import 'package:a2ui_flutter/v0_9/basic_catalog.dart' as v0_9;
+import 'package:json_schema_builder/json_schema_builder.dart'
+    hide ValidationResult;
 import 'package:material_ui/material_ui.dart';
-import 'package:genui/genui.dart';
-import 'package:json_schema_builder/json_schema_builder.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Signature of a widget builder referenced by name from a JSON catalog
-/// definition. The builder receives the [CatalogItemContext] for the component
-/// instance and returns the Flutter widget to render it.
-typedef GenuiWidgetBuilder = CatalogWidgetBuilder;
+/// definition. The builder receives the resolved [ComponentProps] of the
+/// component instance and returns the Flutter widget to render it.
+typedef GenuiWidgetBuilder = ComponentWidgetBuilder;
 
 /// A parsed GenUI catalog item definition supplied by the host application.
 ///
@@ -101,9 +105,9 @@ class GenuiCatalogRegistry {
 ///
 /// This is used when no custom catalog items are provided, preserving the
 /// chat-bubble interaction model of the playground.
-final CatalogItem genuiChatMessageItem = CatalogItem(
+final ComponentImplementation genuiChatMessageItem = ComponentImplementation(
   name: 'ChatMessage',
-  dataSchema: S.object(
+  schema: S.object(
     description: 'A chat message bubble.',
     properties: {
       'role': S.string(
@@ -113,38 +117,30 @@ final CatalogItem genuiChatMessageItem = CatalogItem(
       'text': S.string(description: 'The message content.'),
     },
     required: ['text'],
+    // Accept properties the schema does not list, as genui's CatalogItem did.
+    additionalProperties: true,
   ),
-  widgetBuilder: _chatMessageBuilder,
-  exampleData: [
-    () => '''
-    [
-      {
-        "id": "root",
-        "component": "ChatMessage",
-        "role": "assistant",
-        "text": "Hello! Ask me anything."
-      }
-    ]
-    ''',
-  ],
+  builder: _chatMessageBuilder,
 );
 
-/// Builds a GenUI [Catalog] from an optional JSON list of catalog item
-/// definitions.
+/// Builds an A2UI [CatalogImplementation] from an optional JSON list of
+/// catalog item definitions.
 ///
-/// The resulting catalog always includes the GenUI basic catalog items (Text,
-/// Column, Row, Button, TextField, ChoicePicker, ...) plus the default
-/// [genuiChatMessageItem]. When [catalogJson] or [catalogItems] is provided,
-/// the corresponding items are merged in (replacing any item with the same
-/// name). When [clientFunctions] is provided, they are registered into the catalog.
-Catalog buildGenuiCatalog({
+/// The resulting catalog always includes the A2UI v0.9 basic catalog items
+/// (Text, Column, Row, Button, TextField, ChoicePicker, ...) except Image,
+/// Video and AudioPlayer, plus the default [genuiChatMessageItem]. It keeps the
+/// basic catalog's id, functions and theme schema. When [catalogJson] or
+/// [catalogItems] is provided, the corresponding items are merged in
+/// (replacing any item with the same name). When [clientFunctions] is
+/// provided, they are registered into the catalog.
+CatalogImplementation buildGenuiCatalog({
   String? catalogJson,
   List<GenuiCatalogItemDefinition>? catalogItems,
-  List<ClientFunction>? clientFunctions,
+  List<FunctionImplementation>? clientFunctions,
 }) {
-  final base = BasicCatalogItems.asNoAssetCatalog();
+  final base = v0_9.basicCatalog(openUrl: launchUrl);
 
-  final custom = <CatalogItem>[genuiChatMessageItem];
+  final custom = <ComponentImplementation>[genuiChatMessageItem];
 
   if (catalogJson != null && catalogJson.trim().isNotEmpty) {
     final decoded = jsonDecode(catalogJson);
@@ -166,38 +162,50 @@ Catalog buildGenuiCatalog({
     }
   }
 
-  return base.copyWith(
-    newItems: custom,
-    newFunctions: clientFunctions,
+  return base.derive(
+    catalogId: base.id,
+    components: base.components.keys.where(
+      (name) => !const {'Image', 'Video', 'AudioPlayer'}.contains(name),
+    ),
+    addComponents: custom,
+    addFunctions: clientFunctions ?? const [],
+    instructions: base.instructions,
   );
 }
 
-CatalogItem _catalogItemFromDefinition(GenuiCatalogItemDefinition definition) {
+ComponentImplementation _catalogItemFromDefinition(
+  GenuiCatalogItemDefinition definition,
+) {
   final GenuiWidgetBuilder builder =
       (definition.builder != null
           ? GenuiCatalogRegistry.lookup(definition.builder!)
           : null) ??
       _genericBuilder(definition.type);
 
-  return CatalogItem(
+  final schema = definition.schema.value;
+  return ComponentImplementation(
     name: definition.type,
-    dataSchema: definition.schema,
-    widgetBuilder: builder,
-    exampleData: definition.examples
-        .map(
-          (e) =>
-              () => e,
-        )
-        .toList(),
+    // Accept properties the schema does not list, as genui's CatalogItem did,
+    // unless the definition says otherwise.
+    schema:
+        schema.containsKey('additionalProperties') ||
+            schema.containsKey('unevaluatedProperties')
+        ? definition.schema
+        : Schema.fromMap({...schema, 'additionalProperties': true}),
+    builder: builder,
   );
 }
 
-Widget _chatMessageBuilder(CatalogItemContext context) {
-  final data = Map<String, Object?>.from(context.data as Map);
-  final text = data['text']?.toString() ?? '';
-  final role = data['role']?.toString() ?? 'assistant';
+Widget _chatMessageBuilder(
+  BuildContext context,
+  ComponentNode<ComponentImplementation> node,
+  ComponentProps props,
+  ChildWidgetBuilder buildChild,
+) {
+  final text = props.value('text')?.toString() ?? '';
+  final role = props.value('role')?.toString() ?? 'assistant';
   final isUser = role == 'user';
-  final theme = Theme.of(context.buildContext);
+  final theme = Theme.of(context);
   final isDark = theme.brightness == Brightness.dark;
 
   return Padding(
@@ -244,9 +252,9 @@ Widget _chatMessageBuilder(CatalogItemContext context) {
 }
 
 GenuiWidgetBuilder _genericBuilder(String type) {
-  return (CatalogItemContext context) {
-    final data = Map<String, Object?>.from(context.data as Map);
-    final theme = Theme.of(context.buildContext);
+  return (context, node, props, buildChild) {
+    final data = {for (final key in props.keys) key: props.value(key)};
+    final theme = Theme.of(context);
     final body = const JsonEncoder.withIndent('  ').convert(data);
 
     return Card(

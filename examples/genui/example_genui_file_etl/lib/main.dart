@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -272,19 +273,21 @@ final datasetSummarySchema = S.object(
   required: ['file_name', 'total_rows', 'total_columns'],
 );
 
-final datasetSummaryItem = CatalogItem(
+final datasetSummaryItem = ComponentImplementation(
   name: 'DatasetSummaryCard',
-  dataSchema: datasetSummarySchema,
-  widgetBuilder: (itemContext) => _DatasetSummaryCardWidget(itemContext: itemContext),
+  schema: datasetSummarySchema,
+  builder: (context, node, props, buildChild) =>
+      _DatasetSummaryCardWidget(node: node, props: props),
 );
 
 class _DatasetSummaryCardWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _DatasetSummaryCardWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _DatasetSummaryCardWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final file = data['file_name']?.toString() ?? 'dataset.csv';
     final rows = data['total_rows']?.toString() ?? '0';
     final cols = data['total_columns']?.toString() ?? '0';
@@ -404,19 +407,21 @@ final schemaTransformerSchema = S.object(
   required: ['attributes'],
 );
 
-final schemaTransformerItem = CatalogItem(
+final schemaTransformerItem = ComponentImplementation(
   name: 'SchemaTransformerWidget',
-  dataSchema: schemaTransformerSchema,
-  widgetBuilder: (itemContext) => _SchemaTransformerWidget(itemContext: itemContext),
+  schema: schemaTransformerSchema,
+  builder: (context, node, props, buildChild) =>
+      _SchemaTransformerWidget(node: node, props: props),
 );
 
 class _SchemaTransformerWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _SchemaTransformerWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _SchemaTransformerWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Detected Schema & Attribute Definitions';
     final attrs = (data['attributes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
@@ -497,19 +502,21 @@ final dataPreviewSchema = S.object(
   required: ['columns', 'rows'],
 );
 
-final dataPreviewItem = CatalogItem(
+final dataPreviewItem = ComponentImplementation(
   name: 'DataPreviewTable',
-  dataSchema: dataPreviewSchema,
-  widgetBuilder: (itemContext) => _DataPreviewTableWidget(itemContext: itemContext),
+  schema: dataPreviewSchema,
+  builder: (context, node, props, buildChild) =>
+      _DataPreviewTableWidget(node: node, props: props),
 );
 
 class _DataPreviewTableWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _DataPreviewTableWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _DataPreviewTableWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Filtered Dataset View';
     final columns = (data['columns'] as List?)?.cast<String>() ?? [];
     final rows = (data['rows'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -598,15 +605,17 @@ final exportPipelineSchema = S.object(
   required: ['format', 'code_snippet'],
 );
 
-final exportPipelineItem = CatalogItem(
+final exportPipelineItem = ComponentImplementation(
   name: 'ExportPipelineCard',
-  dataSchema: exportPipelineSchema,
-  widgetBuilder: (itemContext) => _ExportPipelineCardWidget(itemContext: itemContext),
+  schema: exportPipelineSchema,
+  builder: (context, node, props, buildChild) =>
+      _ExportPipelineCardWidget(node: node, props: props),
 );
 
 class _ExportPipelineCardWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _ExportPipelineCardWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ExportPipelineCardWidget({required this.node, required this.props});
 
   @override
   State<_ExportPipelineCardWidget> createState() => _ExportPipelineCardWidgetState();
@@ -616,7 +625,7 @@ class _ExportPipelineCardWidgetState extends State<_ExportPipelineCardWidget> {
   bool _copied = false;
   @override
   Widget build(BuildContext context) {
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = widget.props;
     final format = data['format']?.toString().toUpperCase() ?? 'CSV';
     final code = data['code_snippet']?.toString() ?? '';
     final count = data['record_count']?.toString() ?? 'All';
@@ -715,8 +724,11 @@ class FileEtlScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [
+    final catalog = basicCatalog(openUrl: launchUrl).copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
         datasetSummaryItem,
         schemaTransformerItem,
         dataPreviewItem,

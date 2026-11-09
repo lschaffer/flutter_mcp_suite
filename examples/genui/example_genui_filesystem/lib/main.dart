@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:genui/genui.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -208,16 +209,19 @@ final directoryExplorerSchema = S.object(
   required: ['path', 'entries'],
 );
 
-final directoryExplorerItem = CatalogItem(
+final directoryExplorerItem = ComponentImplementation(
   name: 'DirectoryExplorer',
-  dataSchema: directoryExplorerSchema,
-  widgetBuilder: (ctx) => _DirectoryExplorerWidget(itemContext: ctx),
+  schema: directoryExplorerSchema,
+  builder: (context, node, props, buildChild) =>
+      _DirectoryExplorerWidget(node: node, props: props),
 );
 
 class _DirectoryExplorerWidget extends StatefulWidget {
-  const _DirectoryExplorerWidget({required this.itemContext});
+  const _DirectoryExplorerWidget({required this.node, required this.props});
 
-  final CatalogItemContext itemContext;
+  final ComponentNode<ComponentImplementation> node;
+
+  final ComponentProps props;
 
   @override
   State<_DirectoryExplorerWidget> createState() => _DirectoryExplorerWidgetState();
@@ -230,7 +234,7 @@ class _DirectoryExplorerWidgetState extends State<_DirectoryExplorerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final data = Map<String, Object?>.from(widget.itemContext.data as Map);
+    final data = Map<String, Object?>.from(widget.props);
     final path = data['path']?.toString() ?? '.';
     final rawEntries = (data['entries'] as List?) ?? const [];
     final theme = Theme.of(context);
@@ -266,13 +270,12 @@ class _DirectoryExplorerWidgetState extends State<_DirectoryExplorerWidget> {
                 tooltip: 'Go to parent directory',
                 onPressed: () {
                   final parent = p.dirname(path);
-                  widget.itemContext.dispatchEvent(
-                    UserActionEvent(
-                      name: 'list_directory_tree',
-                      sourceComponentId: widget.itemContext.id,
-                      context: <String, Object?>{'path': parent},
-                    ),
-                  );
+                  unawaited(widget.node.context?.dispatchAction({
+                    'event': {
+                      'name': 'list_directory_tree',
+                      'context': <String, Object?>{'path': parent},
+                    },
+                  }));
                 },
               ),
             ],
@@ -320,13 +323,12 @@ class _DirectoryExplorerWidgetState extends State<_DirectoryExplorerWidget> {
                   ),
                   onTap: () async {
                     if (isDirectory) {
-                      widget.itemContext.dispatchEvent(
-                        UserActionEvent(
-                          name: 'list_directory_tree',
-                          sourceComponentId: widget.itemContext.id,
-                          context: <String, Object?>{'path': itemPath},
-                        ),
-                      );
+                      unawaited(widget.node.context?.dispatchAction({
+                        'event': {
+                          'name': 'list_directory_tree',
+                          'context': <String, Object?>{'path': itemPath},
+                        },
+                      }));
                     } else {
                       setState(() {
                         _selectedFilePath = itemPath;
@@ -351,13 +353,12 @@ class _DirectoryExplorerWidgetState extends State<_DirectoryExplorerWidget> {
                           }
                         }
                       } else {
-                        widget.itemContext.dispatchEvent(
-                          UserActionEvent(
-                            name: 'read_file_content',
-                            sourceComponentId: widget.itemContext.id,
-                            context: <String, Object?>{'path': itemPath},
-                          ),
-                        );
+                        unawaited(widget.node.context?.dispatchAction({
+                          'event': {
+                            'name': 'read_file_content',
+                            'context': <String, Object?>{'path': itemPath},
+                          },
+                        }));
                       }
                     }
                   },
@@ -434,9 +435,16 @@ class _DirectoryExplorerWidgetState extends State<_DirectoryExplorerWidget> {
 // 3. GenUI Catalog Builder
 // ═══════════════════════════════════════════════════════════════
 
-Catalog buildFilesystemGenuiCatalog() {
-  final base = BasicCatalogItems.asNoAssetCatalog();
-  return base.copyWith(newItems: [directoryExplorerItem]);
+CatalogImplementation buildFilesystemGenuiCatalog() {
+  final base = basicCatalog(openUrl: launchUrl);
+  return base.copyWith(
+    components: [
+      ...BasicComponents.all.where(
+        (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+      ),
+      directoryExplorerItem,
+    ],
+  );
 }
 
 const String filesystemGenuiSystemPrompt = '''

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -206,19 +207,21 @@ final benchmarkScorecardSchema = S.object(
   required: ['winner_model', 'avg_latency_ms', 'top_accuracy_percent'],
 );
 
-final benchmarkScorecardItem = CatalogItem(
+final benchmarkScorecardItem = ComponentImplementation(
   name: 'BenchmarkScorecard',
-  dataSchema: benchmarkScorecardSchema,
-  widgetBuilder: (itemContext) => _BenchmarkScorecardWidget(itemContext: itemContext),
+  schema: benchmarkScorecardSchema,
+  builder: (context, node, props, buildChild) =>
+      _BenchmarkScorecardWidget(node: node, props: props),
 );
 
 class _BenchmarkScorecardWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _BenchmarkScorecardWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _BenchmarkScorecardWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final winner = data['winner_model']?.toString() ?? 'deepseek-chat';
     final latency = data['avg_latency_ms']?.toString() ?? '480';
     final accuracy = data['top_accuracy_percent']?.toString() ?? '98.2';
@@ -354,19 +357,21 @@ final qualityComparisonSchema = S.object(
   required: ['models'],
 );
 
-final qualityComparisonItem = CatalogItem(
+final qualityComparisonItem = ComponentImplementation(
   name: 'RadarQualityChart',
-  dataSchema: qualityComparisonSchema,
-  widgetBuilder: (itemContext) => _RadarQualityChartWidget(itemContext: itemContext),
+  schema: qualityComparisonSchema,
+  builder: (context, node, props, buildChild) =>
+      _RadarQualityChartWidget(node: node, props: props),
 );
 
 class _RadarQualityChartWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _RadarQualityChartWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _RadarQualityChartWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Model Quality Criterion Breakdown';
     final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
@@ -484,19 +489,21 @@ final latencyCostSchema = S.object(
   required: ['models'],
 );
 
-final latencyCostItem = CatalogItem(
+final latencyCostItem = ComponentImplementation(
   name: 'LatencyCostScatter',
-  dataSchema: latencyCostSchema,
-  widgetBuilder: (itemContext) => _LatencyCostScatterWidget(itemContext: itemContext),
+  schema: latencyCostSchema,
+  builder: (context, node, props, buildChild) =>
+      _LatencyCostScatterWidget(node: node, props: props),
 );
 
 class _LatencyCostScatterWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _LatencyCostScatterWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _LatencyCostScatterWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Speed vs. Cost Evaluation';
     final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
@@ -604,8 +611,11 @@ class BenchmarkLabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [
+    final catalog = basicCatalog(openUrl: launchUrl).copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
         benchmarkScorecardItem,
         qualityComparisonItem,
         latencyCostItem,

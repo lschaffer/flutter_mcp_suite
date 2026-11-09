@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -231,19 +232,21 @@ final swarmTimelineSchema = S.object(
   required: ['title', 'agents'],
 );
 
-final swarmTimelineItem = CatalogItem(
+final swarmTimelineItem = ComponentImplementation(
   name: 'AgentSwarmTimeline',
-  dataSchema: swarmTimelineSchema,
-  widgetBuilder: (itemContext) => _AgentSwarmTimelineWidget(itemContext: itemContext),
+  schema: swarmTimelineSchema,
+  builder: (context, node, props, buildChild) =>
+      _AgentSwarmTimelineWidget(node: node, props: props),
 );
 
 class _AgentSwarmTimelineWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _AgentSwarmTimelineWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _AgentSwarmTimelineWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final title = data['title']?.toString() ?? 'Multi-Agent Pipeline Progression';
     final agents = (data['agents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final theme = Theme.of(context);
@@ -384,19 +387,21 @@ final subagentCardSchema = S.object(
   required: ['role', 'objective', 'findings'],
 );
 
-final subagentCardItem = CatalogItem(
+final subagentCardItem = ComponentImplementation(
   name: 'SubagentCard',
-  dataSchema: subagentCardSchema,
-  widgetBuilder: (itemContext) => _SubagentCardWidget(itemContext: itemContext),
+  schema: subagentCardSchema,
+  builder: (context, node, props, buildChild) =>
+      _SubagentCardWidget(node: node, props: props),
 );
 
 class _SubagentCardWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _SubagentCardWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _SubagentCardWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final data = itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = props;
     final role = data['role']?.toString() ?? 'Specialist Subagent';
     final id = data['agent_id']?.toString() ?? 'subagent';
     final objective = data['objective']?.toString() ?? '';
@@ -531,15 +536,17 @@ final approvalGateSchema = S.object(
   required: ['action_name', 'risk_level', 'description'],
 );
 
-final approvalGateItem = CatalogItem(
+final approvalGateItem = ComponentImplementation(
   name: 'ApprovalGateWidget',
-  dataSchema: approvalGateSchema,
-  widgetBuilder: (itemContext) => _ApprovalGateWidget(itemContext: itemContext),
+  schema: approvalGateSchema,
+  builder: (context, node, props, buildChild) =>
+      _ApprovalGateWidget(node: node, props: props),
 );
 
 class _ApprovalGateWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _ApprovalGateWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ApprovalGateWidget({required this.node, required this.props});
 
   @override
   State<_ApprovalGateWidget> createState() => _ApprovalGateWidgetState();
@@ -550,7 +557,7 @@ class _ApprovalGateWidgetState extends State<_ApprovalGateWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.itemContext.data as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> data = widget.props;
     final action = data['action_name']?.toString() ?? 'Deploy Code Changes';
     final risk = data['risk_level']?.toString() ?? 'medium';
     final desc = data['description']?.toString() ?? '';
@@ -686,8 +693,11 @@ class AgentSwarmScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [
+    final catalog = basicCatalog(openUrl: launchUrl).copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
         swarmTimelineItem,
         subagentCardItem,
         approvalGateItem,

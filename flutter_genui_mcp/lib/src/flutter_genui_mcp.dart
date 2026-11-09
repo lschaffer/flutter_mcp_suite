@@ -1,14 +1,16 @@
+import 'package:a2ui_core/a2ui_core.dart' show FunctionImplementation;
+import 'package:a2ui_flutter/a2ui_flutter.dart' show CatalogImplementation;
+import 'package:dart_mcp_core/dart_mcp_core.dart' hide LocalMCPClient;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:genui/genui.dart' hide ChatMessage;
-import 'package:dart_mcp_core/dart_mcp_core.dart' hide LocalMCPClient;
 import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
 import 'package:uuid/uuid.dart';
 
 import 'genui_catalog.dart';
 import 'genui_chat_controller.dart';
+import 'genui_surface.dart';
 
 String _mimeFromExtension(String name) => mimeFromExtension(name);
 
@@ -45,14 +47,15 @@ class GenuiMcpPlayground extends StatefulWidget {
   /// Optional list of GenUI catalog items to register.
   final List<GenuiCatalogItemDefinition>? genuiCatalogItems;
 
-  /// Optional custom GenUI catalog.
-  final Catalog? genuiCatalog;
+  /// Optional custom GenUI catalog: an A2UI v0.9 catalog, such as one derived
+  /// from `basicCatalog()`.
+  final CatalogImplementation? genuiCatalog;
 
   /// Optional catalog JSON string.
   final String? genuiCatalogJson;
 
   /// Optional list of GenUI client-side functions to register into the catalog.
-  final List<ClientFunction>? clientFunctions;
+  final List<FunctionImplementation>? clientFunctions;
 
   /// Whether to show the Agent Inspector side panel and toggle button. Defaults to true.
   final bool showAgentInspector;
@@ -2190,10 +2193,11 @@ class _GenuiMcpPlaygroundState extends State<GenuiMcpPlayground> {
               padding: const EdgeInsets.all(12),
               child: Builder(
                 builder: (surfaceCtx) {
-                  Widget surfaceWidget = Surface(
-                    surfaceContext:
-                        _genuiController!.contextFor(entry.surfaceId!),
+                  final surface = _genuiController!.contextFor(
+                    entry.surfaceId!,
                   );
+                  if (surface == null) return const SizedBox.shrink();
+                  Widget surfaceWidget = buildGenuiSurface(surface);
                   if (Localizations.of<MaterialLocalizations>(
                           surfaceCtx, MaterialLocalizations) ==
                       null) {

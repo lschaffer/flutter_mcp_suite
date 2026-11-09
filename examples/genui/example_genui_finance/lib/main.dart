@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_genui_mcp/flutter_genui_mcp.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'env_loader.dart';
 
 void main() async {
@@ -48,24 +49,22 @@ class GenuiFinanceApp extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 /// Deterministically fetches the monthly breakdown of spending and income.
-class GetMonthlyExpensesFunction extends SynchronousClientFunction {
-  const GetMonthlyExpensesFunction();
+class GetMonthlyExpensesFunction extends FunctionImplementation {
+  GetMonthlyExpensesFunction()
+      : super(
+          name: 'getMonthlyExpenses',
+          description:
+              'Returns a deterministic breakdown of monthly expenses by category (Housing, Groceries, Transit, Leisure, Utilities) and total monthly income.',
+          returnType: A2uiReturnType.object,
+          argumentSchema: S.object(properties: {}),
+        );
 
   @override
-  String get name => 'getMonthlyExpenses';
-
-  @override
-  String get description =>
-      'Returns a deterministic breakdown of monthly expenses by category (Housing, Groceries, Transit, Leisure, Utilities) and total monthly income.';
-
-  @override
-  ClientFunctionReturnType get returnType => ClientFunctionReturnType.object;
-
-  @override
-  Schema get argumentSchema => S.object(properties: {});
-
-  @override
-  Object? executeSync(JsonMap args, ExecutionContext _) {
+  Object? execute(
+    Map<String, dynamic> args,
+    DataContext context, [
+    CancellationSignal? cancellationSignal,
+  ]) {
     return {
       'income': 5400.0,
       'total_expenses': 3650.0,
@@ -81,30 +80,28 @@ class GetMonthlyExpensesFunction extends SynchronousClientFunction {
 }
 
 /// Deterministically calculates monthly and annual savings and savings rate.
-class CalculateBudgetSavingsFunction extends SynchronousClientFunction {
-  const CalculateBudgetSavingsFunction();
+class CalculateBudgetSavingsFunction extends FunctionImplementation {
+  CalculateBudgetSavingsFunction()
+      : super(
+          name: 'calculateBudgetSavings',
+          description:
+              'Calculates projected annual and monthly savings and savings rate based on monthly income and expense adjustments.',
+          returnType: A2uiReturnType.object,
+          argumentSchema: S.object(
+            properties: {
+              'monthly_income': S.number(description: 'Gross monthly income'),
+              'monthly_expenses': S.number(description: 'Total monthly expenses'),
+            },
+            required: ['monthly_income', 'monthly_expenses'],
+          ),
+        );
 
   @override
-  String get name => 'calculateBudgetSavings';
-
-  @override
-  String get description =>
-      'Calculates projected annual and monthly savings and savings rate based on monthly income and expense adjustments.';
-
-  @override
-  ClientFunctionReturnType get returnType => ClientFunctionReturnType.object;
-
-  @override
-  Schema get argumentSchema => S.object(
-        properties: {
-          'monthly_income': S.number(description: 'Gross monthly income'),
-          'monthly_expenses': S.number(description: 'Total monthly expenses'),
-        },
-        required: ['monthly_income', 'monthly_expenses'],
-      );
-
-  @override
-  Object? executeSync(JsonMap args, ExecutionContext _) {
+  Object? execute(
+    Map<String, dynamic> args,
+    DataContext context, [
+    CancellationSignal? cancellationSignal,
+  ]) {
     final income = (args['monthly_income'] as num?)?.toDouble() ?? 0.0;
     final expenses = (args['monthly_expenses'] as num?)?.toDouble() ?? 0.0;
     final monthlySavings = (income - expenses).clamp(0.0, double.infinity);
@@ -120,35 +117,33 @@ class CalculateBudgetSavingsFunction extends SynchronousClientFunction {
 }
 
 /// Deterministically computes compound investment projections.
-class SimulateInvestmentGrowthFunction extends SynchronousClientFunction {
-  const SimulateInvestmentGrowthFunction();
-
-  @override
-  String get name => 'simulateInvestmentGrowth';
-
-  @override
-  String get description =>
-      'Simulates deterministic compound interest returns over 1, 3, 5, and 10 years for regular monthly contributions. Can also return a single year projection if "years" is provided.';
-
-  @override
-  ClientFunctionReturnType get returnType => ClientFunctionReturnType.any;
-
-  @override
-  Schema get argumentSchema => S.object(
-        properties: {
-          'monthly_contribution': S.number(description: 'Monthly contribution amount'),
-          'annual_interest_rate': S.number(
-            description: 'Annual interest rate (e.g. 0.075 for 7.5%)',
+class SimulateInvestmentGrowthFunction extends FunctionImplementation {
+  SimulateInvestmentGrowthFunction()
+      : super(
+          name: 'simulateInvestmentGrowth',
+          description:
+              'Simulates deterministic compound interest returns over 1, 3, 5, and 10 years for regular monthly contributions. Can also return a single year projection if "years" is provided.',
+          returnType: A2uiReturnType.any,
+          argumentSchema: S.object(
+            properties: {
+              'monthly_contribution': S.number(description: 'Monthly contribution amount'),
+              'annual_interest_rate': S.number(
+                description: 'Annual interest rate (e.g. 0.075 for 7.5%)',
+              ),
+              'years': S.number(
+                description: 'Optional number of years to project (e.g. 1, 3, 5, 10)',
+              ),
+            },
+            required: ['monthly_contribution'],
           ),
-          'years': S.number(
-            description: 'Optional number of years to project (e.g. 1, 3, 5, 10)',
-          ),
-        },
-        required: ['monthly_contribution'],
-      );
+        );
 
   @override
-  Object? executeSync(JsonMap args, ExecutionContext _) {
+  Object? execute(
+    Map<String, dynamic> args,
+    DataContext context, [
+    CancellationSignal? cancellationSignal,
+  ]) {
     final rawPmt = args['monthly_contribution'] ??
         args['monthlyContribution'] ??
         args['contribution'] ??
@@ -219,7 +214,7 @@ class SimulateInvestmentGrowthFunction extends SynchronousClientFunction {
   }
 }
 
-const financeClientFunctions = <ClientFunction>[
+final financeClientFunctions = <FunctionImplementation>[
   GetMonthlyExpensesFunction(),
   CalculateBudgetSavingsFunction(),
   SimulateInvestmentGrowthFunction(),
@@ -229,10 +224,10 @@ const financeClientFunctions = <ClientFunction>[
 // 2. Custom GenUI Catalog Items
 // ═══════════════════════════════════════════════════════════════
 
-final ExecutionContext _fallbackContext =
-    DataContext(InMemoryDataModel(), DataPath('/'));
+final DataContext _fallbackContext =
+    DataContext(DataModel(), (name, args, context) => null, '/');
 
-dynamic _resolveCall(dynamic raw, [ExecutionContext? context]) {
+dynamic _resolveCall(dynamic raw, [DataContext? context]) {
   if (raw == null) return null;
   if (raw is Map) {
     if (raw.containsKey('call')) {
@@ -241,11 +236,9 @@ dynamic _resolveCall(dynamic raw, [ExecutionContext? context]) {
       final args = rawArgs is Map ? Map<String, dynamic>.from(rawArgs) : <String, dynamic>{};
       for (final func in financeClientFunctions) {
         if (func.name.toLowerCase() == funcName.toLowerCase().replaceAll('_', '')) {
-          if (func is SynchronousClientFunction) {
-            try {
-              return func.executeSync(args, context ?? _fallbackContext);
-            } catch (_) {}
-          }
+          try {
+            return func.execute(args, context ?? _fallbackContext);
+          } catch (_) {}
         }
       }
     }
@@ -373,15 +366,17 @@ final expensePieSchema = S.object(
   required: ['categories'],
 );
 
-final expensePieItem = CatalogItem(
+final expensePieItem = ComponentImplementation(
   name: 'ExpensePieChart',
-  dataSchema: expensePieSchema,
-  widgetBuilder: (itemContext) => _ExpensePieWidget(itemContext: itemContext),
+  schema: expensePieSchema,
+  builder: (context, node, props, buildChild) =>
+      _ExpensePieWidget(node: node, props: props),
 );
 
 class _ExpensePieWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _ExpensePieWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _ExpensePieWidget({required this.node, required this.props});
 
   static const List<Color> _colors = [
     Color(0xFF3B82F6),
@@ -393,14 +388,14 @@ class _ExpensePieWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawData = _resolveCall(itemContext.data, itemContext.dataContext);
+    final rawData = _resolveCall(props, node.context?.dataContext);
     var list = _extractCategories(
       rawData is Map ? (rawData['categories'] ?? rawData) : rawData,
     );
     var total = _extractTotalExpenses(rawData, list);
 
     if (list.isEmpty) {
-      final defaultExpenses = const GetMonthlyExpensesFunction().executeSync(const {}, _fallbackContext) as Map<String, dynamic>;
+      final defaultExpenses = GetMonthlyExpensesFunction().execute(const {}, _fallbackContext) as Map<String, dynamic>;
       list = _extractCategories(defaultExpenses['categories']);
       total = (defaultExpenses['total_expenses'] as num).toDouble();
     }
@@ -474,15 +469,17 @@ final budgetSliderSchema = S.object(
   required: ['categories'],
 );
 
-final budgetSliderItem = CatalogItem(
+final budgetSliderItem = ComponentImplementation(
   name: 'BudgetSliders',
-  dataSchema: budgetSliderSchema,
-  widgetBuilder: (itemContext) => _BudgetSlidersWidget(itemContext: itemContext),
+  schema: budgetSliderSchema,
+  builder: (context, node, props, buildChild) =>
+      _BudgetSlidersWidget(node: node, props: props),
 );
 
 class _BudgetSlidersWidget extends StatefulWidget {
-  final CatalogItemContext itemContext;
-  const _BudgetSlidersWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _BudgetSlidersWidget({required this.node, required this.props});
 
   @override
   State<_BudgetSlidersWidget> createState() => _BudgetSlidersWidgetState();
@@ -501,19 +498,19 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
   @override
   void didUpdateWidget(covariant _BudgetSlidersWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.itemContext.data != widget.itemContext.data) {
+    if (oldWidget.props != widget.props) {
       _extractData();
     }
   }
 
   void _extractData() {
-    final rawData = _resolveCall(widget.itemContext.data, widget.itemContext.dataContext);
+    final rawData = _resolveCall(widget.props, widget.node.context?.dataContext);
     _income = _extractIncome(rawData);
     var list = _extractCategories(
       rawData is Map ? (rawData['categories'] ?? rawData) : rawData,
     );
     if (list.isEmpty) {
-      final defaultExpenses = const GetMonthlyExpensesFunction().executeSync(const {}, _fallbackContext) as Map<String, dynamic>;
+      final defaultExpenses = GetMonthlyExpensesFunction().execute(const {}, _fallbackContext) as Map<String, dynamic>;
       list = _extractCategories(defaultExpenses['categories']);
     }
     for (final c in list) {
@@ -526,12 +523,12 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final rawData = _resolveCall(widget.itemContext.data, widget.itemContext.dataContext);
+    final rawData = _resolveCall(widget.props, widget.node.context?.dataContext);
     var list = _extractCategories(
       rawData is Map ? (rawData['categories'] ?? rawData) : rawData,
     );
     if (list.isEmpty) {
-      final defaultExpenses = const GetMonthlyExpensesFunction().executeSync(const {}, _fallbackContext) as Map<String, dynamic>;
+      final defaultExpenses = GetMonthlyExpensesFunction().execute(const {}, _fallbackContext) as Map<String, dynamic>;
       list = _extractCategories(defaultExpenses['categories']);
     }
     final theme = Theme.of(context);
@@ -617,19 +614,21 @@ final investmentGrowthSchema = S.object(
   required: ['monthly_contribution'],
 );
 
-final investmentGrowthItem = CatalogItem(
+final investmentGrowthItem = ComponentImplementation(
   name: 'InvestmentGrowthCard',
-  dataSchema: investmentGrowthSchema,
-  widgetBuilder: (itemContext) => _InvestmentGrowthWidget(itemContext: itemContext),
+  schema: investmentGrowthSchema,
+  builder: (context, node, props, buildChild) =>
+      _InvestmentGrowthWidget(node: node, props: props),
 );
 
 class _InvestmentGrowthWidget extends StatelessWidget {
-  final CatalogItemContext itemContext;
-  const _InvestmentGrowthWidget({required this.itemContext});
+  final ComponentNode<ComponentImplementation> node;
+  final ComponentProps props;
+  const _InvestmentGrowthWidget({required this.node, required this.props});
 
   @override
   Widget build(BuildContext context) {
-    final rawData = _resolveCall(itemContext.data, itemContext.dataContext);
+    final rawData = _resolveCall(props, node.context?.dataContext);
     final map = rawData is Map ? Map<String, dynamic>.from(rawData) : <String, dynamic>{};
 
     final pmt = (map['monthly_contribution'] ?? map['monthlyContribution'] ?? map['amount'] as num?)?.toDouble() ?? 450.0;
@@ -640,7 +639,7 @@ class _InvestmentGrowthWidget extends StatelessWidget {
       if (rate > 1.0) rate = rate / 100.0;
     }
 
-    final sim = const SimulateInvestmentGrowthFunction().executeSync({
+    final sim = SimulateInvestmentGrowthFunction().execute({
       'monthly_contribution': pmt,
       'annual_interest_rate': rate,
     }, _fallbackContext) as Map<String, dynamic>;
@@ -786,9 +785,17 @@ class FinanceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
-      newItems: [expensePieItem, budgetSliderItem, investmentGrowthItem],
-      newFunctions: financeClientFunctions,
+    final base = basicCatalog(openUrl: launchUrl);
+    final catalog = base.copyWith(
+      components: [
+        ...BasicComponents.all.where(
+          (c) => !const {'Image', 'Video', 'AudioPlayer'}.contains(c.name),
+        ),
+        expensePieItem,
+        budgetSliderItem,
+        investmentGrowthItem,
+      ],
+      functions: [...base.functions.values, ...financeClientFunctions],
     );
 
     // Load initial LLM configuration if configured in .env

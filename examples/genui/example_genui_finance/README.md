@@ -14,11 +14,11 @@ The model orchestrates and generates rich interactive GenUI components:
 
 ## Features
 - Dynamic financial widget generation using GenUI (`A2UI`)
-- Native client-side functions (`SynchronousClientFunction`) for instant deterministic calculations without server round-trips
+- Native client-side functions (A2UI `FunctionImplementation`s) for instant deterministic calculations without server round-trips
 - FlChart pie chart visualization
 - Real-time interactive client-side calculation sliders
 
-## 🚀 Client-Side Functions (`SynchronousClientFunction`)
+## 🚀 Client-Side Functions (`FunctionImplementation`)
 As described in the [Flutter official blog](https://flutter.dev/blog/a2ui-client-side-functions), client-side functions enable AI agents to delegate arithmetic and deterministic operations directly to Dart code running locally on the user's device.
 
 Benefits:

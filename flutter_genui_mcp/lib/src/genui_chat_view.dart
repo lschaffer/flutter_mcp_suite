@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:genui/genui.dart';
 
 import 'genui_chat_controller.dart';
+import 'genui_surface.dart';
 
 /// A self-contained chat view backed by a [McpGenuiChatController].
 ///
@@ -204,9 +204,9 @@ class _GenuiChatViewState extends State<GenuiChatView> {
         padding: const EdgeInsets.all(12),
         child: Builder(
           builder: (surfaceCtx) {
-            Widget surfaceWidget = Surface(
-              surfaceContext: widget.controller.contextFor(surfaceId),
-            );
+            final surface = widget.controller.contextFor(surfaceId);
+            if (surface == null) return const SizedBox.shrink();
+            Widget surfaceWidget = buildGenuiSurface(surface);
             if (Localizations.of<MaterialLocalizations>(
                     surfaceCtx, MaterialLocalizations) ==
                 null) {

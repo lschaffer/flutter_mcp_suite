@@ -9,7 +9,7 @@ An interactive, dynamic **GenUI & Agentic MCP Widget** for Flutter.
 ## ✨ Features
 
 - **Dynamic GenUI Surface Rendering** – Render model-generated interactive forms, charts, tables, and custom widgets directly inline in the chat transcript.
-- **Pluggable GenUI Catalog** – Define custom components using JSON schemas (`GenuiCatalogItemDefinition`) or Dart builders with `Catalog` and `BasicCatalogItems`.
+- **Pluggable GenUI Catalog** – Define custom components using JSON schemas (`GenuiCatalogItemDefinition`) or Dart builders with A2UI's `ComponentImplementation`, `CatalogImplementation` and `basicCatalog()`.
 - **Multi-LLM Support** – OpenAI, Anthropic Claude, Google Gemini, Ollama (local), Mistral AI, and custom OpenAI-compatible endpoints.
 - **Embedded On-Device LLMs** – Run GGUF models locally with `llamadart` without network dependencies.
 - **MCP & Local Tool Calling** – Connect remote HTTP/SSE MCP servers, local subprocess servers, and Dart-native tools.
@@ -91,7 +91,6 @@ Add to your `pubspec.yaml`:
 ```yaml
 dependencies:
   flutter_genui_mcp: ^1.5.7
-  genui: ^0.10.4
 ```
 
 Then import:
@@ -113,10 +112,10 @@ The primary widget providing a full-featured generative UI and agent interface.
 | `initialLlmConfig` | `LlmConfig?` | `null` | Default LLM provider, model, API key, and settings. |
 | `initialServers` | `List<McpServerConfig>?` | `null` | Pre-configured list of HTTP MCP servers to connect to on startup. |
 | `customLocalTools` | `List<McpLocalTool>?` | `null` | Custom Dart-native tool implementations. |
-| `genuiCatalog` | `Catalog?` | `null` | Custom GenUI `Catalog` instance. |
+| `genuiCatalog` | `CatalogImplementation?` | `null` | Custom A2UI v0.9 catalog, such as one built from `basicCatalog()`. |
 | `genuiCatalogItems` | `List<GenuiCatalogItemDefinition>?` | `null` | List of JSON schema item definitions to build the catalog dynamically. |
 | `genuiCatalogJson` | `String?` | `null` | Raw JSON string containing schema catalog definitions. |
-| `clientFunctions` | `List<ClientFunction>?` | `null` | List of GenUI client-side functions (`ClientFunction` / `SynchronousClientFunction`) registered in the catalog. |
+| `clientFunctions` | `List<FunctionImplementation>?` | `null` | List of A2UI client-side functions (`FunctionImplementation`) registered in the catalog. |
 | `initialSystemPrompt` | `String?` | `null` | Optional initial system prompt. |
 | `initialEnabledTools` | `List<String>?` | `null` | Tool names pre-selected on startup. |
 | `showAgentInspector` | `bool` | `true` | Show/hide the side-by-side Agent Inspector panel. |

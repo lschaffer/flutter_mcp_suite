@@ -1,3 +1,17 @@
+## Unreleased
+
+* **Breaking: Move from `genui` to the A2UI Dart SDKs**:
+  * The package depends on `a2ui_core`, `a2ui_flutter` and `a2ui_agent` instead of `genui` and `genai_primitives`. It still speaks A2UI v0.9.
+  * The genui re-exports are replaced by their A2UI counterparts: `CatalogImplementation` (was `Catalog`), `ComponentImplementation` (was `CatalogItem`), `ComponentWidgetBuilder` with `ComponentNode`, `ComponentProps` and `ChildWidgetBuilder` (was `CatalogWidgetBuilder` with `CatalogItemContext`), `basicCatalog()` and `BasicComponents` (was `BasicCatalogItems`), `FunctionImplementation` and `A2uiReturnType` (was `ClientFunction`, `SynchronousClientFunction` and `ClientFunctionReturnType`), `BasicCatalog` (was `BasicFunctions`), `DataContext` (also replaces `ExecutionContext`) and `DataModel` (also replaces `InMemoryDataModel`). `DataPath` and `JsonMap` are gone: paths are JSON Pointer strings and maps are `Map<String, Object?>`. `A2uiSurface`, `SurfaceModel`, `CommonSchemas` and `CancellationSignal` are new re-exports.
+  * `GenuiMcpPlayground.genuiCatalog` and `McpGenuiChatController(catalog:)` take a `CatalogImplementation`, and `clientFunctions` takes `FunctionImplementation`s.
+  * `GenuiWidgetBuilder`, the builder type of `GenuiCatalogRegistry`, is now `ComponentWidgetBuilder`: `(context, node, props, buildChild)`, where `props` holds the component's resolved properties.
+  * `genuiChatMessageItem` is a `ComponentImplementation`, and `buildGenuiCatalog` returns a `CatalogImplementation`.
+  * `McpGenuiChatController.surfaceController` and `conversation` are replaced by `processor`, the A2UI `MessageProcessor` that holds the surfaces. `contextFor` returns the surface's `SurfaceModel`, or null if there is none; render it with `A2uiSurface`.
+* **Behavior Changes**:
+  * The system prompt comes from `a2ui_agent` and asks the model for A2UI JSON in `<a2ui-json>` blocks instead of markdown-fenced JSON. A2UI JSON the model writes outside these blocks, fenced or as bare components, is still rendered when its reply ends.
+  * Components are checked against their schemas before they render, and an A2UI message with a component that fails the check is dropped. Components defined with `GenuiCatalogItemDefinition` and the `ChatMessage` component still accept properties their schema does not list; a `ComponentImplementation` accepts them only when its schema sets `additionalProperties: true`.
+  * A reply that updates a surface an earlier reply created is rejected. The prompt already asked the model to create a new surface instead.
+
 ## 1.5.7
 
 * **Synchronized Suite Upgrades**:
