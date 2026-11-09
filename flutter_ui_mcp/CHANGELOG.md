@@ -1,3 +1,9 @@
+## 1.5.8
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.8`, `flutter_ui_mcp_core: ^1.5.8`, `openai_dart: ^12.0.0`, `ollama_dart: ^5.0.0`, `anthropic_sdk_dart: ^10.0.0`, and `googleai_dart: ^13.1.0`.
+  * Inherited 10-minute HTTP request timeouts for resilient local model execution (Hypura, vLLM, LM Studio).
+
 ## 1.5.7
 
 * **Synchronized Suite Upgrades**:

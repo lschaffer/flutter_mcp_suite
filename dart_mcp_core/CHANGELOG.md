@@ -1,3 +1,15 @@
+## 1.5.8
+
+- **Configurable HTTP Request Timeout (10 Minutes Default)**:
+  - Added `timeoutSeconds` (default: 600 seconds / 10 minutes) and `Duration get timeout` to `LlmConfig`.
+  - Injected `config.timeout` into `OpenAIConfig`, `OllamaConfig`, `AnthropicConfig`, and `GoogleAIConfig`.
+  - Added `.timeout(timeout)` in `_OpenAiCompatiblePatchClient` to prevent 2-minute timeouts when interacting with local models (Hypura, vLLM, LM Studio) during non-streaming tool execution turns.
+- **AI SDK Major Upgrades**:
+  - Upgraded `openai_dart` to `^12.0.0` (aligned with sealed `ChatMessage` / `AssistantMessage` model hierarchy).
+  - Upgraded `ollama_dart` to `^5.0.0` (Ollama 0.40.14 alignment with multimodal embedding types and speech/audio).
+  - Upgraded `anthropic_sdk_dart` to `^10.0.0` (file document source and cancellation support).
+  - Upgraded `googleai_dart` to `^13.1.0`.
+
 ## 1.5.7
 
 - **Synchronized Suite Upgrades**:

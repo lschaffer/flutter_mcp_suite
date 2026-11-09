@@ -375,15 +375,20 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.openai.com/v1';
-    final cacheKey = 'openai_${config.apiKey}_$baseUrl';
+    final cacheKey = 'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
         config: openai.OpenAIConfig(
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
+          timeout: config.timeout,
+          connectTimeout: const Duration(seconds: 60),
         ),
-        httpClient: _OpenAiCompatiblePatchClient(http.Client()),
+        httpClient: _OpenAiCompatiblePatchClient(
+          http.Client(),
+          timeout: config.timeout,
+        ),
       ),
     );
     return await _generateOpenAIWithClient(
@@ -404,15 +409,20 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.mistral.ai/v1';
-    final cacheKey = 'mistral_${config.apiKey}_$baseUrl';
+    final cacheKey = 'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
         config: openai.OpenAIConfig(
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
+          timeout: config.timeout,
+          connectTimeout: const Duration(seconds: 60),
         ),
-        httpClient: _MistralPatchClient(http.Client()),
+        httpClient: _MistralPatchClient(
+          http.Client(),
+          timeout: config.timeout,
+        ),
       ),
     );
     return await _generateOpenAIWithClient(
@@ -433,15 +443,20 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.openai.com/v1';
-    final cacheKey = 'openai_${config.apiKey}_$baseUrl';
+    final cacheKey = 'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
         config: openai.OpenAIConfig(
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
+          timeout: config.timeout,
+          connectTimeout: const Duration(seconds: 60),
         ),
-        httpClient: _OpenAiCompatiblePatchClient(http.Client()),
+        httpClient: _OpenAiCompatiblePatchClient(
+          http.Client(),
+          timeout: config.timeout,
+        ),
       ),
     );
     return _streamOpenAIWithClient(client, config, messages, tools, systemPrompt);
@@ -456,15 +471,20 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.mistral.ai/v1';
-    final cacheKey = 'mistral_${config.apiKey}_$baseUrl';
+    final cacheKey = 'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
         config: openai.OpenAIConfig(
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
+          timeout: config.timeout,
+          connectTimeout: const Duration(seconds: 60),
         ),
-        httpClient: _MistralPatchClient(http.Client()),
+        httpClient: _MistralPatchClient(
+          http.Client(),
+          timeout: config.timeout,
+        ),
       ),
     );
     return _streamOpenAIWithClient(client, config, messages, tools, systemPrompt);
@@ -571,12 +591,13 @@ class LLMService {
     List<MCPTool> tools,
     String? systemPrompt,
   ) async {
-    final cacheKey = 'anthropic_${config.apiKey}';
+    final cacheKey = 'anthropic_${config.apiKey}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => anthropic.AnthropicClient(
         config: anthropic.AnthropicConfig(
           authProvider: anthropic.ApiKeyProvider(config.apiKey),
+          timeout: config.timeout,
         ),
       ),
     );
@@ -717,12 +738,13 @@ class LLMService {
     List<MCPTool> tools,
     String? systemPrompt,
   ) async* {
-    final cacheKey = 'anthropic_${config.apiKey}';
+    final cacheKey = 'anthropic_${config.apiKey}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => anthropic.AnthropicClient(
         config: anthropic.AnthropicConfig(
           authProvider: anthropic.ApiKeyProvider(config.apiKey),
+          timeout: config.timeout,
         ),
       ),
     );
@@ -895,12 +917,13 @@ class LLMService {
     List<MCPTool> tools,
     String? systemPrompt,
   ) async {
-    final cacheKey = 'gemini_${config.apiKey}';
+    final cacheKey = 'gemini_${config.apiKey}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => gemini.GoogleAIClient(
         config: gemini.GoogleAIConfig.googleAI(
           authProvider: gemini.ApiKeyProvider(config.apiKey),
+          timeout: config.timeout,
         ),
       ),
     );
@@ -1082,12 +1105,13 @@ class LLMService {
     List<MCPTool> tools,
     String? systemPrompt,
   ) async* {
-    final cacheKey = 'gemini_${config.apiKey}';
+    final cacheKey = 'gemini_${config.apiKey}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => gemini.GoogleAIClient(
         config: gemini.GoogleAIConfig.googleAI(
           authProvider: gemini.ApiKeyProvider(config.apiKey),
+          timeout: config.timeout,
         ),
       ),
     );
@@ -1339,11 +1363,15 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'http://localhost:11434/api';
-    final cacheKey = 'ollama_${config.apiKey}_$baseUrl';
+    final cacheKey = 'ollama_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => ollama.OllamaClient(
-        config: ollama.OllamaConfig(baseUrl: baseUrl, defaultHeaders: headers),
+        config: ollama.OllamaConfig(
+          baseUrl: baseUrl,
+          defaultHeaders: headers,
+          timeout: config.timeout,
+        ),
       ),
     );
 
@@ -1414,11 +1442,15 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'http://localhost:11434/api';
-    final cacheKey = 'ollama_${config.apiKey}_$baseUrl';
+    final cacheKey = 'ollama_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => ollama.OllamaClient(
-        config: ollama.OllamaConfig(baseUrl: baseUrl, defaultHeaders: headers),
+        config: ollama.OllamaConfig(
+          baseUrl: baseUrl,
+          defaultHeaders: headers,
+          timeout: config.timeout,
+        ),
       ),
     );
 
@@ -1504,9 +1536,14 @@ class LLMService {
 ///   in openai_dart's requireJsonInt for fields like cache_write_tokens).
 /// - Both non-streaming responses and SSE streams (text/event-stream).
 class _OpenAiCompatiblePatchClient extends http.BaseClient {
-  _OpenAiCompatiblePatchClient(this._inner, {this.isMistral = false});
+  _OpenAiCompatiblePatchClient(
+    this._inner, {
+    this.isMistral = false,
+    this.timeout = const Duration(minutes: 10),
+  });
   final http.Client _inner;
   final bool isMistral;
+  final Duration timeout;
 
   static bool _sanitizeUsage(Map<String, dynamic> decoded) {
     bool changed = false;
@@ -1721,7 +1758,7 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
       } catch (_) {}
     }
 
-    final streamed = await _inner.send(requestToSend);
+    final streamed = await _inner.send(requestToSend).timeout(timeout);
 
     if (!request.url.path.contains('chat/completions')) {
       return streamed;
@@ -1804,5 +1841,8 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
 
 /// Backwards compatible subclass for Mistral-specific configuration.
 class _MistralPatchClient extends _OpenAiCompatiblePatchClient {
-  _MistralPatchClient(super.inner) : super(isMistral: true);
+  _MistralPatchClient(
+    super.inner, {
+    super.timeout = const Duration(minutes: 10),
+  }) : super(isMistral: true);
 }

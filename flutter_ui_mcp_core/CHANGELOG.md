@@ -1,3 +1,15 @@
+## 1.5.8
+
+* **Configurable 10-Minute HTTP Timeout for Local Models & Coding Agents**:
+  * Inherited `timeoutSeconds` (default 600s / 10m) from `dart_mcp_core` across all LLM adapters.
+  * Eliminates 2-minute timeouts when interacting with local models (Hypura, vLLM, LM Studio) during non-streaming tool execution turns.
+* **Synchronized AI SDK Major Upgrades**:
+  * Upgraded `openai_dart` to `^12.0.0`.
+  * Upgraded `ollama_dart` to `^5.0.0`.
+  * Upgraded `anthropic_sdk_dart` to `^10.0.0`.
+  * Upgraded `googleai_dart` to `^13.1.0`.
+  * Upgraded `dart_mcp_core` to `^1.5.8`.
+
 ## 1.5.7
 
 * **Clickable Markdown & Autolinked URLs**:
