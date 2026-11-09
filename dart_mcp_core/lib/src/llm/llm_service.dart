@@ -200,9 +200,11 @@ class LLMService {
         }
         i++;
       } else if (msg.role == ChatRole.tool) {
-        openAiMsgs.add(
-          openai.ChatMessage.tool(toolCallId: msg.id, content: msg.content),
-        );
+        if (openAiMsgs.isNotEmpty && openAiMsgs.last is openai.AssistantMessage) {
+          openAiMsgs.add(
+            openai.ChatMessage.tool(toolCallId: msg.id, content: msg.content),
+          );
+        }
         i++;
       } else if (msg.role == ChatRole.assistant) {
         final textParts = <String>[];

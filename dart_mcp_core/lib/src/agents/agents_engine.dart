@@ -1750,6 +1750,14 @@ class McpAgentEngine {
 
       // ── Final result ────────────────────────────────────
       _statuses[agentKey] = AgentStatus.finished;
+      if (lastResponse.trim().isEmpty) {
+        for (final m in messages.reversed) {
+          if (m.role == ChatRole.assistant && m.content.trim().isNotEmpty) {
+            lastResponse = m.content;
+            break;
+          }
+        }
+      }
       emit(AgentFinalResultEvent(lastResponse, messages: List.unmodifiable(messages)));
       onFinalResult?.call(lastResponse);
 

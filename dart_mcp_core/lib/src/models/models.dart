@@ -94,6 +94,7 @@ class LlmConfig {
   final int? seed;
   final int maxToolOutputSize;
   final int tokenWarningThreshold;
+  final int timeoutSeconds;
 
   // Flags
   final bool isSlm;
@@ -112,7 +113,7 @@ class LlmConfig {
     this.baseUrl = '',
     this.temperature = 0.2,
     this.maxTokens = 0,
-    this.maxToolIterations = 30,
+    this.maxToolIterations = 100,
     this.maxTurns = 500,
     this.turnLimit = 0,
     this.topP,
@@ -121,6 +122,7 @@ class LlmConfig {
     this.seed,
     this.maxToolOutputSize = 2560000,
     this.tokenWarningThreshold = 1500000,
+    this.timeoutSeconds = 600,
     this.isSlm = false,
     this.isMultiModal = true,
     this.thinking = false,
@@ -128,6 +130,10 @@ class LlmConfig {
     this.useSafeToolCall = false,
     this.useStreaming = false,
   });
+
+  /// Duration timeout for HTTP requests, defaulting to 10 minutes (600 seconds).
+  Duration get timeout =>
+      Duration(seconds: timeoutSeconds > 0 ? timeoutSeconds : 600);
 
   /// Human-friendly display name, falling back to model name or provider label.
   String get displayName =>
@@ -141,7 +147,7 @@ class LlmConfig {
           ? id!
           : 'llm_${provider.name}_${model.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
 
-  /// Alias for [maxToolIterations] (default 30, 0 = unlimited).
+  /// Alias for [maxToolIterations] (default 100, 0 = unlimited).
   int get maxToolCalls => maxToolIterations;
 
   bool get isConfigured {
@@ -184,6 +190,7 @@ class LlmConfig {
     int? seed,
     int? maxToolOutputSize,
     int? tokenWarningThreshold,
+    int? timeoutSeconds,
     bool? isSlm,
     bool? isMultiModal,
     bool? thinking,
@@ -210,6 +217,7 @@ class LlmConfig {
       maxToolOutputSize: maxToolOutputSize ?? this.maxToolOutputSize,
       tokenWarningThreshold:
           tokenWarningThreshold ?? this.tokenWarningThreshold,
+      timeoutSeconds: timeoutSeconds ?? this.timeoutSeconds,
       isSlm: isSlm ?? this.isSlm,
       isMultiModal: isMultiModal ?? this.isMultiModal,
       thinking: thinking ?? this.thinking,
@@ -238,6 +246,8 @@ class LlmConfig {
     if (seed != null) 'seed': seed,
     'maxToolOutputSize': maxToolOutputSize,
     'tokenWarningThreshold': tokenWarningThreshold,
+    'timeoutSeconds': timeoutSeconds,
+    'timeout_seconds': timeoutSeconds,
     'isSlm': isSlm,
     'isMultiModal': isMultiModal,
     'thinking': thinking,
@@ -254,6 +264,10 @@ class LlmConfig {
         json['maxToolIterations'];
     final maxTurnsVal = json['max_turns'] ?? json['maxTurns'];
     final turnLimitVal = json['turn_limit'] ?? json['turnLimit'];
+    final timeoutVal =
+        json['timeoutSeconds'] ??
+        json['timeout_seconds'] ??
+        json['timeout'];
 
     return LlmConfig(
       id: json['id'] as String?,
@@ -279,6 +293,9 @@ class LlmConfig {
       seed: json['seed'] as int?,
       maxToolOutputSize: json['maxToolOutputSize'] as int? ?? 2560000,
       tokenWarningThreshold: json['tokenWarningThreshold'] as int? ?? 1500000,
+      timeoutSeconds: timeoutVal is int
+          ? timeoutVal
+          : int.tryParse(timeoutVal?.toString() ?? '') ?? 600,
       isSlm: json['isSlm'] as bool? ?? false,
       isMultiModal: json['isMultiModal'] as bool? ?? true,
       thinking: json['thinking'] as bool? ?? false,

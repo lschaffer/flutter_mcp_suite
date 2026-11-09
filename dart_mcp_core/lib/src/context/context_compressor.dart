@@ -226,7 +226,7 @@ class ContextCompressor {
     String? systemPrompt,
   }) async {
     final totalMessages = messages.length;
-    final splitIndex = totalMessages - preserveRecentCount;
+    var splitIndex = totalMessages - preserveRecentCount;
     if (splitIndex <= 0) {
       final currentTokens = estimateTokens(messages, systemPrompt: systemPrompt);
       return CompressionResult(
@@ -236,6 +236,16 @@ class ContextCompressor {
         summary: '',
         compressedTurnCount: 0,
       );
+    }
+
+    // Ensure we do not split in the middle of a tool call / tool response sequence
+    while (splitIndex > 0 && messages[splitIndex].role == ChatRole.tool) {
+      splitIndex--;
+    }
+    while (splitIndex > 0 &&
+        messages[splitIndex].role == ChatRole.assistant &&
+        messages[splitIndex].type == MessageType.toolCall) {
+      splitIndex--;
     }
 
     final oldMessages = messages.sublist(0, splitIndex);
@@ -281,7 +291,7 @@ class ContextCompressor {
         tools: const [],
         systemPrompt:
             'You are a conversation summarizer. Distill history into dense, factual bullet points.',
-      );
+      ).timeout(const Duration(seconds: 45));
       summary = response.text.trim();
     } catch (_) {
       // Fallback: create a basic truncated outline if model call fails
