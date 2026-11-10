@@ -1773,7 +1773,7 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
     if (isStreaming) {
       final transformer = StreamTransformer<List<int>, List<int>>.fromHandlers(
         handleData: (bytes, sink) {
-          final text = utf8.decode(bytes);
+          final text = utf8.decode(bytes, allowMalformed: true);
           final lines = text.split('\n');
           final patchedLines = <String>[];
           for (final line in lines) {
