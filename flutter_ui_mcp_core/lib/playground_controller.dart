@@ -1483,6 +1483,7 @@ class PlaygroundController extends ChangeNotifier {
       final savedTools = await _storage.loadEnabledTools();
       _enabledToolNames.clear();
       _enabledToolNames.addAll(savedTools);
+      _enabledToolNames.removeWhere((t) => t.startsWith('gh_mcp_'));
       if (_progressiveMcpDiscovery) {
         _enabledToolNames.remove('mcp_list_tools');
         _enabledToolNames.remove('mcp_call_tool');
@@ -1538,14 +1539,36 @@ class PlaygroundController extends ChangeNotifier {
     _servers.add(server);
     await _storage.saveServers(_servers);
     if (!autoSelectTools) {
-      _initializedClientIds.add(server.name);
+      _initializedClientIds.add(server.id);
       await _storage.saveInitializedClients(_initializedClientIds);
+    } else if (server.enabled) {
+      final cachedTools = await _storage.loadCachedServerTools(server.id);
+      if (cachedTools.isNotEmpty) {
+        for (final t in cachedTools) {
+          _enabledToolNames.add(t.name);
+        }
+        await _storage.saveEnabledTools(_enabledToolNames);
+      } else {
+        _initializedClientIds.remove(server.id);
+      }
     }
     await _syncMcpServers();
     notifyListeners();
   }
 
   Future<void> removeServer(String id) async {
+    final cachedTools = await _storage.loadCachedServerTools(id);
+    final existingClient =
+        _mcpManager.clients.where((c) => c.name == id).firstOrNull;
+    final toolNamesToRemove = <String>{
+      ...cachedTools.map((t) => t.name),
+      if (existingClient != null)
+        ...existingClient.availableTools.map((t) => t.name),
+    };
+    if (toolNamesToRemove.isNotEmpty) {
+      _enabledToolNames.removeAll(toolNamesToRemove);
+      await _storage.saveEnabledTools(_enabledToolNames);
+    }
     _servers.removeWhere((s) => s.id == id);
     await _storage.saveServers(_servers);
     await _syncMcpServers();
@@ -1557,6 +1580,29 @@ class PlaygroundController extends ChangeNotifier {
     if (idx != -1) {
       _servers[idx] = _servers[idx].copyWith(enabled: enabled);
       await _storage.saveServers(_servers);
+      final cachedTools = await _storage.loadCachedServerTools(id);
+      if (enabled) {
+        if (cachedTools.isNotEmpty) {
+          for (final t in cachedTools) {
+            _enabledToolNames.add(t.name);
+          }
+          await _storage.saveEnabledTools(_enabledToolNames);
+        } else {
+          _initializedClientIds.remove(id);
+        }
+      } else {
+        final existingClient =
+            _mcpManager.clients.where((c) => c.name == id).firstOrNull;
+        final toolNamesToRemove = <String>{
+          ...cachedTools.map((t) => t.name),
+          if (existingClient != null)
+            ...existingClient.availableTools.map((t) => t.name),
+        };
+        if (toolNamesToRemove.isNotEmpty) {
+          _enabledToolNames.removeAll(toolNamesToRemove);
+          await _storage.saveEnabledTools(_enabledToolNames);
+        }
+      }
       await _syncMcpServers();
       notifyListeners();
     }
@@ -1565,8 +1611,33 @@ class PlaygroundController extends ChangeNotifier {
   Future<void> updateServer(McpServerConfig server) async {
     final idx = _servers.indexWhere((s) => s.id == server.id);
     if (idx != -1) {
+      final wasEnabled = _servers[idx].enabled;
       _servers[idx] = server;
       await _storage.saveServers(_servers);
+      if (!wasEnabled && server.enabled) {
+        final cachedTools = await _storage.loadCachedServerTools(server.id);
+        if (cachedTools.isNotEmpty) {
+          for (final t in cachedTools) {
+            _enabledToolNames.add(t.name);
+          }
+          await _storage.saveEnabledTools(_enabledToolNames);
+        } else {
+          _initializedClientIds.remove(server.id);
+        }
+      } else if (wasEnabled && !server.enabled) {
+        final cachedTools = await _storage.loadCachedServerTools(server.id);
+        final existingClient =
+            _mcpManager.clients.where((c) => c.name == server.id).firstOrNull;
+        final toolNamesToRemove = <String>{
+          ...cachedTools.map((t) => t.name),
+          if (existingClient != null)
+            ...existingClient.availableTools.map((t) => t.name),
+        };
+        if (toolNamesToRemove.isNotEmpty) {
+          _enabledToolNames.removeAll(toolNamesToRemove);
+          await _storage.saveEnabledTools(_enabledToolNames);
+        }
+      }
       await _syncMcpServers();
       notifyListeners();
     }
@@ -1588,6 +1659,7 @@ class PlaygroundController extends ChangeNotifier {
 
     final List<MCPClientDef> nextClients = [];
     final List<MCPClientDef> clientsToConnect = [];
+    bool toolsAutoEnabled = false;
 
     for (final s in activeServers) {
       final cachedTools = await _storage.loadCachedServerTools(s.id);
@@ -1620,10 +1692,21 @@ class PlaygroundController extends ChangeNotifier {
       }
       nextClients.add(clientDef);
 
-      final hasSelectedTool = cachedTools.any(
+      bool hasSelectedTool = cachedTools.any(
         (t) => _enabledToolNames.contains(t.name),
       );
-      final shouldConnect = hasSelectedTool;
+      if (!hasSelectedTool && cachedTools.isNotEmpty) {
+        for (final t in cachedTools) {
+          _enabledToolNames.add(t.name);
+        }
+        hasSelectedTool = true;
+        toolsAutoEnabled = true;
+      }
+
+      final shouldConnect =
+          hasSelectedTool ||
+          cachedTools.isEmpty ||
+          !_initializedClientIds.contains(s.id);
 
       if (shouldConnect) {
         clientsToConnect.add(clientDef);
@@ -1639,14 +1722,14 @@ class PlaygroundController extends ChangeNotifier {
       _mcpManager.registerClient(c);
     }
 
-    // Only trigger actual connections for selected/undiscovered servers
+    // Trigger actual connections for selected/undiscovered servers
     if (clientsToConnect.isNotEmpty) {
       await Future.wait(
         clientsToConnect.map((c) => _connectClientAndCacheTools(c)),
       );
     }
 
-    bool changed = false;
+    bool changed = toolsAutoEnabled;
     for (final clientDef in _mcpManager.clients) {
       if (clientDef.isConnected &&
           !_initializedClientIds.contains(clientDef.name)) {
@@ -1663,10 +1746,20 @@ class PlaygroundController extends ChangeNotifier {
 
   Future<void> _connectClientAndCacheTools(MCPClientDef c) async {
     try {
+      final wasInitialized = _initializedClientIds.contains(c.name);
+      final hadAnySelected = c.availableTools.any(
+        (t) => _enabledToolNames.contains(t.name),
+      );
       await c.client.connect();
       if (c.client.availableTools.isNotEmpty) {
         await _storage.saveCachedServerTools(c.name, c.client.availableTools);
         c.cachedTools = c.client.availableTools;
+        if (!wasInitialized || !hadAnySelected) {
+          for (final t in c.client.availableTools) {
+            _enabledToolNames.add(t.name);
+          }
+          await _storage.saveEnabledTools(_enabledToolNames);
+        }
         _initializedClientIds.add(c.name);
         await _storage.saveInitializedClients(_initializedClientIds);
       }

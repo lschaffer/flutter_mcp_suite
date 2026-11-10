@@ -1,3 +1,10 @@
+## 1.5.9
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.9` and `flutter_ui_mcp_core: ^1.5.9`.
+  * Inherited automatic MCP server tool caching, auto-selection, and cleanup in `PlaygroundController` to eliminate "0 Tools" states.
+  * Inherited lazy on-demand MCP client auto-connections and name/label tool discovery matching.
+
 ## 1.5.8
 
 * **Synchronized Suite Upgrades**:

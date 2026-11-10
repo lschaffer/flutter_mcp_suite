@@ -1,3 +1,11 @@
+## 1.5.9
+
+- **Cached MCP Tools Exposure & Auto-Connection in `MultiMCPManager`**:
+  - `MultiMCPManager.availableTools`: Exposes registered client tools when available (including cached tools), avoiding dropping tools prior to initial handshake.
+  - `MultiMCPManager.callTool`: Automatically connects lazy-initialized clients on demand when calling an MCP tool that is registered with cached tools.
+- **Progressive Tool Discovery Server Matching (`McpListToolsTool`)**:
+  - `McpListToolsTool.execute`: Searches both client `name` and friendly display `label` when filtering tools by server name.
+
 ## 1.5.8
 
 - **Configurable HTTP Request Timeout (10 Minutes Default)**:

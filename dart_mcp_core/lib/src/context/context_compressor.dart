@@ -55,20 +55,21 @@ class EpisodicMemoryEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'archiveId': archiveId,
-        'startTurnIndex': startTurnIndex,
-        'endTurnIndex': endTurnIndex,
-        'timestamp': timestamp.toIso8601String(),
-        'rawMessages': rawMessages.map((m) => m.toJson()).toList(),
-        'summary': summary,
-      };
+    'archiveId': archiveId,
+    'startTurnIndex': startTurnIndex,
+    'endTurnIndex': endTurnIndex,
+    'timestamp': timestamp.toIso8601String(),
+    'rawMessages': rawMessages.map((m) => m.toJson()).toList(),
+    'summary': summary,
+  };
 
   factory EpisodicMemoryEntry.fromJson(Map<String, dynamic> json) =>
       EpisodicMemoryEntry(
         archiveId: json['archiveId'] as String,
         startTurnIndex: json['startTurnIndex'] as int? ?? 0,
         endTurnIndex: json['endTurnIndex'] as int? ?? 0,
-        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+        timestamp:
+            DateTime.tryParse(json['timestamp'] as String? ?? '') ??
             DateTime.now(),
         rawMessages: (json['rawMessages'] as List? ?? [])
             .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
@@ -149,9 +150,7 @@ class EpisodicMemoryStore {
       _entries.map((e) => e.toJson()).toList();
 
   /// Bulk serialization of all entries into a map.
-  Map<String, dynamic> toJson() => {
-        'entries': toJsonList(),
-      };
+  Map<String, dynamic> toJson() => {'entries': toJsonList()};
 
   /// Restores an [EpisodicMemoryStore] from a serialized map.
   factory EpisodicMemoryStore.fromJson(Map<String, dynamic> json) {
@@ -274,7 +273,6 @@ class ContextCompressor {
       recentMessages = messages.sublist(splitIndex);
     }
 
-
     // Build the transcript text for older messages
     final buffer = StringBuffer();
     for (final msg in oldMessages) {
@@ -285,15 +283,18 @@ class ContextCompressor {
       }
       if (msg.toolResult != null) {
         final t = msg.toolResult!.text;
-        final snippet = t.length > 400 ? '${t.substring(0, 400)}...[truncated]' : t;
+        final snippet = t.length > 400
+            ? '${t.substring(0, 400)}...[truncated]'
+            : t;
         buffer.writeln('[TOOL RESULT]: $snippet');
       }
     }
 
-    final instructions = customSummaryPrompt ??
+    final instructions =
+        customSummaryPrompt ??
         'Summarize the following conversation history concisely in bullet points. '
-        'Retain all key facts, user goals, decisions, constraints, and tool results. '
-        'Do not add commentary, output only the bulleted summary:';
+            'Retain all key facts, user goals, decisions, constraints, and tool results. '
+            'Do not add commentary, output only the bulleted summary:';
     final promptText = '$instructions\n\n$buffer';
 
     final summaryRequest = [
@@ -355,12 +356,14 @@ class ContextCompressor {
 
     final compressedList = <ChatMessage>[
       summaryMessage,
-      if (preservedUserPrompt != null) preservedUserPrompt,
+      ?preservedUserPrompt,
       ...recentMessages,
     ];
 
-    final compressedTokens =
-        estimateTokens(compressedList, systemPrompt: systemPrompt);
+    final compressedTokens = estimateTokens(
+      compressedList,
+      systemPrompt: systemPrompt,
+    );
 
     return CompressionResult(
       compressedMessages: compressedList,

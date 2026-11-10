@@ -90,7 +90,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_genui_mcp: ^1.5.8
+  flutter_genui_mcp: ^1.5.9
   genui: ^0.10.4
 ```
 

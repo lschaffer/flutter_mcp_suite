@@ -58,10 +58,11 @@ class McpListToolsTool extends McpLocalTool {
 
     // Add connected MCP tools
     for (final clientDef in mcpManager.clients) {
-      if (!clientDef.isConnected) continue;
+      if (!clientDef.isConnected && clientDef.availableTools.isEmpty) continue;
       if (serverFilter != null &&
           serverFilter.isNotEmpty &&
-          !clientDef.name.toLowerCase().contains(serverFilter)) {
+          !clientDef.name.toLowerCase().contains(serverFilter) &&
+          !clientDef.label.toLowerCase().contains(serverFilter)) {
         continue;
       }
       for (final tool in clientDef.availableTools) {

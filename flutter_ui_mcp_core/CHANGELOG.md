@@ -1,3 +1,13 @@
+## 1.5.9
+
+* **Automatic MCP Server Tool Selection & Synchronization**:
+  * Enabling or adding an MCP server now automatically discovers/caches tools and registers them into `enabledToolNames`, preventing the "0 Tools" state when external or custom MCP servers are toggled.
+  * Disabling or removing an MCP server automatically purges its associated tools from `enabledToolNames`.
+  * Server synchronization automatically triggers connections for enabled servers that have cached tools or have not yet completed tool discovery.
+  * Cleans up legacy pseudo-tool IDs (e.g. `gh_mcp_*`) on startup.
+* **Suite Synchronization**:
+  * Upgraded `dart_mcp_core` dependency to `^1.5.9`.
+
 ## 1.5.8
 
 * **Configurable 10-Minute HTTP Timeout for Local Models & Coding Agents**:

@@ -85,7 +85,7 @@ class MultiMCPManager extends McpChangeNotifier {
     final seen = <String>{};
 
     for (final clientDef in _clients) {
-      if (!clientDef.isConnected) continue;
+      if (!clientDef.isConnected && clientDef.availableTools.isEmpty) continue;
       for (final tool in clientDef.availableTools) {
         if (seen.add(tool.name)) {
           tools.add(tool);
@@ -111,8 +111,11 @@ class MultiMCPManager extends McpChangeNotifier {
   ) async {
     final resolvedName = _resolveToolName(toolName);
     for (final clientDef in _clients) {
-      if (!clientDef.isConnected) continue;
+      if (!clientDef.isConnected && clientDef.availableTools.isEmpty) continue;
       if (clientDef.availableTools.any((t) => t.name == resolvedName)) {
+        if (!clientDef.isConnected) {
+          await clientDef.client.connect();
+        }
         return await clientDef.callTool(resolvedName, arguments);
       }
     }
