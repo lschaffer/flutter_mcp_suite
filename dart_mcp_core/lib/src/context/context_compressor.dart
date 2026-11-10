@@ -274,7 +274,6 @@ class ContextCompressor {
       recentMessages = messages.sublist(splitIndex);
     }
 
-    final originalTokens = estimateTokens(messages, systemPrompt: systemPrompt);
 
     // Build the transcript text for older messages
     final buffer = StringBuffer();
