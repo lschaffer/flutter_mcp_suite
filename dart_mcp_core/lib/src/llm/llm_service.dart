@@ -609,7 +609,7 @@ class LLMService {
         if (fallback.text.isNotEmpty) {
           yield LLMStreamChunk(textDelta: fallback.text);
         }
-        yield LLMStreamChunk(isDone: true, finalResponse: fallback);
+        yield LLMStreamChunk(textDelta: '', isDone: true, finalResponse: fallback);
         return;
       } catch (_) {}
     }
