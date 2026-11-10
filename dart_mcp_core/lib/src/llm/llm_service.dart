@@ -200,12 +200,41 @@ class LLMService {
         }
         i++;
       } else if (msg.role == ChatRole.tool) {
-        if (openAiMsgs.isNotEmpty && openAiMsgs.last is openai.AssistantMessage) {
-          openAiMsgs.add(
-            openai.ChatMessage.tool(toolCallId: msg.id, content: msg.content),
-          );
+        final toolResults = <ChatMessage>[];
+        while (i < messages.length && messages[i].role == ChatRole.tool) {
+          toolResults.add(messages[i]);
+          i++;
         }
-        i++;
+
+        openai.AssistantMessage? lastAssistant;
+        for (int k = openAiMsgs.length - 1; k >= 0; k--) {
+          final m = openAiMsgs[k];
+          if (m is openai.AssistantMessage) {
+            lastAssistant = m;
+            break;
+          }
+          if (m is! openai.ToolMessage) break;
+        }
+
+        if (lastAssistant == null || lastAssistant.toolCalls == null || lastAssistant.toolCalls!.isEmpty) {
+          final syntheticCalls = toolResults.map((t) => openai.ToolCall.functionCall(
+            id: t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}',
+            call: openai.FunctionCall.fromMap(
+              name: t.toolName ?? 'tool',
+              arguments: {},
+            ),
+          )).toList();
+          openAiMsgs.add(openai.ChatMessage.assistant(toolCalls: syntheticCalls));
+          for (int idx = 0; idx < toolResults.length; idx++) {
+            final t = toolResults[idx];
+            final callId = syntheticCalls[idx].id;
+            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: callId, content: t.content));
+          }
+        } else {
+          for (final t in toolResults) {
+            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: t.id, content: t.content));
+          }
+        }
       } else if (msg.role == ChatRole.assistant) {
         final textParts = <String>[];
         final toolCalls = <openai.ToolCall>[];
@@ -242,6 +271,11 @@ class LLMService {
       } else {
         i++;
       }
+    }
+
+    int firstNonSystemIdx = openAiMsgs.indexWhere((m) => m is! openai.SystemMessage);
+    if (firstNonSystemIdx != -1 && openAiMsgs[firstNonSystemIdx] is! openai.UserMessage) {
+      openAiMsgs.insert(firstNonSystemIdx, openai.ChatMessage.user('Continue.'));
     }
 
     return openAiMsgs;
@@ -527,32 +561,57 @@ class LLMService {
     final textBuffer = StringBuffer();
     final Map<int, Map<String, dynamic>> toolCallAccumulators = {};
 
-    await for (final event in stream) {
-      final choice = event.choices?.firstOrNull;
-      if (choice != null) {
-        final content = choice.delta.content;
-        if (content != null && content.isNotEmpty) {
-          textBuffer.write(content);
-          yield LLMStreamChunk(textDelta: content);
-        }
+    try {
+      final timedStream = stream.timeout(
+        const Duration(seconds: 40),
+        onTimeout: (sink) {
+          sink.close();
+        },
+      );
+      await for (final event in timedStream) {
+        final choice = event.choices?.firstOrNull;
+        if (choice != null) {
+          final content = choice.delta.content;
+          if (content != null && content.isNotEmpty) {
+            textBuffer.write(content);
+            yield LLMStreamChunk(textDelta: content);
+          }
 
-        final deltas = choice.delta.toolCalls;
-        if (deltas != null) {
-          for (final d in deltas) {
-            final idx = d.index;
-            final acc = toolCallAccumulators.putIfAbsent(idx, () => <String, dynamic>{
-              'id': '',
-              'name': '',
-              'arguments': StringBuffer(),
-            });
-            if (d.id != null) acc['id'] = d.id;
-            if (d.function?.name != null) acc['name'] = d.function!.name;
-            if (d.function?.arguments != null) {
-              (acc['arguments'] as StringBuffer).write(d.function!.arguments);
+          final deltas = choice.delta.toolCalls;
+          if (deltas != null) {
+            for (final d in deltas) {
+              final idx = d.index;
+              final acc = toolCallAccumulators.putIfAbsent(idx, () => <String, dynamic>{
+                'id': '',
+                'name': '',
+                'arguments': StringBuffer(),
+              });
+              if (d.id != null) acc['id'] = d.id;
+              if (d.function?.name != null) acc['name'] = d.function!.name;
+              if (d.function?.arguments != null) {
+                (acc['arguments'] as StringBuffer).write(d.function!.arguments);
+              }
             }
           }
         }
       }
+    } catch (_) {}
+
+    if (textBuffer.isEmpty && toolCallAccumulators.isEmpty) {
+      try {
+        final fallback = await _generateOpenAIWithClient(
+          client,
+          config,
+          messages,
+          tools,
+          systemPrompt,
+        ).timeout(const Duration(seconds: 45));
+        if (fallback.text.isNotEmpty) {
+          yield LLMStreamChunk(textDelta: fallback.text);
+        }
+        yield LLMStreamChunk(isDone: true, finalResponse: fallback);
+        return;
+      } catch (_) {}
     }
 
     final toolCalls = <LLMToolCall>[];

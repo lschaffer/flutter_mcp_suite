@@ -226,30 +226,53 @@ class ContextCompressor {
     String? systemPrompt,
   }) async {
     final totalMessages = messages.length;
-    var splitIndex = totalMessages - preserveRecentCount;
-    if (splitIndex <= 0) {
-      final currentTokens = estimateTokens(messages, systemPrompt: systemPrompt);
-      return CompressionResult(
-        compressedMessages: List.of(messages),
-        originalTokens: currentTokens,
-        compressedTokens: currentTokens,
-        summary: '',
-        compressedTurnCount: 0,
-      );
+    final originalTokens = estimateTokens(messages, systemPrompt: systemPrompt);
+
+    // Find the latest user message index
+    int lastUserIdx = -1;
+    for (int k = messages.length - 1; k >= 0; k--) {
+      if (messages[k].role == ChatRole.user) {
+        lastUserIdx = k;
+        break;
+      }
     }
 
-    // Ensure we do not split in the middle of a tool call / tool response sequence
-    while (splitIndex > 0 && messages[splitIndex].role == ChatRole.tool) {
-      splitIndex--;
-    }
-    while (splitIndex > 0 &&
-        messages[splitIndex].role == ChatRole.assistant &&
-        messages[splitIndex].type == MessageType.toolCall) {
-      splitIndex--;
-    }
+    final List<ChatMessage> oldMessages;
+    final List<ChatMessage> recentMessages;
+    final ChatMessage? preservedUserPrompt;
 
-    final oldMessages = messages.sublist(0, splitIndex);
-    final recentMessages = messages.sublist(splitIndex);
+    if (lastUserIdx > 0) {
+      // Multiple user turns exist: split cleanly at the latest user turn boundary
+      oldMessages = messages.sublist(0, lastUserIdx);
+      recentMessages = messages.sublist(lastUserIdx);
+      preservedUserPrompt = null;
+    } else {
+      // Single in-flight user turn with extensive tool executions:
+      // Preserve the user's root prompt (messages[0]), compress intermediate tool calls
+      var splitIndex = totalMessages - preserveRecentCount;
+      while (splitIndex > 1 && messages[splitIndex].role == ChatRole.tool) {
+        splitIndex--;
+      }
+      while (splitIndex > 1 &&
+          messages[splitIndex].role == ChatRole.assistant &&
+          messages[splitIndex].type == MessageType.toolCall) {
+        splitIndex--;
+      }
+
+      if (splitIndex <= 1) {
+        return CompressionResult(
+          compressedMessages: List.of(messages),
+          originalTokens: originalTokens,
+          compressedTokens: originalTokens,
+          summary: '',
+          compressedTurnCount: 0,
+        );
+      }
+
+      preservedUserPrompt = messages.first;
+      oldMessages = messages.sublist(1, splitIndex);
+      recentMessages = messages.sublist(splitIndex);
+    }
 
     final originalTokens = estimateTokens(messages, systemPrompt: systemPrompt);
 
@@ -333,6 +356,7 @@ class ContextCompressor {
 
     final compressedList = <ChatMessage>[
       summaryMessage,
+      if (preservedUserPrompt != null) preservedUserPrompt,
       ...recentMessages,
     ];
 

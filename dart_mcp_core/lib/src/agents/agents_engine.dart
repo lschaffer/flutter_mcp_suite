@@ -1319,20 +1319,31 @@ class McpAgentEngine {
           if (agent.llmConfig.useStreaming || agent.llmConfig.isSlm) {
             final textBuffer = StringBuffer();
             LLMResponse? finalResponse;
-            await for (final chunk in LLMService.generateStream(
-              config: agent.llmConfig,
-              messages: requestMsgs,
-              tools: mcpTools,
-              systemPrompt: callSystemPrompt,
-            )) {
-              if (_cancelTokens[agentKey] == true) break;
-              if (chunk.textDelta.isNotEmpty) {
-                textBuffer.write(chunk.textDelta);
-                emit(AgentTextChunkEvent(chunk.textDelta));
+            try {
+              final stream = LLMService.generateStream(
+                config: agent.llmConfig,
+                messages: requestMsgs,
+                tools: mcpTools,
+                systemPrompt: callSystemPrompt,
+              ).timeout(
+                const Duration(seconds: 75),
+                onTimeout: (sink) {
+                  _log('Agent stream timed out after 75s of inactivity.');
+                  sink.close();
+                },
+              );
+              await for (final chunk in stream) {
+                if (_cancelTokens[agentKey] == true) break;
+                if (chunk.textDelta.isNotEmpty) {
+                  textBuffer.write(chunk.textDelta);
+                  emit(AgentTextChunkEvent(chunk.textDelta));
+                }
+                if (chunk.isDone) {
+                  finalResponse = chunk.finalResponse;
+                }
               }
-              if (chunk.isDone) {
-                finalResponse = chunk.finalResponse;
-              }
+            } catch (e) {
+              _log('Stream error or timeout in agent loop: $e');
             }
             if (_cancelTokens[agentKey] == true) break;
             response =
