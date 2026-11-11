@@ -1,3 +1,9 @@
+## 1.5.10
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.10` and `flutter_ui_mcp_core: ^1.5.10`.
+  * Inherited OpenAI-compatible chat template empty content fix (`BadRequestException: can only concatenate str`) and context window auto-compression improvements.
+
 ## 1.5.9
 
 * **Synchronized Suite Upgrades**:

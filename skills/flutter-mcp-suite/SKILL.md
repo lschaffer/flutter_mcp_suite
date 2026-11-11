@@ -22,7 +22,7 @@ This skill equips AI agents (Claude Code, Cursor, Copilot, OpenClaw, Codex CLI) 
 
 Activate this skill whenever the user asks to:
 1. **Build or Architect Flutter Apps**: Create new widgets, screens, responsive layouts, or state management logic.
-2. **Use Flutter MCP Suite Tools**: Connect or orchestrate tools from `dart_mcp_core`, `flutter_ui_mcp`, or `flutter_genui_mcp`.
+2. **Use Flutter MCP Suite Tools**: Connect or orchestrate tools from `dart_mcp_core`, `flutter_ui_mcp`, `flutter_ui_mcp_core`, or `flutter_a2ui_mcp` (successor to `flutter_genui_mcp`).
 3. **Generate Dynamic GenUI (A2UI)**: Emit structured UI component schemas for real-time rendering in Flutter.
 4. **Audit and Analyze Dart Code**: Run static analysis (`dart analyze` / `flutter analyze`), inspect git diffs, or enforce Flutter best practices.
 5. **Configure MCP in Developer Environments**: Set up `.cursor/mcp.json`, Claude Desktop config, or stdio/SSE server connections for Flutter.

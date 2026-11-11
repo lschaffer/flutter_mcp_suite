@@ -224,15 +224,15 @@ class LLMService {
               arguments: {},
             ),
           )).toList();
-          openAiMsgs.add(openai.ChatMessage.assistant(toolCalls: syntheticCalls));
+          openAiMsgs.add(openai.ChatMessage.assistant(content: '', toolCalls: syntheticCalls));
           for (int idx = 0; idx < toolResults.length; idx++) {
             final t = toolResults[idx];
             final callId = syntheticCalls[idx].id;
-            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: callId, content: t.content));
+            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: callId, content: t.content.isNotEmpty ? t.content : '(empty result)'));
           }
         } else {
           for (final t in toolResults) {
-            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: t.id, content: t.content));
+            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}', content: t.content.isNotEmpty ? t.content : '(empty result)'));
           }
         }
       } else if (msg.role == ChatRole.assistant) {
@@ -261,7 +261,7 @@ class LLMService {
         if (toolCalls.isNotEmpty) {
           openAiMsgs.add(
             openai.ChatMessage.assistant(
-              content: combinedText.isNotEmpty ? combinedText : null,
+              content: combinedText,
               toolCalls: toolCalls,
             ),
           );

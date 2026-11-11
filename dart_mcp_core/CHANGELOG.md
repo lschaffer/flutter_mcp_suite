@@ -1,3 +1,11 @@
+## 1.5.10
+
+- **OpenAI Compatible Content Sanitization for Python/vLLM/DeepInfra Chat Templates**:
+  - Ensured `openai.ChatMessage.assistant` serializes `content: ''` (empty string) rather than `null` when emitting messages with `tool_calls` or synthetic function calls, preventing `BadRequestException: can only concatenate str (not "NoneType") to str` in Jinja chat templates.
+  - Sanitized tool message content with fallback for empty results.
+- **Context Window Auto-Compression Guardrails (`ContextCompressor`)**:
+  - Increased minimum threshold check (`preserveRecentCount + 4`) and require at least 4 older turns before triggering in-flight compression, avoiding repeated 1-turn archiving loops.
+
 ## 1.5.9
 
 - **Cached MCP Tools Exposure & Auto-Connection in `MultiMCPManager`**:

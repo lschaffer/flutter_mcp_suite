@@ -208,7 +208,7 @@ class ContextCompressor {
 
   /// Determines whether [messages] exceed [tokenThreshold] and can be compressed.
   bool shouldCompress(List<ChatMessage> messages, {String? systemPrompt}) {
-    if (messages.length <= preserveRecentCount + 1) return false;
+    if (messages.length <= preserveRecentCount + 4) return false;
     final tokens = estimateTokens(messages, systemPrompt: systemPrompt);
     return tokens >= tokenThreshold;
   }
@@ -258,7 +258,7 @@ class ContextCompressor {
         splitIndex--;
       }
 
-      if (splitIndex <= 1) {
+      if (splitIndex <= 3) {
         return CompressionResult(
           compressedMessages: List.of(messages),
           originalTokens: originalTokens,

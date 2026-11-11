@@ -1,3 +1,8 @@
+## 1.5.10
+
+* **Suite Synchronization**:
+  * Upgraded `dart_mcp_core` dependency to `^1.5.10` (OpenAI compatible empty content sanitization and context window auto-compression improvements).
+
 ## 1.5.9
 
 * **Automatic MCP Server Tool Selection & Synchronization**:
