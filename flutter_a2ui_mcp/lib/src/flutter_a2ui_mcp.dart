@@ -261,7 +261,9 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
   void _onStateChange() {
     if (!mounted) return;
     final activeLlm = _getActiveLlmConfig();
-    _a2uiController?.llmConfig = activeLlm;
+    if (_a2uiController != null && _a2uiController!.llmConfig != activeLlm) {
+      _a2uiController!.llmConfig = activeLlm;
+    }
     try {
       final binding = WidgetsBinding.instance;
       if (binding.schedulerPhase == SchedulerPhase.persistentCallbacks) {

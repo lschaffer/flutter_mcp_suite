@@ -8,4 +8,5 @@
   - **Multi-LLM Support**: Supports OpenAI, Anthropic Claude, Google Gemini, Ollama, Mistral AI, OpenAI-compatible APIs, and local embedded GGUF models.
   - **Agent Inspector**: Real-time side panel for inspecting tool executions, active system prompts, tokens, and A2UI JSON payloads.
   - **Backwards Compatibility**: Includes typedefs (`FlutterGenUiMcp`, `GenuiMcpPlayground`) and compatibility aliases for smooth transition from `flutter_genui_mcp`.
+  - **Reactivity & Recursion Guards**: Guarded `updateLlmConfig` and `_onStateChange` against redundant re-entrant state notifications.
 

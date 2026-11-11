@@ -146,7 +146,11 @@ class McpA2uiChatController extends ChangeNotifier {
   }
 
   /// Sets the LLM configuration.
-  set llmConfig(mp.LlmConfig config) => updateLlmConfig(config);
+  set llmConfig(mp.LlmConfig config) {
+    if (_llmConfig != config) {
+      updateLlmConfig(config);
+    }
+  }
 
   /// Active surface IDs currently available in the processor.
   Iterable<String> get activeSurfaceIds =>
@@ -583,8 +587,10 @@ class McpA2uiChatController extends ChangeNotifier {
 
   /// Updates the LLM configuration.
   void updateLlmConfig(mp.LlmConfig config) {
-    _llmConfig = config;
-    notifyListeners();
+    if (_llmConfig != config) {
+      _llmConfig = config;
+      notifyListeners();
+    }
   }
 
   /// Updates the active local tools.
