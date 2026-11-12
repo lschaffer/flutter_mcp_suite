@@ -14,13 +14,39 @@ dependencies:
     sdk: flutter
   flutter_a2ui_mcp:
     path: ../
-  dart_mcp_core: ^1.5.9
-  flutter_ui_mcp_core: ^1.5.9
+  dart_mcp_core: ^1.5.10
+  flutter_ui_mcp_core: ^1.5.10
+  mcp_playground_shared_tools:
+    path: shared_tools
+  http: ^1.6.0
+  fl_chart: ^1.2.0
   a2ui_flutter: ^0.3.0
   a2ui_core: ^0.7.0
   json_schema_builder: ^0.1.7
-  http: ^1.6.0
-  fl_chart: ^1.2.0
+  image: ^4.8.0
+  file_picker: ^13.1.0
+  url_launcher: ^6.3.1
+  material_ui: ^1.8.0
+  example_a2ui_weather:
+    path: ../../examples/a2ui/example_a2ui_weather
+  example_a2ui_smarthome:
+    path: ../../examples/a2ui/example_a2ui_smarthome
+  example_a2ui_pc_builder:
+    path: ../../examples/a2ui/example_a2ui_pc_builder
+  example_a2ui_finance:
+    path: ../../examples/a2ui/example_a2ui_finance
+  example_a2ui_filesystem:
+    path: ../../examples/a2ui/example_a2ui_filesystem
+  example_a2ui_file_etl:
+    path: ../../examples/a2ui/example_a2ui_file_etl
+  example_a2ui_data_studio:
+    path: ../../examples/a2ui/example_a2ui_data_studio
+  example_a2ui_model_optimizer:
+    path: ../../examples/a2ui/example_a2ui_model_optimizer
+  example_a2ui_benchmark_lab:
+    path: ../../examples/a2ui/example_a2ui_benchmark_lab
+  example_a2ui_agent_swarm:
+    path: ../../examples/a2ui/example_a2ui_agent_swarm
 
 dependency_overrides:
   dart_mcp_core:
@@ -29,6 +55,7 @@ dependency_overrides:
     path: ../../flutter_ui_mcp_core
   flutter_a2ui_mcp:
     path: ../
+  a2ui_core: ^0.7.0
 
 dev_dependencies:
   flutter_test:
@@ -37,3 +64,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - ../../.env

@@ -1,6 +1,7 @@
 library;
 
-export 'package:a2ui_core/a2ui_core.dart' hide Action;
+export 'package:a2ui_core/a2ui_core.dart'
+    hide Action, Catalog, ExecutionContext, DataContext, DataModel;
 export 'package:a2ui_flutter/a2ui_flutter.dart';
 export 'package:a2ui_flutter/basic_catalog.dart';
 export 'package:json_schema_builder/json_schema_builder.dart' show Schema, S;
@@ -17,6 +18,7 @@ export 'src/a2ui_catalog.dart';
 export 'src/a2ui_chat_controller.dart';
 export 'src/a2ui_chat_view.dart';
 export 'src/flutter_a2ui_mcp.dart';
+export 'src/a2ui_bridge.dart';
 
 import 'package:a2ui_core/a2ui_core.dart' hide Action;
 import 'package:a2ui_flutter/a2ui_flutter.dart';

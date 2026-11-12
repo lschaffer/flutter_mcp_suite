@@ -1,4 +1,5 @@
-import 'package:a2ui_core/a2ui_core.dart' hide Action;
+import 'dart:convert';
+import 'package:a2ui_core/a2ui_core.dart' hide Action, Catalog, ExecutionContext, DataContext, DataModel;
 import 'package:a2ui_flutter/a2ui_flutter.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart' hide LocalMCPClient;
 import 'package:file_picker/file_picker.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
 import 'package:uuid/uuid.dart';
 
+import 'a2ui_bridge.dart';
 import 'a2ui_catalog.dart';
 import 'a2ui_chat_controller.dart';
 
@@ -47,7 +49,7 @@ class A2uiMcpPlayground extends StatefulWidget {
   final List<A2uiCatalogItemDefinition>? a2uiCatalogItems;
 
   /// Optional custom A2UI catalog.
-  final CatalogImplementation? a2uiCatalog;
+  final dynamic a2uiCatalog;
 
   /// Optional catalog JSON string.
   final String? a2uiCatalogJson;
@@ -60,9 +62,9 @@ class A2uiMcpPlayground extends StatefulWidget {
 
   // Backwards compatibility aliases
   List<A2uiCatalogItemDefinition>? get genuiCatalogItems => a2uiCatalogItems;
-  CatalogImplementation? get genuiCatalog => a2uiCatalog;
+  dynamic get genuiCatalog => a2uiCatalog;
   String? get genuiCatalogJson => a2uiCatalogJson;
-  List<FunctionImplementation>? get clientFunctions => customFunctions;
+  dynamic get clientFunctions => customFunctions;
 
   /// Whether to show the Agent Inspector side panel and toggle button. Defaults to true.
   final bool showAgentInspector;
@@ -119,14 +121,14 @@ class A2uiMcpPlayground extends StatefulWidget {
     this.locale,
     this.enableLogging = false,
     List<A2uiCatalogItemDefinition>? a2uiCatalogItems,
-    CatalogImplementation? a2uiCatalog,
+    dynamic a2uiCatalog,
     String? a2uiCatalogJson,
     this.customComponents,
     List<FunctionImplementation>? customFunctions,
     List<A2uiCatalogItemDefinition>? genuiCatalogItems,
-    CatalogImplementation? genuiCatalog,
+    dynamic genuiCatalog,
     String? genuiCatalogJson,
-    List<FunctionImplementation>? clientFunctions,
+    dynamic clientFunctions,
     this.showAgentInspector = true,
     this.initialSystemPrompt,
     this.initialEnabledTools,
@@ -145,10 +147,13 @@ class A2uiMcpPlayground extends StatefulWidget {
     this.chatBackgroundDecoration,
     this.showEmptyChatState,
     this.emptyChatBuilder,
-  })  : a2uiCatalogItems = a2uiCatalogItems ?? genuiCatalogItems,
-        a2uiCatalog = a2uiCatalog ?? genuiCatalog,
-        a2uiCatalogJson = a2uiCatalogJson ?? genuiCatalogJson,
-        customFunctions = customFunctions ?? clientFunctions;
+  }) : a2uiCatalogItems = a2uiCatalogItems ?? genuiCatalogItems,
+       a2uiCatalog = a2uiCatalog ?? genuiCatalog,
+       a2uiCatalogJson = a2uiCatalogJson ?? genuiCatalogJson,
+       customFunctions = customFunctions ??
+           (clientFunctions is List<FunctionImplementation>
+               ? clientFunctions
+               : null);
 
   /// Optional custom decoration (e.g. background image or color) for the chat message view.
   /// Falls back to [PlaygroundController.chatBackgroundDecoration] if null.
@@ -582,6 +587,35 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
   void _initA2uiController() {
     _a2uiController?.dispose();
     final activeLlm = _getActiveLlmConfig();
+
+    final List<ComponentImplementation> extraComponents = [
+      if (widget.customComponents != null) ...widget.customComponents!,
+    ];
+    if (widget.a2uiCatalog is Catalog) {
+      for (final item in (widget.a2uiCatalog as Catalog).items) {
+        extraComponents.add(
+          ComponentImplementation(
+            name: item.name,
+            schema: item.dataSchema,
+            builder: (ctx, node, props, buildChild) {
+              final data = props.value('data') ?? node.toJson();
+              return item.widgetBuilder(
+                CatalogItemContext(
+                  id: node.componentId,
+                  data: data,
+                  buildContext: ctx,
+                  onDispatchEvent: (evt) {
+                    final text = 'Action: ${evt.name} with ${jsonEncode(evt.context)}';
+                    _a2uiController?.sendMessage(text);
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      }
+    }
+
     _a2uiController = McpA2uiChatController(
       llmConfig: activeLlm,
       tools: _controller.localTools,
@@ -591,10 +625,12 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                 (_controller.systemPrompt.isNotEmpty
                     ? _controller.systemPrompt
                     : null)),
-      catalog: widget.a2uiCatalog,
+      catalog: widget.a2uiCatalog is CatalogImplementation
+          ? (widget.a2uiCatalog as CatalogImplementation)
+          : null,
       catalogJson: widget.a2uiCatalogJson,
       catalogItems: widget.a2uiCatalogItems,
-      customComponents: widget.customComponents,
+      customComponents: extraComponents.isNotEmpty ? extraComponents : widget.customComponents,
       customFunctions: widget.customFunctions,
       playgroundController: _controller,
     );
@@ -1009,7 +1045,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
       final enabledGroups = groups.where((g) => _isToolsetEnabled(g)).toList();
 
       String promptText =
-          'Write a concise, professional system prompt (maximum 2-3 sentences) for a GenUI AI assistant. ';
+          'Write a concise, professional system prompt (maximum 2-3 sentences) for an A2UI AI assistant. ';
       if (enabledGroups.isNotEmpty) {
         final toolDetails = enabledGroups
             .map((g) => '${g.name}: ${g.description}')
@@ -1153,8 +1189,8 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                       message: _controller.chatMode
                           ? 'Direct Chat Mode (tap to switch to Agent Mode)'
                           : (_controller.progressiveMcpDiscovery
-                              ? 'Agent Mode: ${_controller.enabledToolNames.length} catalog tools available via 2 progressive meta-tools (tap to switch to Direct Chat)'
-                              : 'Agent Mode (tap to switch to Direct Chat)'),
+                                ? 'Agent Mode: ${_controller.enabledToolNames.length} catalog tools available via 2 progressive meta-tools (tap to switch to Direct Chat)'
+                                : 'Agent Mode (tap to switch to Direct Chat)'),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: () {
@@ -1243,7 +1279,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      'GenUI ${l10n.get('agentPlayground')}',
+                                      'A2UI ${l10n.get('agentPlayground')}',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 18,
@@ -1938,7 +1974,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
             child: FilledButton.icon(
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text(
-                'Start GenUI Agent',
+                'Start A2UI Agent',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               onPressed: _startPlayground,
@@ -1956,12 +1992,12 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
     }
 
     final isGenerating = _a2uiController!.isGenerating;
-    final bgDecoration = widget.chatBackgroundDecoration ??
-        _controller.chatBackgroundDecoration;
-    final showEmpty = widget.showEmptyChatState ??
-        _controller.showEmptyChatState;
-    final emptyBuilder = widget.emptyChatBuilder ??
-        _controller.emptyChatBuilder;
+    final bgDecoration =
+        widget.chatBackgroundDecoration ?? _controller.chatBackgroundDecoration;
+    final showEmpty =
+        widget.showEmptyChatState ?? _controller.showEmptyChatState;
+    final emptyBuilder =
+        widget.emptyChatBuilder ?? _controller.emptyChatBuilder;
 
     return Column(
       children: [
@@ -1986,7 +2022,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                   padding: const EdgeInsets.only(bottom: 24),
                   children: [
                     for (final entry in entries)
-                      _buildGenuiEntry(context, entry, theme),
+                      _buildA2uiEntry(context, entry, theme),
                   ],
                 );
               },
@@ -2009,7 +2045,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'GenUI Agent is generating interactive widgets and tool calls...',
+                    'A2UI Agent is generating interactive widgets and tool calls...',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.grey,
                     ),
@@ -2025,7 +2061,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
     );
   }
 
-  Widget _buildGenuiEntry(
+  Widget _buildA2uiEntry(
     BuildContext context,
     A2uiChatEntry entry,
     ThemeData theme,
@@ -2216,7 +2252,9 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                 builder: (surfaceCtx) {
                   Widget surfaceWidget = A2uiSurface(surface: surfaceModel);
                   if (Localizations.of<MaterialLocalizations>(
-                          surfaceCtx, MaterialLocalizations) ==
+                        surfaceCtx,
+                        MaterialLocalizations,
+                      ) ==
                       null) {
                     surfaceWidget = Localizations(
                       locale: const Locale('en', 'US'),
@@ -2287,7 +2325,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  hasLlm ? 'GenUI Agent Ready' : 'Welcome to GenUI Assistant',
+                  hasLlm ? 'A2UI Agent Ready' : 'Welcome to A2UI Assistant',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -2296,7 +2334,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                 const SizedBox(height: 8),
                 Text(
                   hasLlm
-                      ? 'Interactive GenUI widgets will be dynamically rendered directly from agent responses and MCP tool calls.'
+                      ? 'Interactive A2UI widgets will be dynamically rendered directly from agent responses and MCP tool calls.'
                       : 'To get started, configure your LLM provider (Gemini, Claude, OpenAI, Ollama, etc.) and model.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -2386,8 +2424,8 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
                 minLines: 1,
                 maxLines: 6,
                 hintText: isGen
-                    ? 'GenUI Agent is working...'
-                    : 'Ask the GenUI agent to render UI or run tools...',
+                    ? 'A2UI Agent is working...'
+                    : 'Ask the A2UI agent to render UI or run tools...',
                 leading: IconButton(
                   icon: const Icon(Icons.attach_file_outlined),
                   tooltip: 'Attach Files / Images',

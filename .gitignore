@@ -39,6 +39,7 @@ node_modules/
 # Recursively ignore build and Dart tool caches
 **/build/
 **/.dart_tool/
+**/ephemeral/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 **/.packages
