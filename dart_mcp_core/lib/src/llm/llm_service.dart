@@ -689,6 +689,9 @@ class LLMService {
     >
     grouped = [];
 
+    final List<String> currentToolUseIds = [];
+    int toolResponseIndex = 0;
+
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
 
@@ -699,6 +702,8 @@ class LLMService {
 
       final List<anthropic.InputContentBlock> blocks = [];
       if (msg.role == ChatRole.user) {
+        currentToolUseIds.clear();
+        toolResponseIndex = 0;
         if (msg.content.isNotEmpty) {
           blocks.add(anthropic.InputContentBlock.text(msg.content));
         }
@@ -725,6 +730,7 @@ class LLMService {
         }
       } else if (msg.role == ChatRole.assistant) {
         if (msg.type == MessageType.toolCall) {
+          currentToolUseIds.add(msg.id);
           blocks.add(
             anthropic.InputContentBlock.toolUse(
               id: msg.id,
@@ -738,9 +744,16 @@ class LLMService {
           }
         }
       } else if (msg.role == ChatRole.tool) {
+        String toolUseId = msg.id;
+        if (!currentToolUseIds.contains(toolUseId)) {
+          if (toolResponseIndex < currentToolUseIds.length) {
+            toolUseId = currentToolUseIds[toolResponseIndex];
+          }
+        }
+        toolResponseIndex++;
         blocks.add(
           anthropic.InputContentBlock.toolResultText(
-            toolUseId: msg.id,
+            toolUseId: toolUseId,
             text: msg.content,
           ),
         );
@@ -833,6 +846,9 @@ class LLMService {
 
     final List<MapEntry<anthropic.MessageRole, List<anthropic.InputContentBlock>>> grouped = [];
 
+    final List<String> currentToolUseIds = [];
+    int toolResponseIndex = 0;
+
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
 
@@ -843,6 +859,8 @@ class LLMService {
 
       final List<anthropic.InputContentBlock> blocks = [];
       if (msg.role == ChatRole.user) {
+        currentToolUseIds.clear();
+        toolResponseIndex = 0;
         if (msg.content.isNotEmpty) {
           blocks.add(anthropic.InputContentBlock.text(msg.content));
         }
@@ -869,6 +887,7 @@ class LLMService {
         }
       } else if (msg.role == ChatRole.assistant) {
         if (msg.type == MessageType.toolCall) {
+          currentToolUseIds.add(msg.id);
           blocks.add(
             anthropic.InputContentBlock.toolUse(
               id: msg.id,
@@ -882,9 +901,16 @@ class LLMService {
           }
         }
       } else if (msg.role == ChatRole.tool) {
+        String toolUseId = msg.id;
+        if (!currentToolUseIds.contains(toolUseId)) {
+          if (toolResponseIndex < currentToolUseIds.length) {
+            toolUseId = currentToolUseIds[toolResponseIndex];
+          }
+        }
+        toolResponseIndex++;
         blocks.add(
           anthropic.InputContentBlock.toolResultText(
-            toolUseId: msg.id,
+            toolUseId: toolUseId,
             text: msg.content,
           ),
         );
@@ -1026,6 +1052,8 @@ class LLMService {
     }
 
     final List<MapEntry<String, List<gemini.Part>>> grouped = [];
+    final List<String> lastModelFunctionNames = [];
+    int geminiToolResponseIndex = 0;
 
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
@@ -1035,6 +1063,8 @@ class LLMService {
 
       switch (msg.role) {
         case ChatRole.user:
+          lastModelFunctionNames.clear();
+          geminiToolResponseIndex = 0;
           geminiRole = 'user';
           if (msg.content.isNotEmpty) {
             parts.add(gemini.Part.text(msg.content));
@@ -1051,9 +1081,11 @@ class LLMService {
         case ChatRole.assistant:
           geminiRole = 'model';
           if (msg.type == MessageType.toolCall) {
+            final fName = msg.toolName ?? 'tool';
+            lastModelFunctionNames.add(fName);
             parts.add(
               gemini.Part.functionCall(
-                msg.toolName ?? '',
+                fName,
                 args: msg.toolArguments,
               ),
             );
@@ -1064,8 +1096,14 @@ class LLMService {
           }
         case ChatRole.tool:
           geminiRole = 'function';
+          final fName = (msg.toolName != null && msg.toolName!.isNotEmpty)
+              ? msg.toolName!
+              : (geminiToolResponseIndex < lastModelFunctionNames.length
+                  ? lastModelFunctionNames[geminiToolResponseIndex]
+                  : 'tool');
+          geminiToolResponseIndex++;
           parts.add(
-            gemini.Part.functionResponse(msg.toolName ?? '', {
+            gemini.Part.functionResponse(fName, {
               'content': msg.content,
             }),
           );
@@ -1214,6 +1252,8 @@ class LLMService {
     }
 
     final List<MapEntry<String, List<gemini.Part>>> grouped = [];
+    final List<String> lastModelFunctionNames = [];
+    int geminiToolResponseIndex = 0;
 
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
@@ -1223,6 +1263,8 @@ class LLMService {
 
       switch (msg.role) {
         case ChatRole.user:
+          lastModelFunctionNames.clear();
+          geminiToolResponseIndex = 0;
           geminiRole = 'user';
           if (msg.content.isNotEmpty) {
             parts.add(gemini.Part.text(msg.content));
@@ -1239,9 +1281,11 @@ class LLMService {
         case ChatRole.assistant:
           geminiRole = 'model';
           if (msg.type == MessageType.toolCall) {
+            final fName = msg.toolName ?? 'tool';
+            lastModelFunctionNames.add(fName);
             parts.add(
               gemini.Part.functionCall(
-                msg.toolName ?? '',
+                fName,
                 args: msg.toolArguments,
               ),
             );
@@ -1252,8 +1296,14 @@ class LLMService {
           }
         case ChatRole.tool:
           geminiRole = 'function';
+          final fName = (msg.toolName != null && msg.toolName!.isNotEmpty)
+              ? msg.toolName!
+              : (geminiToolResponseIndex < lastModelFunctionNames.length
+                  ? lastModelFunctionNames[geminiToolResponseIndex]
+                  : 'tool');
+          geminiToolResponseIndex++;
           parts.add(
-            gemini.Part.functionResponse(msg.toolName ?? '', {
+            gemini.Part.functionResponse(fName, {
               'content': msg.content,
             }),
           );
@@ -1388,13 +1438,52 @@ class LLMService {
         );
         i++;
       } else if (msg.role == ChatRole.tool) {
-        ollamaMsgs.add(
-          ollama.ChatMessage(
-            role: ollama.MessageRole.tool,
-            content: msg.content,
-          ),
-        );
-        i++;
+        final toolResults = <ChatMessage>[];
+        while (i < messages.length && messages[i].role == ChatRole.tool) {
+          toolResults.add(messages[i]);
+          i++;
+        }
+
+        ollama.ChatMessage? lastAssistant;
+        for (int k = ollamaMsgs.length - 1; k >= 0; k--) {
+          final m = ollamaMsgs[k];
+          if (m.role == ollama.MessageRole.assistant) {
+            lastAssistant = m;
+            break;
+          }
+          if (m.role != ollama.MessageRole.tool) break;
+        }
+
+        if (lastAssistant == null ||
+            lastAssistant.toolCalls == null ||
+            lastAssistant.toolCalls!.isEmpty) {
+          final syntheticCalls = toolResults
+              .map(
+                (t) => ollama.ToolCall(
+                  function: ollama.ToolCallFunction(
+                    name: t.toolName ?? 'tool',
+                    arguments: t.toolArguments ?? {},
+                  ),
+                ),
+              )
+              .toList();
+          ollamaMsgs.add(
+            ollama.ChatMessage(
+              role: ollama.MessageRole.assistant,
+              content: '',
+              toolCalls: syntheticCalls,
+            ),
+          );
+        }
+
+        for (final t in toolResults) {
+          ollamaMsgs.add(
+            ollama.ChatMessage(
+              role: ollama.MessageRole.tool,
+              content: t.content.isNotEmpty ? t.content : '(empty result)',
+            ),
+          );
+        }
       } else if (msg.role == ChatRole.assistant) {
         final textParts = <String>[];
         final toolCalls = <ollama.ToolCall>[];
