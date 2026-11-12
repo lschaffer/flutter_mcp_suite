@@ -307,12 +307,13 @@ class McpA2uiChatController extends ChangeNotifier {
 
           if (chunk.textDelta.isNotEmpty) {
             responseBuffer.write(chunk.textDelta);
+            final cleanText = _sanitizeAssistantText(responseBuffer.toString());
             final idx = _entries.indexWhere((e) => e.id == assistantEntryId);
             if (idx != -1) {
               _entries[idx] = A2uiChatEntry(
                 id: assistantEntryId,
                 kind: A2uiChatEntryKind.assistant,
-                text: responseBuffer.toString(),
+                text: cleanText,
               );
               notifyListeners();
             }
@@ -337,23 +338,36 @@ class McpA2uiChatController extends ChangeNotifier {
       }
 
       final fullResponse = responseBuffer.toString();
-      final assistantMsg = mp.ChatMessage(
-        id: assistantMsgId,
-        content: fullResponse,
-        role: mp.ChatRole.assistant,
-        timestamp: DateTime.now(),
-        type: requestedToolCalls.isNotEmpty
-            ? mp.MessageType.toolCall
-            : mp.MessageType.text,
-        toolName: requestedToolCalls.isNotEmpty
-            ? requestedToolCalls.first.name
-            : null,
-        toolArguments: requestedToolCalls.isNotEmpty
-            ? requestedToolCalls.first.arguments
-            : null,
-      );
-      _conversationHistory.add(assistantMsg);
-      _playgroundController?.addMessage(assistantMsg);
+      final cleanText = _sanitizeAssistantText(fullResponse);
+
+      if (fullResponse.trim().isNotEmpty) {
+        final assistantTextMsg = mp.ChatMessage(
+          id: assistantMsgId,
+          content: fullResponse,
+          role: mp.ChatRole.assistant,
+          timestamp: DateTime.now(),
+          type: mp.MessageType.text,
+        );
+        _conversationHistory.add(assistantTextMsg);
+        _playgroundController?.addMessage(assistantTextMsg);
+
+        final idx = _entries.indexWhere((e) => e.id == assistantEntryId);
+        if (cleanText.isNotEmpty) {
+          if (idx != -1) {
+            _entries[idx] = A2uiChatEntry(
+              id: assistantEntryId,
+              kind: A2uiChatEntryKind.assistant,
+              text: cleanText,
+            );
+          }
+        } else if (idx != -1) {
+          _entries.removeAt(idx);
+        }
+      } else {
+        // No text produced (e.g. model emitted only tool calls)
+        _entries.removeWhere((e) => e.id == assistantEntryId);
+      }
+      notifyListeners();
 
       // Parse and process any A2UI JSON payload in the response
       _parseAndProcessA2uiPayloads(fullResponse);
@@ -362,13 +376,30 @@ class McpA2uiChatController extends ChangeNotifier {
         break;
       }
 
-      // Execute tool calls
+      // Record tool call assistant messages with matching IDs
+      for (final tc in requestedToolCalls) {
+        final callId = tc.id.isNotEmpty ? tc.id : 'call_${tc.name}_${_newId()}';
+        final toolCallMsg = mp.ChatMessage(
+          id: callId,
+          content: '',
+          role: mp.ChatRole.assistant,
+          timestamp: DateTime.now(),
+          type: mp.MessageType.toolCall,
+          toolName: tc.name,
+          toolArguments: tc.arguments,
+        );
+        _conversationHistory.add(toolCallMsg);
+        _playgroundController?.addMessage(toolCallMsg);
+      }
+
+      // Execute tool calls and record tool response messages with matching IDs
       for (final tc in requestedToolCalls) {
         if (_cancelled) break;
 
+        final callId = tc.id.isNotEmpty ? tc.id : 'call_${tc.name}_${_newId()}';
         final toolResult = await _executeTool(tc);
         final toolMsg = mp.ChatMessage(
-          id: _newId(),
+          id: callId,
           content: toolResult.text,
           role: mp.ChatRole.tool,
           timestamp: DateTime.now(),
@@ -488,6 +519,31 @@ class McpA2uiChatController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  static final RegExp _a2uiJsonBlockRegex = RegExp(
+    r'```(?:json)?\s*[\s\S]*?```|<a2ui-json>[\s\S]*?</a2ui-json>|\{\s*"version"\s*:\s*"v?[0-9\.]+"[\s\S]*\}|,\s*\{\s*"id"\s*:[\s\S]*\}|\{\s*"id"\s*:[\s\S]*?"component"[\s\S]*?\}|\{\s*"component"\s*:[\s\S]*?\}',
+    caseSensitive: false,
+  );
+
+  /// Strips A2UI JSON code blocks so they are not displayed in the chat view.
+  static String _sanitizeAssistantText(String raw) {
+    String cleaned = raw;
+    // Strip in-progress code blocks during streaming
+    final unclosedCodeBlock =
+        RegExp(r'```(?:json)?\s*\{?[\s\S]*$', caseSensitive: false);
+    cleaned = cleaned.replaceAll(unclosedCodeBlock, '');
+    final unclosedTag = RegExp(r'<a2ui-json>[\s\S]*$', caseSensitive: false);
+    cleaned = cleaned.replaceAll(unclosedTag, '');
+    // Strip closed A2UI and component JSON blocks
+    cleaned = cleaned.replaceAll(_a2uiJsonBlockRegex, '');
+    // Strip trailing/dangling JSON fragments like ", { ... " or indented JSON
+    final danglingJson = RegExp(
+      r',?\s*\{\s*"(?:id|component|title|version|createSurface)"[\s\S]*$',
+      caseSensitive: false,
+    );
+    cleaned = cleaned.replaceAll(danglingJson, '');
+    return cleaned.trim();
+  }
+
   Future<mp.MCPToolResult> _executeTool(mp.LLMToolCall tc) async {
     // 1. Check local tools
     for (final t in _tools) {
@@ -509,6 +565,29 @@ class McpA2uiChatController extends ChangeNotifier {
         );
       } catch (e) {
         return mp.MCPToolResult.text('MCP tool execution error: $e');
+      }
+    }
+
+    // 3. Handle A2UI operations if invoked as tools
+    const a2uiOpMap = {
+      'createsurface': 'createSurface',
+      'updatecomponents': 'updateComponents',
+      'updatedatamodel': 'updateDataModel',
+      'deletesurface': 'deleteSurface',
+    };
+    final normalizedOp = a2uiOpMap[tc.name.toLowerCase().replaceAll('_', '')];
+    if (normalizedOp != null) {
+      try {
+        final payload = <String, dynamic>{
+          'version': 'v1.0',
+          normalizedOp: tc.arguments,
+        };
+        _processDecodedPayload(payload);
+        return mp.MCPToolResult.text(
+          'Surface operation $normalizedOp executed successfully',
+        );
+      } catch (e) {
+        return mp.MCPToolResult.text('A2UI tool error: $e');
       }
     }
 

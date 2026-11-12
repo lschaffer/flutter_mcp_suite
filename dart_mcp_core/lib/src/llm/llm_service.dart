@@ -231,8 +231,23 @@ class LLMService {
             openAiMsgs.add(openai.ChatMessage.tool(toolCallId: callId, content: t.content.isNotEmpty ? t.content : '(empty result)'));
           }
         } else {
-          for (final t in toolResults) {
-            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}', content: t.content.isNotEmpty ? t.content : '(empty result)'));
+          final existingCallIds = lastAssistant.toolCalls!
+              .map((tc) => tc.id)
+              .toSet();
+          for (int idx = 0; idx < toolResults.length; idx++) {
+            final t = toolResults[idx];
+            String callId = t.id;
+            if (!existingCallIds.contains(callId)) {
+              if (idx < lastAssistant.toolCalls!.length) {
+                callId = lastAssistant.toolCalls![idx].id;
+              } else {
+                callId = t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}';
+              }
+            }
+            openAiMsgs.add(openai.ChatMessage.tool(
+              toolCallId: callId,
+              content: t.content.isNotEmpty ? t.content : '(empty result)',
+            ));
           }
         }
       } else if (msg.role == ChatRole.assistant) {
@@ -561,6 +576,7 @@ class LLMService {
     final textBuffer = StringBuffer();
     final Map<int, Map<String, dynamic>> toolCallAccumulators = {};
 
+    Object? streamError;
     try {
       final timedStream = stream.timeout(
         const Duration(seconds: 40),
@@ -595,7 +611,9 @@ class LLMService {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      streamError = e;
+    }
 
     if (textBuffer.isEmpty && toolCallAccumulators.isEmpty) {
       try {
@@ -611,7 +629,12 @@ class LLMService {
         }
         yield LLMStreamChunk(textDelta: '', isDone: true, finalResponse: fallback);
         return;
-      } catch (_) {}
+      } catch (e) {
+        if (streamError != null) {
+          throw streamError;
+        }
+        rethrow;
+      }
     }
 
     final toolCalls = <LLMToolCall>[];
@@ -1676,9 +1699,10 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
     return changed;
   }
 
-  Map<String, dynamic> _sanitizeMistralChatRequest(
-    Map<String, dynamic> payload,
-  ) {
+  Map<String, dynamic> _sanitizeOpenAiCompatibleChatRequest(
+    Map<String, dynamic> payload, {
+    bool isMistral = false,
+  }) {
     final rawMessages = payload['messages'];
     if (rawMessages is! List) return payload;
 
@@ -1694,7 +1718,7 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
       final msg = Map<String, dynamic>.from(item);
       final role = (msg['role'] ?? '').toString();
 
-      if (role == 'user') {
+      if (role == 'user' && isMistral) {
         final content = msg['content'];
         if (content is List) {
           final patchedContent = content.map((part) {
@@ -1801,8 +1825,11 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
               }
             }
           }
-          final patchedPayload = isMistral ? _sanitizeMistralChatRequest(decoded) : decoded;
-          if (isMistral) changed = true;
+          final patchedPayload = _sanitizeOpenAiCompatibleChatRequest(
+            decoded,
+            isMistral: isMistral,
+          );
+          changed = true;
 
           if (changed) {
             final cleanHeaders = Map<String, String>.from(request.headers);
