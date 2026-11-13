@@ -598,15 +598,44 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
             name: item.name,
             schema: item.dataSchema,
             builder: (ctx, node, props, buildChild) {
-              final data = props.value('data') ?? node.toJson();
+              final Map<String, dynamic> dataMap = {};
+              final rawData = props.value('data');
+              if (rawData is Map) {
+                dataMap.addAll(Map<String, dynamic>.from(rawData));
+              } else {
+                dataMap.addAll(Map<String, dynamic>.from(node.toJson()));
+              }
+              for (final entry in props.entries) {
+                if (!dataMap.containsKey(entry.key)) {
+                  dataMap[entry.key] = ComponentProps.unwrap(entry.value);
+                }
+              }
+
               return item.widgetBuilder(
                 CatalogItemContext(
                   id: node.componentId,
-                  data: data,
+                  data: dataMap,
                   buildContext: ctx,
                   onDispatchEvent: (evt) {
-                    final text = 'Action: ${evt.name} with ${jsonEncode(evt.context)}';
-                    _a2uiController?.sendMessage(text);
+                    String msg;
+                    if (evt.name == 'get_weather_forecast' &&
+                        evt.context.containsKey('city')) {
+                      final city = evt.context['city'];
+                      final hours = evt.context['hours'] ?? 24;
+                      msg = 'Get weather forecast for $city ($hours hours)';
+                    } else if (evt.name == 'search_travel_destinations' &&
+                        (evt.context.containsKey('destination') ||
+                            evt.context.containsKey('query'))) {
+                      final q = evt.context['query'] ??
+                          evt.context['destination'];
+                      msg = 'Search accommodations: $q';
+                    } else {
+                      final ctxStr = evt.context.isNotEmpty
+                          ? ' with parameters: ${jsonEncode(evt.context)}'
+                          : '';
+                      msg = 'Perform action ${evt.name}$ctxStr';
+                    }
+                    _a2uiController?.sendMessage(msg);
                   },
                 ),
               );

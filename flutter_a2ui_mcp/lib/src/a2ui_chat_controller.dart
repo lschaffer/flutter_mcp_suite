@@ -340,6 +340,13 @@ class McpA2uiChatController extends ChangeNotifier {
       final fullResponse = responseBuffer.toString();
       final cleanText = _sanitizeAssistantText(fullResponse);
 
+      final initialSurfaceCount = _knownSurfaces.length;
+
+      // Parse and process any A2UI JSON payload in the response
+      _parseAndProcessA2uiPayloads(fullResponse);
+
+      final hasNewSurface = _knownSurfaces.length > initialSurfaceCount;
+
       if (fullResponse.trim().isNotEmpty) {
         final assistantTextMsg = mp.ChatMessage(
           id: assistantMsgId,
@@ -361,16 +368,21 @@ class McpA2uiChatController extends ChangeNotifier {
             );
           }
         } else if (idx != -1) {
-          _entries.removeAt(idx);
+          if (hasNewSurface) {
+            _entries.removeAt(idx);
+          } else {
+            _entries[idx] = A2uiChatEntry(
+              id: assistantEntryId,
+              kind: A2uiChatEntryKind.assistant,
+              text: fullResponse.trim(),
+            );
+          }
         }
       } else {
         // No text produced (e.g. model emitted only tool calls)
         _entries.removeWhere((e) => e.id == assistantEntryId);
       }
       notifyListeners();
-
-      // Parse and process any A2UI JSON payload in the response
-      _parseAndProcessA2uiPayloads(fullResponse);
 
       if (_cancelled || requestedToolCalls.isEmpty) {
         break;
@@ -416,60 +428,167 @@ class McpA2uiChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _parseAndProcessA2uiPayloads(String text) {
-    final candidates = <String>[];
+  /// Extracts top-level JSON objects from text by tracking balanced braces.
+  static List<Map<String, dynamic>> extractJsonObjects(String text) {
+    final results = <Map<String, dynamic>>[];
+    int depth = 0;
+    int startIndex = -1;
+    bool inString = false;
+    bool escape = false;
 
-    // Look for <a2ui-json>...</a2ui-json>
-    final tagRegex = RegExp(r'<a2ui-json>([\s\S]*?)</a2ui-json>', caseSensitive: false);
-    for (final m in tagRegex.allMatches(text)) {
-      final s = m.group(1)?.trim();
-      if (s != null && s.isNotEmpty) candidates.add(s);
-    }
-
-    // Look for ```json ... ``` code fences
-    final fenceRegex = RegExp(r'```(?:json)?\s*([\s\S]*?)\s*```');
-    for (final m in fenceRegex.allMatches(text)) {
-      final s = m.group(1)?.trim();
-      if (s != null && s.isNotEmpty) candidates.add(s);
-    }
-
-    // Look for un-fenced JSON objects with "component" or "createSurface"
-    if (candidates.isEmpty) {
-      final objRegex = RegExp(
-        r'\{[\s\S]*?(?:"component"|"createSurface")\s*:[\s\S]*?\}',
-        caseSensitive: false,
-      );
-      for (final m in objRegex.allMatches(text)) {
-        final s = m.group(0)?.trim();
-        if (s != null && s.isNotEmpty) candidates.add(s);
+    for (int i = 0; i < text.length; i++) {
+      final char = text[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char == '\\' && inString) {
+        escape = true;
+        continue;
+      }
+      if (char == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char == '{') {
+          if (depth == 0) {
+            startIndex = i;
+          }
+          depth++;
+        } else if (char == '}') {
+          depth--;
+          if (depth == 0 && startIndex != -1) {
+            final jsonSub = text.substring(startIndex, i + 1);
+            try {
+              final decoded = jsonDecode(jsonSub);
+              if (decoded is Map<String, dynamic>) {
+                results.add(decoded);
+              }
+            } catch (_) {}
+            startIndex = -1;
+          }
+        }
       }
     }
+    return results;
+  }
 
-    for (final jsonStr in candidates) {
+  void _parseAndProcessA2uiPayloads(String text) {
+    // 1. Check code fences and tags first
+    final fenceRegex = RegExp(
+      r'```(?:json)?\s*([\s\S]*?)\s*```|<a2ui-json>([\s\S]*?)</a2ui-json>',
+      caseSensitive: false,
+    );
+    final rawBlocks = <String>[];
+    for (final m in fenceRegex.allMatches(text)) {
+      final s = (m.group(1) ?? m.group(2))?.trim();
+      if (s != null && s.isNotEmpty) rawBlocks.add(s);
+    }
+
+    bool processedAny = false;
+    for (final block in rawBlocks) {
       try {
-        final decoded = jsonDecode(jsonStr);
+        final decoded = jsonDecode(block);
         if (decoded is Map<String, dynamic>) {
           _processDecodedPayload(decoded);
+          processedAny = true;
         } else if (decoded is List) {
           for (final item in decoded) {
             if (item is Map<String, dynamic>) {
               _processDecodedPayload(item);
+              processedAny = true;
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Block might contain concatenated JSON objects
+        final objects = extractJsonObjects(block);
+        for (final obj in objects) {
+          _processDecodedPayload(obj);
+          processedAny = true;
+        }
+      }
+    }
+
+    // 2. If no valid JSON found in code fences/tags, scan the entire text for JSON objects
+    if (!processedAny) {
+      final objects = extractJsonObjects(text);
+      for (final obj in objects) {
+        _processDecodedPayload(obj);
+      }
     }
   }
 
   void _processDecodedPayload(Map<String, dynamic> payload) {
     try {
+      // Normalize wire protocol version (A2UI wire version requires '1.0', rejecting 'v1.0')
+      final rawVersion = payload['version']?.toString().trim();
+      if (rawVersion == null ||
+          rawVersion == 'v1.0' ||
+          rawVersion == '1.0.0' ||
+          rawVersion == '1' ||
+          rawVersion == '1.0') {
+        payload['version'] = '1.0';
+      } else if (rawVersion == '0.9' ||
+          rawVersion == '0.9.0' ||
+          rawVersion == 'v0.9') {
+        payload['version'] = 'v0.9';
+      } else if (rawVersion == '0.9.1' || rawVersion == 'v0.9.1') {
+        payload['version'] = 'v0.9.1';
+      }
+
+      // Infer component name if missing from model JSON output
+      if (!payload.containsKey('component') &&
+          !payload.containsKey('createSurface') &&
+          !payload.containsKey('updateComponents')) {
+        if (payload.containsKey('items') ||
+            payload.containsKey('accommodations') ||
+            (payload.containsKey('title') &&
+                payload['title'].toString().toLowerCase().contains('stay'))) {
+          payload['component'] = 'AccommodationGrid';
+        } else if (payload.containsKey('days') ||
+            payload.containsKey('itinerary') ||
+            (payload.containsKey('title') &&
+                payload['title']
+                    .toString()
+                    .toLowerCase()
+                    .contains('itinerary'))) {
+          payload['component'] = 'TravelItineraryCard';
+        } else if (payload.containsKey('defaultDestination') ||
+            (payload.containsKey('title') &&
+                payload['title']
+                    .toString()
+                    .toLowerCase()
+                    .contains('finder'))) {
+          payload['component'] = 'TravelSearchForm';
+        } else if (payload.containsKey('times') &&
+            payload.containsKey('channels')) {
+          payload['component'] = 'WeatherChart';
+        } else if ((payload.containsKey('title') &&
+                payload['title']
+                    .toString()
+                    .toLowerCase()
+                    .contains('forecast duration')) ||
+            (payload.containsKey('duration') &&
+                payload.containsKey('channels'))) {
+          payload['component'] = 'WeatherForm';
+        } else if (payload.containsKey('current_temp') ||
+            payload.containsKey('target_temp') ||
+            payload.containsKey('room')) {
+          payload['component'] = 'ThermostatCard';
+        } else if (payload.containsKey('devices')) {
+          payload['component'] = 'DeviceGrid';
+        } else if (payload.containsKey('total_kwh') ||
+            payload.containsKey('breakdown')) {
+          payload['component'] = 'EnergyChart';
+        }
+      }
+
       if (payload.containsKey('createSurface') ||
           payload.containsKey('updateComponents') ||
           payload.containsKey('updateDataModel') ||
           payload.containsKey('deleteSurface')) {
-        if (!payload.containsKey('version')) {
-          payload['version'] = 'v1.0';
-        }
         if (payload.containsKey('createSurface')) {
           final cs = payload['createSurface'];
           if (cs is Map<String, dynamic> && !cs.containsKey('catalogId')) {
@@ -488,34 +607,34 @@ class McpA2uiChatController extends ChangeNotifier {
     if (compName.isEmpty) return;
 
     final surfaceId =
-        'surface_${compName.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
-    final compId = comp['id']?.toString() ?? 'root';
+        'surface_${compName.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}_${_newId().substring(0, 4)}';
     final compProps = Map<String, dynamic>.from(comp);
     compProps.remove('id');
     compProps.remove('component');
 
     try {
-      _processor.processMessages({
-        'version': 'v1.0',
-        'createSurface': {
-          'surfaceId': surfaceId,
-          'catalogId': _catalog.id,
+      _processor.processMessages([
+        {
+          'version': '1.0',
+          'createSurface': {
+            'surfaceId': surfaceId,
+            'catalogId': _catalog.id,
+          },
         },
-      });
-
-      _processor.processMessages({
-        'version': 'v1.0',
-        'updateComponents': {
-          'surfaceId': surfaceId,
-          'components': [
-            {
-              'id': compId,
-              'component': compName,
-              ...compProps,
-            },
-          ],
+        {
+          'version': '1.0',
+          'updateComponents': {
+            'surfaceId': surfaceId,
+            'components': [
+              {
+                'id': 'root',
+                'component': compName,
+                ...compProps,
+              },
+            ],
+          },
         },
-      });
+      ]);
     } catch (_) {}
   }
 
@@ -579,7 +698,7 @@ class McpA2uiChatController extends ChangeNotifier {
     if (normalizedOp != null) {
       try {
         final payload = <String, dynamic>{
-          'version': 'v1.0',
+          'version': '1.0',
           normalizedOp: tc.arguments,
         };
         _processDecodedPayload(payload);
@@ -638,9 +757,9 @@ class McpA2uiChatController extends ChangeNotifier {
     buffer.writeln();
     buffer.writeln(
       'Standard protocol messages:\n'
-      '1. createSurface: {"version": "v1.0", "createSurface": {"surfaceId": "...", "catalogId": "${_catalog.id}"}}\n'
-      '2. updateComponents: {"version": "v1.0", "updateComponents": {"surfaceId": "...", "components": [{"id": "root", "component": "...", ...}]}}\n'
-      '3. Direct shorthand: {"component": "ComponentName", ...}\n',
+      '1. Direct shorthand (RECOMMENDED): {"component": "ComponentName", ...properties}\n'
+      '2. Standard A2UI batch: [{"version": "1.0", "createSurface": {"surfaceId": "...", "catalogId": "${_catalog.id}"}}, {"version": "1.0", "updateComponents": {"surfaceId": "...", "components": [{"id": "root", "component": "ComponentName", ...}]}}]\n'
+      'Always include "component": "<ComponentName>" in any UI JSON payload.',
     );
 
     return buffer.toString();

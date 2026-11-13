@@ -494,11 +494,12 @@ When the user asks about home climate, devices, or energy usage:
 1. Invoke the tools: `get_home_state` or `get_energy_usage`.
 2. Generate interactive A2UI components:
    - "ThermostatCard" for climate control:
-     {"room": "Living Room", "current_temp": 21.5, "target_temp": 23.0, "mode": "Comfort", "humidity": 48}
+     {"component": "ThermostatCard", "room": "Living Room", "current_temp": 21.5, "target_temp": 23.0, "mode": "Comfort", "humidity": 48}
    - "DeviceGrid" for lights/switches:
-     {"devices": [{"id": "1", "name": "Living Room Chandelier", "is_on": true, "brightness": 80}]}
+     {"component": "DeviceGrid", "devices": [{"id": "1", "name": "Living Room Chandelier", "is_on": true, "brightness": 80}]}
    - "EnergyChart" for consumption:
-     {"total_kwh": 14.8, "breakdown": [{"room": "Living Room", "kwh": 4.5}]}
+     {"component": "EnergyChart", "total_kwh": 14.8, "breakdown": [{"room": "Living Room", "kwh": 4.5}]}
+Always emit component JSON inside ```json ... ``` blocks.
 ''';
 
 class SmartHomeScreen extends StatelessWidget {

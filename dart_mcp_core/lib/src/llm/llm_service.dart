@@ -21,7 +21,8 @@ class LLMService {
     required List<ChatMessage> messages,
     required List<MCPTool> tools,
     String? systemPrompt,
-  })? embeddedHandler;
+  })?
+  embeddedHandler;
 
   /// Pluggable delegate to handle streaming embedded (on-device) models execution.
   static Stream<LLMStreamChunk> Function({
@@ -29,8 +30,8 @@ class LLMService {
     required List<ChatMessage> messages,
     required List<MCPTool> tools,
     String? systemPrompt,
-  })? embeddedStreamHandler;
-
+  })?
+  embeddedStreamHandler;
 
   static T _getOrCreateClient<T>({
     required String key,
@@ -78,7 +79,9 @@ class LLMService {
       case LlmProvider.embedded:
         final handler = embeddedHandler;
         if (handler == null) {
-          throw Exception('Embedded model handler not registered on LLMService.');
+          throw Exception(
+            'Embedded model handler not registered on LLMService.',
+          );
         }
         return await handler(
           config: config,
@@ -115,7 +118,9 @@ class LLMService {
       case LlmProvider.embedded:
         final streamHandler = embeddedStreamHandler;
         if (streamHandler == null) {
-          throw Exception('Embedded model stream handler not registered on LLMService.');
+          throw Exception(
+            'Embedded model stream handler not registered on LLMService.',
+          );
         }
         yield* streamHandler(
           config: config,
@@ -173,7 +178,11 @@ class LLMService {
               }
             } else if (part is DocumentPart) {
               if (part.textContent != null && part.textContent!.isNotEmpty) {
-                parts.add(openai.ContentPart.text('[Document: ${part.fileName}]\n${part.textContent}'));
+                parts.add(
+                  openai.ContentPart.text(
+                    '[Document: ${part.fileName}]\n${part.textContent}',
+                  ),
+                );
               }
             }
           }
@@ -183,7 +192,8 @@ class LLMService {
             parts.add(openai.ContentPart.text(msg.content));
           }
           for (final att in msg.attachments!) {
-            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+            if (att.bytes != null &&
+                att.mimeType.toLowerCase().startsWith('image/')) {
               final base64Str = base64Encode(att.bytes!);
               final dataUri = 'data:${att.mimeType};base64,$base64Str';
               if (!addedImageUris.contains(dataUri)) {
@@ -216,19 +226,35 @@ class LLMService {
           if (m is! openai.ToolMessage) break;
         }
 
-        if (lastAssistant == null || lastAssistant.toolCalls == null || lastAssistant.toolCalls!.isEmpty) {
-          final syntheticCalls = toolResults.map((t) => openai.ToolCall.functionCall(
-            id: t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}',
-            call: openai.FunctionCall.fromMap(
-              name: t.toolName ?? 'tool',
-              arguments: {},
+        if (lastAssistant == null ||
+            lastAssistant.toolCalls == null ||
+            lastAssistant.toolCalls!.isEmpty) {
+          final syntheticCalls = toolResults
+              .map(
+                (t) => openai.ToolCall.functionCall(
+                  id: t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}',
+                  call: openai.FunctionCall.fromMap(
+                    name: t.toolName ?? 'tool',
+                    arguments: {},
+                  ),
+                ),
+              )
+              .toList();
+          openAiMsgs.add(
+            openai.ChatMessage.assistant(
+              content: '',
+              toolCalls: syntheticCalls,
             ),
-          )).toList();
-          openAiMsgs.add(openai.ChatMessage.assistant(content: '', toolCalls: syntheticCalls));
+          );
           for (int idx = 0; idx < toolResults.length; idx++) {
             final t = toolResults[idx];
             final callId = syntheticCalls[idx].id;
-            openAiMsgs.add(openai.ChatMessage.tool(toolCallId: callId, content: t.content.isNotEmpty ? t.content : '(empty result)'));
+            openAiMsgs.add(
+              openai.ChatMessage.tool(
+                toolCallId: callId,
+                content: t.content.isNotEmpty ? t.content : '(empty result)',
+              ),
+            );
           }
         } else {
           final existingCallIds = lastAssistant.toolCalls!
@@ -244,10 +270,12 @@ class LLMService {
                 callId = t.id.isNotEmpty ? t.id : 'call_${_uuid.v4()}';
               }
             }
-            openAiMsgs.add(openai.ChatMessage.tool(
-              toolCallId: callId,
-              content: t.content.isNotEmpty ? t.content : '(empty result)',
-            ));
+            openAiMsgs.add(
+              openai.ChatMessage.tool(
+                toolCallId: callId,
+                content: t.content.isNotEmpty ? t.content : '(empty result)',
+              ),
+            );
           }
         }
       } else if (msg.role == ChatRole.assistant) {
@@ -288,9 +316,15 @@ class LLMService {
       }
     }
 
-    int firstNonSystemIdx = openAiMsgs.indexWhere((m) => m is! openai.SystemMessage);
-    if (firstNonSystemIdx != -1 && openAiMsgs[firstNonSystemIdx] is! openai.UserMessage) {
-      openAiMsgs.insert(firstNonSystemIdx, openai.ChatMessage.user('Continue.'));
+    int firstNonSystemIdx = openAiMsgs.indexWhere(
+      (m) => m is! openai.SystemMessage,
+    );
+    if (firstNonSystemIdx != -1 &&
+        openAiMsgs[firstNonSystemIdx] is! openai.UserMessage) {
+      openAiMsgs.insert(
+        firstNonSystemIdx,
+        openai.ChatMessage.user('Continue.'),
+      );
     }
 
     return openAiMsgs;
@@ -299,7 +333,9 @@ class LLMService {
   /// Cleans and sanitizes a tool input schema so that LLM providers (including Gemini,
   /// OpenAI, Anthropic, DeepInfra, and Ollama) receive standard, self-contained JSON Schemas
   /// without unresolved external `$ref` pointers (e.g. references to undefined schemas).
-  static Map<String, dynamic> sanitizeSchemaForLlm(Map<String, dynamic>? schema) {
+  static Map<String, dynamic> sanitizeSchemaForLlm(
+    Map<String, dynamic>? schema,
+  ) {
     if (schema == null) {
       return {'type': 'object', 'properties': <String, dynamic>{}};
     }
@@ -424,7 +460,8 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.openai.com/v1';
-    final cacheKey = 'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final cacheKey =
+        'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -458,7 +495,8 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.mistral.ai/v1';
-    final cacheKey = 'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final cacheKey =
+        'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -468,10 +506,7 @@ class LLMService {
           timeout: config.timeout,
           connectTimeout: const Duration(seconds: 60),
         ),
-        httpClient: _MistralPatchClient(
-          http.Client(),
-          timeout: config.timeout,
-        ),
+        httpClient: _MistralPatchClient(http.Client(), timeout: config.timeout),
       ),
     );
     return await _generateOpenAIWithClient(
@@ -492,7 +527,8 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.openai.com/v1';
-    final cacheKey = 'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final cacheKey =
+        'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -508,7 +544,13 @@ class LLMService {
         ),
       ),
     );
-    return _streamOpenAIWithClient(client, config, messages, tools, systemPrompt);
+    return _streamOpenAIWithClient(
+      client,
+      config,
+      messages,
+      tools,
+      systemPrompt,
+    );
   }
 
   static Stream<LLMStreamChunk> _streamMistral(
@@ -520,7 +562,8 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'https://api.mistral.ai/v1';
-    final cacheKey = 'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final cacheKey =
+        'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -530,13 +573,16 @@ class LLMService {
           timeout: config.timeout,
           connectTimeout: const Duration(seconds: 60),
         ),
-        httpClient: _MistralPatchClient(
-          http.Client(),
-          timeout: config.timeout,
-        ),
+        httpClient: _MistralPatchClient(http.Client(), timeout: config.timeout),
       ),
     );
-    return _streamOpenAIWithClient(client, config, messages, tools, systemPrompt);
+    return _streamOpenAIWithClient(
+      client,
+      config,
+      messages,
+      tools,
+      systemPrompt,
+    );
   }
 
   static Stream<LLMStreamChunk> _streamOpenAIWithClient(
@@ -597,11 +643,14 @@ class LLMService {
           if (deltas != null) {
             for (final d in deltas) {
               final idx = d.index;
-              final acc = toolCallAccumulators.putIfAbsent(idx, () => <String, dynamic>{
-                'id': '',
-                'name': '',
-                'arguments': StringBuffer(),
-              });
+              final acc = toolCallAccumulators.putIfAbsent(
+                idx,
+                () => <String, dynamic>{
+                  'id': '',
+                  'name': '',
+                  'arguments': StringBuffer(),
+                },
+              );
               if (d.id != null) acc['id'] = d.id;
               if (d.function?.name != null) acc['name'] = d.function!.name;
               if (d.function?.arguments != null) {
@@ -627,7 +676,11 @@ class LLMService {
         if (fallback.text.isNotEmpty) {
           yield LLMStreamChunk(textDelta: fallback.text);
         }
-        yield LLMStreamChunk(textDelta: '', isDone: true, finalResponse: fallback);
+        yield LLMStreamChunk(
+          textDelta: '',
+          isDone: true,
+          finalResponse: fallback,
+        );
         return;
       } catch (e) {
         if (streamError != null) {
@@ -660,7 +713,10 @@ class LLMService {
     yield LLMStreamChunk(
       textDelta: '',
       isDone: true,
-      finalResponse: LLMResponse(text: textBuffer.toString(), toolCalls: toolCalls),
+      finalResponse: LLMResponse(
+        text: textBuffer.toString(),
+        toolCalls: toolCalls,
+      ),
     );
   }
 
@@ -709,7 +765,8 @@ class LLMService {
         }
         if (msg.attachments != null) {
           for (final att in msg.attachments!) {
-            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+            if (att.bytes != null &&
+                att.mimeType.toLowerCase().startsWith('image/')) {
               final base64Str = base64Encode(att.bytes!);
               final mediaType = switch (att.mimeType.toLowerCase()) {
                 'image/png' => anthropic.ImageMediaType.png,
@@ -844,7 +901,10 @@ class LLMService {
       ),
     );
 
-    final List<MapEntry<anthropic.MessageRole, List<anthropic.InputContentBlock>>> grouped = [];
+    final List<
+      MapEntry<anthropic.MessageRole, List<anthropic.InputContentBlock>>
+    >
+    grouped = [];
 
     final List<String> currentToolUseIds = [];
     int toolResponseIndex = 0;
@@ -866,7 +926,8 @@ class LLMService {
         }
         if (msg.attachments != null) {
           for (final att in msg.attachments!) {
-            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+            if (att.bytes != null &&
+                att.mimeType.toLowerCase().startsWith('image/')) {
               final base64Str = base64Encode(att.bytes!);
               final mediaType = switch (att.mimeType.toLowerCase()) {
                 'image/png' => anthropic.ImageMediaType.png,
@@ -1012,7 +1073,10 @@ class LLMService {
     yield LLMStreamChunk(
       textDelta: '',
       isDone: true,
-      finalResponse: LLMResponse(text: textBuffer.toString(), toolCalls: toolCalls),
+      finalResponse: LLMResponse(
+        text: textBuffer.toString(),
+        toolCalls: toolCalls,
+      ),
     );
   }
 
@@ -1071,10 +1135,9 @@ class LLMService {
           }
           if (msg.attachments != null) {
             for (final att in msg.attachments!) {
-              if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
-                parts.add(
-                  gemini.Part.bytes(att.bytes!, att.mimeType),
-                );
+              if (att.bytes != null &&
+                  att.mimeType.toLowerCase().startsWith('image/')) {
+                parts.add(gemini.Part.bytes(att.bytes!, att.mimeType));
               }
             }
           }
@@ -1271,10 +1334,9 @@ class LLMService {
           }
           if (msg.attachments != null) {
             for (final att in msg.attachments!) {
-              if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
-                parts.add(
-                  gemini.Part.bytes(att.bytes!, att.mimeType),
-                );
+              if (att.bytes != null &&
+                  att.mimeType.toLowerCase().startsWith('image/')) {
+                parts.add(gemini.Part.bytes(att.bytes!, att.mimeType));
               }
             }
           }
@@ -1372,7 +1434,10 @@ class LLMService {
     yield LLMStreamChunk(
       textDelta: '',
       isDone: true,
-      finalResponse: LLMResponse(text: textBuffer.toString(), toolCalls: toolCalls),
+      finalResponse: LLMResponse(
+        text: textBuffer.toString(),
+        toolCalls: toolCalls,
+      ),
     );
   }
 
@@ -1423,7 +1488,8 @@ class LLMService {
         }
         if (msg.attachments != null) {
           for (final att in msg.attachments!) {
-            if (att.bytes != null && att.mimeType.toLowerCase().startsWith('image/')) {
+            if (att.bytes != null &&
+                att.mimeType.toLowerCase().startsWith('image/')) {
               final b64 = base64Encode(att.bytes!);
               if (addedImageB64.add(b64)) images.add(b64);
             }
@@ -1534,7 +1600,8 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'http://localhost:11434/api';
-    final cacheKey = 'ollama_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final cacheKey =
+        'ollama_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => ollama.OllamaClient(
@@ -1613,7 +1680,8 @@ class LLMService {
     final baseUrl = config.baseUrl.trim().isNotEmpty
         ? config.baseUrl
         : 'http://localhost:11434/api';
-    final cacheKey = 'ollama_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final cacheKey =
+        'ollama_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => ollama.OllamaClient(
@@ -1674,7 +1742,9 @@ class LLMService {
           final fn = tc.function;
           if (fn != null) {
             final name = fn.name;
-            final args = fn.arguments != null ? Map<String, dynamic>.from(fn.arguments!) : const <String, dynamic>{};
+            final args = fn.arguments != null
+                ? Map<String, dynamic>.from(fn.arguments!)
+                : const <String, dynamic>{};
             toolCalls.add(
               LLMToolCall(
                 id: 'call_${name}_${_uuid.v4()}',
@@ -1690,7 +1760,10 @@ class LLMService {
     yield LLMStreamChunk(
       textDelta: '',
       isDone: true,
-      finalResponse: LLMResponse(text: textBuffer.toString(), toolCalls: toolCalls),
+      finalResponse: LLMResponse(
+        text: textBuffer.toString(),
+        toolCalls: toolCalls,
+      ),
     );
   }
 }
@@ -1782,7 +1855,8 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
   static bool _sanitizeResponseMap(Map<String, dynamic> decoded) {
     bool changed = false;
     if (_sanitizeUsage(decoded)) changed = true;
-    if (decoded.containsKey('choices') && _sanitizeChoices(decoded['choices'])) {
+    if (decoded.containsKey('choices') &&
+        _sanitizeChoices(decoded['choices'])) {
       changed = true;
     }
     return changed;
@@ -1940,7 +2014,8 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
     }
 
     final contentType = (streamed.headers['content-type'] ?? '').toLowerCase();
-    final bool isStreaming = contentType.contains('text/event-stream') ||
+    final bool isStreaming =
+        contentType.contains('text/event-stream') ||
         contentType.contains('event-stream') ||
         (requestToSend is http.Request &&
             requestToSend.body.contains('"stream":true'));

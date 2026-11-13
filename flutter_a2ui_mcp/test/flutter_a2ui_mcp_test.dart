@@ -97,4 +97,47 @@ void main() {
     expect(catalog.components, isNotEmpty);
     expect(catalog.components.containsKey('Text'), isTrue);
   });
+
+  test('extractJsonObjects extracts single and multiple balanced JSON objects', () {
+    const text1 = '```json\n{"component": "WeatherForm", "title": "Forecast"}\n```';
+    final res1 = McpA2uiChatController.extractJsonObjects(text1);
+    expect(res1.length, equals(1));
+    expect(res1[0]['component'], equals('WeatherForm'));
+
+    const text2 = '''
+Some intro text here.
+```json
+{"component": "AccommodationGrid", "title": "Stays", "items": [{"name": "Hotel A"}]}
+{"component": "TravelItineraryCard", "title": "Schedule", "days": [{"title": "Day 1"}]}
+```
+''';
+    final res2 = McpA2uiChatController.extractJsonObjects(text2);
+    expect(res2.length, equals(2));
+    expect(res2[0]['component'], equals('AccommodationGrid'));
+    expect(res2[1]['component'], equals('TravelItineraryCard'));
+  });
+
+  test('McpA2uiChatController processes direct shorthand component with version 1.0 normalization', () {
+    final a2uiCtrl = McpA2uiChatController(
+      llmConfig: const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
+    );
+
+    // Initial state: no surfaces
+    expect(a2uiCtrl.activeSurfaceIds, isEmpty);
+
+    // Direct component payload without version (or with 'v1.0')
+    const payload = '''
+```json
+{
+  "component": "ChatMessage",
+  "text": "Hello world from direct shorthand"
+}
+```
+''';
+    // Use controller's payload processing
+    final objects = McpA2uiChatController.extractJsonObjects(payload);
+    expect(objects.length, equals(1));
+
+    a2uiCtrl.dispose();
+  });
 }
