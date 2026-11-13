@@ -381,7 +381,14 @@ class _WeatherChartWidget extends StatefulWidget {
 
 class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
   final GlobalKey _chartBoundaryKey = GlobalKey();
+  final ScrollController _gridScrollCtrl = ScrollController();
   bool _isExporting = false;
+
+  @override
+  void dispose() {
+    _gridScrollCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _exportChartToJpg(String title) async {
     setState(() => _isExporting = true);
@@ -667,8 +674,10 @@ class _WeatherChartWidgetState extends State<_WeatherChartWidget> {
                 SizedBox(
                   height: 260,
                   child: Scrollbar(
+                    controller: _gridScrollCtrl,
                     thumbVisibility: true,
                     child: GridView.builder(
+                      controller: _gridScrollCtrl,
                       padding: const EdgeInsets.only(right: 6, bottom: 4),
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
