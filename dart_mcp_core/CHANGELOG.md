@@ -1,3 +1,11 @@
+## 1.5.11
+
+- **Multi-Turn Tool Call & Response Alignment Across Providers**:
+  - Enforced strict tool call ID preservation and matching for OpenAI-compatible providers (`assistant.tool_calls[i].id == tool.tool_call_id`).
+  - Added fallback matching for Anthropic (`toolUseId` aligned with `toolUse.id`), Gemini (model function call name alignment in multi-turn history), and Ollama (synthetic assistant `tool_calls` when history contains tool responses).
+- **Context Window Auto-Compression (`ContextCompressor`)**:
+  - Fixed threshold condition to accurately trigger compression when message length exceeds `preserveRecentCount`.
+
 ## 1.5.10
 
 - **OpenAI Compatible Content Sanitization for Python/vLLM/DeepInfra Chat Templates**:

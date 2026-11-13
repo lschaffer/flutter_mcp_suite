@@ -9,4 +9,7 @@
   - **Agent Inspector**: Real-time side panel for inspecting tool executions, active system prompts, tokens, and A2UI JSON payloads.
   - **Backwards Compatibility**: Includes typedefs (`FlutterGenUiMcp`, `GenuiMcpPlayground`) and compatibility aliases for smooth transition from `flutter_genui_mcp`.
   - **Reactivity & Recursion Guards**: Guarded `updateLlmConfig` and `_onStateChange` against redundant re-entrant state notifications.
+  - **Protocol Version Normalization**: Enforces strict A2UI wire protocol version `1.0` and `v0.9` compatibility.
+  - **Balanced JSON Scanner & Multi-Surface Extraction**: Robust extraction of concatenated JSON component payloads without regex parsing failures.
+  - **Heuristic Component Inference**: Auto-infers component names when models omit the top-level `component` field.
 

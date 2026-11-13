@@ -1,3 +1,8 @@
+## 1.5.11
+
+* **Suite Synchronization**:
+  * Upgraded `dart_mcp_core` dependency to `^1.5.11` (multi-turn tool call and response ID alignment, provider compatibility fixes, and context compressor adjustments).
+
 ## 1.5.10
 
 * **Suite Synchronization**:

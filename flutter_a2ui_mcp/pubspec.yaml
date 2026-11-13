@@ -20,8 +20,8 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.8.0
-  dart_mcp_core: ^1.5.10
-  flutter_ui_mcp_core: ^1.5.10
+  dart_mcp_core: ^1.5.11
+  flutter_ui_mcp_core: ^1.5.11
   a2ui_flutter: ^0.3.0
   a2ui_core: ^0.7.0
   a2ui_agent: ^0.3.0

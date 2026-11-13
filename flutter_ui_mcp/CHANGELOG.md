@@ -1,3 +1,10 @@
+## 1.5.11
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.11` and `flutter_ui_mcp_core: ^1.5.11`.
+  * Inherited multi-turn tool call ID alignment and verification across OpenAI-compatible providers, Anthropic, Gemini, and Ollama.
+  * Inherited ContextCompressor threshold fix for compact conversational histories.
+
 ## 1.5.10
 
 * **Synchronized Suite Upgrades**:

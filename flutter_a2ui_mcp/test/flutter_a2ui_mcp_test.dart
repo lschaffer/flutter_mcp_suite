@@ -140,4 +140,107 @@ Some intro text here.
 
     a2uiCtrl.dispose();
   });
+
+  test('McpA2uiChatController creates surface and entry for WeatherForm component', () {
+    final a2uiCtrl = McpA2uiChatController(
+      llmConfig: const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
+      customComponents: [
+        ComponentImplementation(
+          name: 'WeatherForm',
+          schema: S.object(
+            properties: {
+              'title': S.string(),
+            },
+          ),
+          builder: (ctx, node, props, buildChild) => const SizedBox(),
+        ),
+      ],
+    );
+
+    const payload = '''
+```json
+{
+  "component": "WeatherForm",
+  "title": "Select City and Forecast Duration"
+}
+```
+''';
+    // Let's test how payloads are parsed
+    a2uiCtrl.processor.processMessages([
+      {
+        'version': '1.0',
+        'createSurface': {
+          'surfaceId': 'test_surface_1',
+          'catalogId': a2uiCtrl.catalog.id,
+        },
+      },
+      {
+        'version': '1.0',
+        'updateComponents': {
+          'surfaceId': 'test_surface_1',
+          'components': [
+            {
+              'id': 'root',
+              'component': 'WeatherForm',
+              'title': 'Select City and Forecast Duration',
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(a2uiCtrl.activeSurfaceIds, contains('test_surface_1'));
+    a2uiCtrl.dispose();
+  });
+
+  test('McpA2uiChatController parses direct component in code block and creates surface', () {
+    final a2uiCtrl = McpA2uiChatController(
+      llmConfig: const LlmConfig(provider: LlmProvider.none, model: '', apiKey: ''),
+      customComponents: [
+        ComponentImplementation(
+          name: 'WeatherForm',
+          schema: S.object(
+            properties: {
+              'title': S.string(),
+            },
+          ),
+          builder: (ctx, node, props, buildChild) => const SizedBox(),
+        ),
+      ],
+    );
+
+    const payload = '```json { "component": "WeatherForm", "title": "Select City and Forecast Duration" }```';
+    final objects = McpA2uiChatController.extractJsonObjects(payload);
+    expect(objects.length, equals(1));
+    expect(objects[0]['component'], equals('WeatherForm'));
+
+    // Now let's test if processMessages works for this component
+    expect(() {
+      a2uiCtrl.processor.processMessages([
+        {
+          'version': '1.0',
+          'createSurface': {
+            'surfaceId': 'surface_test_direct',
+            'catalogId': a2uiCtrl.catalog.id,
+          },
+        },
+        {
+          'version': '1.0',
+          'updateComponents': {
+            'surfaceId': 'surface_test_direct',
+            'components': [
+              {
+                'id': 'root',
+                'component': 'WeatherForm',
+                'title': 'Select City and Forecast Duration',
+              },
+            ],
+          },
+        },
+      ]);
+    }, returnsNormally);
+
+    expect(a2uiCtrl.activeSurfaceIds, contains('surface_test_direct'));
+    a2uiCtrl.dispose();
+  });
 }
