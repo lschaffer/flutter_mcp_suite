@@ -19,6 +19,43 @@ An interactive, dynamic **A2UI & Agentic MCP Widget** for Flutter.
 
 ---
 
+## 🎥 Demos & Visual Showcases
+
+Watch dynamic A2UI in action rendering interactive surfaces across all showcase examples:
+
+### 🎛️ Unified A2UI Showcase Gallery & Feature Switcher
+Explore, switch, and interact with all A2UI showcase scenarios directly from the top bar:
+
+![Unified A2UI Showcase Gallery](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_genui_mcp/flutter_genui_combined_menu.png)
+
+### 🏡 A2UI Smart Home Studio (Thermostat, Lighting & IoT)
+Interactive climate controls, lighting sliders, device status toggles, and energy breakdown charts:
+
+![A2UI Smart Home Studio](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/flutter_genui_mcp/flutter_genui_combined_smarthome.png)
+
+### 💰 A2UI Model Cost & Architecture Optimizer
+![A2UI Model Cost Optimizer](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_model_optimizer.png)
+
+### 🤖 A2UI Autonomous Multi-Agent Mission Control
+![A2UI Multi-Agent Mission Control](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_multi_agent_human_in_loop.png)
+
+### 📊 A2UI File ETL & Data Transformation Studio
+![A2UI File ETL Studio](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_file_etl_data_studio.png)
+
+### 🔬 A2UI Model & Prompt Benchmark Lab
+![A2UI Benchmark Lab](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/example_ui/genui_benchmark.png)
+
+### 🏖️ A2UI Travel & Stay Planner
+![A2UI MCP Travel Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_mcp_travel_example.gif)
+
+### ⛅ A2UI Weather Generator
+![A2UI MCP Weather Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_weather_example.gif)
+
+### 📈 A2UI Finance & Budget Planner
+![A2UI MCP Finance Demo](https://raw.githubusercontent.com/lschaffer/flutter_mcp_suite/main/screenshots/video/genui_finance_example.gif)
+
+---
+
 ## 🚀 Installation
 
 Add to your `pubspec.yaml`:
