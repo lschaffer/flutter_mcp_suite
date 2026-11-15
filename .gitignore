@@ -35,6 +35,8 @@ migrate_working_dir/
 # Local MCP and dependencies
 .venv/
 node_modules/
+scratch/
+**/local.properties
 
 # Recursively ignore build and Dart tool caches
 **/build/
