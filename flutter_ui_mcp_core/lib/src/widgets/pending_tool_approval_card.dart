@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../services/tool_permission_service.dart';

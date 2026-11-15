@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_a2ui_mcp/flutter_a2ui_mcp.dart';
 import 'env_loader.dart';
 
@@ -21,9 +20,6 @@ class A2uiFileEtlApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       localizationsDelegates: const [
         ...materialUiLocalizationsDelegates,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
         Locale('en', ''),

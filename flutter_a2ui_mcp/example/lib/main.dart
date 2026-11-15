@@ -1,5 +1,4 @@
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_a2ui_mcp/flutter_a2ui_mcp.dart';
 import 'env_loader.dart';
 import 'a2ui_travel_example.dart';
@@ -239,9 +238,6 @@ class _A2uiShowcaseAppState extends State<A2uiShowcaseApp> {
       themeMode: _themeMode,
       localizationsDelegates: const [
         ...materialUiLocalizationsDelegates,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
         Locale('en', ''),
