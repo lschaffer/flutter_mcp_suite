@@ -1326,9 +1326,11 @@ class McpAgentEngine {
                 tools: mcpTools,
                 systemPrompt: callSystemPrompt,
               ).timeout(
-                const Duration(seconds: 75),
+                agent.llmConfig.timeout,
                 onTimeout: (sink) {
-                  _log('Agent stream timed out after 75s of inactivity.');
+                  _log(
+                    'Agent stream timed out after ${agent.llmConfig.timeout.inSeconds}s of inactivity.',
+                  );
                   sink.close();
                 },
               );

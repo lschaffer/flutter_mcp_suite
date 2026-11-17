@@ -1,3 +1,9 @@
+## 1.5.12
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.12` and `flutter_ui_mcp_core: ^1.5.12`.
+  * Inherited dynamic streaming, prefill, and fallback timeouts to prevent premature 40s/45s/75s aborts on slow local models.
+
 ## 1.5.11
 
 * **Synchronized Suite Upgrades**:

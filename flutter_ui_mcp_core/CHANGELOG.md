@@ -1,3 +1,8 @@
+## 1.5.12
+
+* **Suite Synchronization**:
+  * Upgraded `dart_mcp_core` dependency to `^1.5.12` (dynamic streaming and prompt prefill timeout support).
+
 ## 1.5.11
 
 * **Suite Synchronization**:

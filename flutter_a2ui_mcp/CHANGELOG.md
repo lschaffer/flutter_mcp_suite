@@ -1,3 +1,9 @@
+## 1.0.1
+
+- **Synchronized Suite Upgrades**:
+  - Bumped dependencies to `dart_mcp_core: ^1.5.12` and `flutter_ui_mcp_core: ^1.5.12`.
+  - Added visual showcase demo images and GIF walkthroughs in package README.
+
 ## 1.0.0
 
 - **Initial release of `flutter_a2ui_mcp`**:

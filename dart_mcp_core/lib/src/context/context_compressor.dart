@@ -314,7 +314,7 @@ class ContextCompressor {
         tools: const [],
         systemPrompt:
             'You are a conversation summarizer. Distill history into dense, factual bullet points.',
-      ).timeout(const Duration(seconds: 45));
+      ).timeout(llmConfig.timeout);
       summary = response.text.trim();
     } catch (_) {
       // Fallback: create a basic truncated outline if model call fails

@@ -1,3 +1,11 @@
+## 1.5.12
+
+- **Dynamic Streaming & Fallback Timeouts (`LLMService` & `McpAgentEngine`)**:
+  - Replaced hardcoded timeouts (`40s` SSE chunk timeout and `45s` non-streaming fallback) in `LLMService._streamOpenAIWithClient` with dynamic `config.timeout`.
+  - Replaced hardcoded `75s` streaming timeout in `McpAgentEngine` with dynamic `agent.llmConfig.timeout`.
+  - Replaced hardcoded `45s` summarization timeout in `ContextCompressor` with `llmConfig.timeout`.
+  - Prevents premature aborts during long prompt prefill on local llama.cpp / vLLM / SLM engines and when operating with large context windows.
+
 ## 1.5.11
 
 - **Multi-Turn Tool Call & Response Alignment Across Providers**:

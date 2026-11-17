@@ -625,7 +625,7 @@ class LLMService {
     Object? streamError;
     try {
       final timedStream = stream.timeout(
-        const Duration(seconds: 40),
+        config.timeout,
         onTimeout: (sink) {
           sink.close();
         },
@@ -672,7 +672,7 @@ class LLMService {
           messages,
           tools,
           systemPrompt,
-        ).timeout(const Duration(seconds: 45));
+        ).timeout(config.timeout);
         if (fallback.text.isNotEmpty) {
           yield LLMStreamChunk(textDelta: fallback.text);
         }
