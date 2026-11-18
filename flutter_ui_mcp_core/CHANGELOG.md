@@ -1,3 +1,8 @@
+## 1.5.13
+
+* **Suite Synchronization**:
+  * Upgraded `dart_mcp_core` dependency to `^1.5.13` (Jinja template single system message normalization and multi-adapter conversation summary retention).
+
 ## 1.5.12
 
 * **Suite Synchronization**:

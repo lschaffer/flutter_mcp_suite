@@ -1,3 +1,8 @@
+## 1.0.2
+
+- **Synchronized Suite Upgrades**:
+  - Bumped dependencies to `dart_mcp_core: ^1.5.13` and `flutter_ui_mcp_core: ^1.5.13`.
+
 ## 1.0.1
 
 - **Synchronized Suite Upgrades**:

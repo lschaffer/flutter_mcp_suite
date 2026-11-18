@@ -1,3 +1,9 @@
+## 1.5.13
+
+* **Synchronized Suite Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.13` and `flutter_ui_mcp_core: ^1.5.13`.
+  * Inherited Jinja template single system message normalization to prevent HTTP 500 errors on local models with context compression.
+
 ## 1.5.12
 
 * **Synchronized Suite Upgrades**:

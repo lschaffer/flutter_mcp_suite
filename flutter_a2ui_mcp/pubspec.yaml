@@ -1,6 +1,6 @@
 name: flutter_a2ui_mcp
 description: "Dynamic Agent-to-User Interface (A2UI) widget for Flutter. Connect to LLMs, execute MCP tools, and render dynamic interactive generative A2UI widgets."
-version: 1.0.1
+version: 1.0.2
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/flutter_a2ui_mcp
 
@@ -20,8 +20,8 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.8.0
-  dart_mcp_core: ^1.5.12
-  flutter_ui_mcp_core: ^1.5.12
+  dart_mcp_core: ^1.5.13
+  flutter_ui_mcp_core: ^1.5.13
   a2ui_flutter: ^0.3.0
   a2ui_core: ^0.7.0
   a2ui_agent: ^0.3.0

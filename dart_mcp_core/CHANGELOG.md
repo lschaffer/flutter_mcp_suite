@@ -1,10 +1,13 @@
-## 1.5.12
+## 1.5.13
 
 - **Single System Message Normalization for OpenAI-Compatible & Ollama Adapters (`LLMService`)**:
   - Merged `systemPrompt` and any leading `ChatRole.system` messages (such as `[Prior Conversation Summary]` created by `ContextCompressor`) into a single `ChatMessage.system` message at index 0.
   - Converted any mid-conversation system messages to user context notices (`[System Notice]: ...`), guaranteeing `openAiMsgs` and `ollamaMsgs` never contain a `system` role at index > 0.
   - Fixes HTTP 500 crashes on local engines (llama.cpp server, vLLM, HuggingFace) with Jinja templates that enforce `{% if not loop.first %}System message must be at the beginning{% endif %}` (e.g. Qwen 2.5 / Qwen 3.8 / Llama 3).
   - Also propagated `effectiveSystemPrompt` (incorporating conversation summary system messages) into Anthropic `system` and Gemini `systemInstruction`.
+
+## 1.5.12
+
 - **Dynamic Streaming & Fallback Timeouts (`LLMService` & `McpAgentEngine`)**:
   - Replaced hardcoded timeouts (`40s` SSE chunk timeout and `45s` non-streaming fallback) in `LLMService._streamOpenAIWithClient` with dynamic `config.timeout`.
   - Replaced hardcoded `75s` streaming timeout in `McpAgentEngine` with dynamic `agent.llmConfig.timeout`.
