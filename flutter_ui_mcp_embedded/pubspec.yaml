@@ -21,7 +21,7 @@ dependencies:
     sdk: flutter
   dart_mcp_core: ^1.5.12
   flutter_ui_mcp_core: ^1.5.12
-  llamadart: ^0.19.11
+  llamadart: ^0.20.0
 
 dev_dependencies:
   flutter_test:

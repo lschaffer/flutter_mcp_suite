@@ -1,7 +1,7 @@
 ## 1.5.12
 
-* **Upgraded llamadart Runtime**:
-  * Bumped `llamadart` dependency to `^0.19.11` for updated native llama.cpp bindings, WebGPU/WASM enhancements, and model compatibility.
+* **Upgraded llamadart Runtime (0.20.0 & llama.cpp v1.0.0)**:
+  * Bumped `llamadart` dependency to `^0.20.0` adopting `llamadart-native@v1.0.0-1` (llama.cpp `v1.0.0`), WebGPU bridge assets `v0.1.86`, and GPU memory fitting.
 * **Synchronized Suite Upgrades**:
   * Aligned dependencies with `dart_mcp_core: ^1.5.12` and `flutter_ui_mcp_core: ^1.5.12`.
 
