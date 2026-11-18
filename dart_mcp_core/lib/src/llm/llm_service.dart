@@ -135,6 +135,18 @@ class LLMService {
     }
   }
 
+  /// Builds OpenAI chat messages with system prompt normalization. Visible for testing.
+  static List<openai.ChatMessage> buildOpenAiChatMessages(
+    List<ChatMessage> messages,
+    String? systemPrompt,
+  ) => _buildOpenAiChatMessages(messages, systemPrompt);
+
+  /// Builds Ollama chat messages with system prompt normalization. Visible for testing.
+  static List<ollama.ChatMessage> buildOllamaChatMessages(
+    List<ChatMessage> messages,
+    String? systemPrompt,
+  ) => _buildOllamaChatMessages(messages, systemPrompt);
+
   // ═══════════════════════════════════════════════════════════════
   // 1. OpenAI Adapter
   // ═══════════════════════════════════════════════════════════════
@@ -143,16 +155,38 @@ class LLMService {
     String? systemPrompt,
   ) {
     final List<openai.ChatMessage> openAiMsgs = [];
+    final List<String> systemParts = [];
+
     if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
-      openAiMsgs.add(openai.ChatMessage.system(systemPrompt));
+      systemParts.add(systemPrompt.trim());
     }
 
     int i = 0;
+    // Consume any leading ChatRole.system messages and merge them into systemParts
+    while (i < messages.length && messages[i].role == ChatRole.system) {
+      final content = messages[i].content.trim();
+      if (content.isNotEmpty) {
+        systemParts.add(content);
+      }
+      i++;
+    }
+
+    // Exactly one system message at index 0 if any system instruction or summary exists
+    if (systemParts.isNotEmpty) {
+      openAiMsgs.add(openai.ChatMessage.system(systemParts.join('\n\n')));
+    }
+
     while (i < messages.length) {
       final msg = messages[i];
       if (msg.role == ChatRole.system) {
-        if (msg.content.isNotEmpty) {
-          openAiMsgs.add(openai.ChatMessage.system(msg.content));
+        // Any subsequent/mid-conversation system message MUST NOT be emitted
+        // as a 'system' role, because Jinja templates (e.g. Qwen, Llama, Mistral)
+        // fail with HTTP 500: "System message must be at the beginning".
+        // Instead, emit it safely as a user context notice.
+        if (msg.content.trim().isNotEmpty) {
+          openAiMsgs.add(
+            openai.ChatMessage.user('[System Notice]: ${msg.content.trim()}'),
+          );
         }
         i++;
       } else if (msg.role == ChatRole.user) {
@@ -748,6 +782,18 @@ class LLMService {
     final List<String> currentToolUseIds = [];
     int toolResponseIndex = 0;
 
+    final systemParts = <String>[];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      systemParts.add(systemPrompt.trim());
+    }
+    for (final msg in messages) {
+      if (msg.role == ChatRole.system && msg.content.trim().isNotEmpty) {
+        systemParts.add(msg.content.trim());
+      }
+    }
+    final effectiveSystemPrompt =
+        systemParts.isNotEmpty ? systemParts.join('\n\n') : null;
+
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
 
@@ -857,8 +903,8 @@ class LLMService {
             ? config.model
             : 'claude-3-5-sonnet-latest',
         messages: anthropicMsgs,
-        system: systemPrompt != null && systemPrompt.trim().isNotEmpty
-            ? anthropic.SystemPrompt.text(systemPrompt)
+        system: effectiveSystemPrompt != null
+            ? anthropic.SystemPrompt.text(effectiveSystemPrompt)
             : null,
         tools: anthropicTools.isNotEmpty ? anthropicTools : null,
         temperature: config.temperature,
@@ -908,6 +954,18 @@ class LLMService {
 
     final List<String> currentToolUseIds = [];
     int toolResponseIndex = 0;
+
+    final systemParts = <String>[];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      systemParts.add(systemPrompt.trim());
+    }
+    for (final msg in messages) {
+      if (msg.role == ChatRole.system && msg.content.trim().isNotEmpty) {
+        systemParts.add(msg.content.trim());
+      }
+    }
+    final effectiveSystemPrompt =
+        systemParts.isNotEmpty ? systemParts.join('\n\n') : null;
 
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
@@ -1018,8 +1076,8 @@ class LLMService {
             ? config.model
             : 'claude-3-5-sonnet-latest',
         messages: anthropicMsgs,
-        system: systemPrompt != null && systemPrompt.trim().isNotEmpty
-            ? anthropic.SystemPrompt.text(systemPrompt)
+        system: effectiveSystemPrompt != null
+            ? anthropic.SystemPrompt.text(effectiveSystemPrompt)
             : null,
         tools: anthropicTools.isNotEmpty ? anthropicTools : null,
         temperature: config.temperature,
@@ -1119,6 +1177,18 @@ class LLMService {
     final List<String> lastModelFunctionNames = [];
     int geminiToolResponseIndex = 0;
 
+    final systemParts = <String>[];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      systemParts.add(systemPrompt.trim());
+    }
+    for (final msg in messages) {
+      if (msg.role == ChatRole.system && msg.content.trim().isNotEmpty) {
+        systemParts.add(msg.content.trim());
+      }
+    }
+    final effectiveSystemPrompt =
+        systemParts.isNotEmpty ? systemParts.join('\n\n') : null;
+
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
 
@@ -1193,9 +1263,8 @@ class LLMService {
       request: gemini.GenerateContentRequest(
         contents: contentList,
         tools: geminiTools.isNotEmpty ? geminiTools : null,
-        systemInstruction:
-            systemPrompt != null && systemPrompt.trim().isNotEmpty
-            ? gemini.Content(parts: [gemini.Part.text(systemPrompt)])
+        systemInstruction: effectiveSystemPrompt != null
+            ? gemini.Content(parts: [gemini.Part.text(effectiveSystemPrompt)])
             : null,
         generationConfig: gemini.GenerationConfig(
           temperature: config.temperature,
@@ -1318,6 +1387,18 @@ class LLMService {
     final List<String> lastModelFunctionNames = [];
     int geminiToolResponseIndex = 0;
 
+    final systemParts = <String>[];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      systemParts.add(systemPrompt.trim());
+    }
+    for (final msg in messages) {
+      if (msg.role == ChatRole.system && msg.content.trim().isNotEmpty) {
+        systemParts.add(msg.content.trim());
+      }
+    }
+    final effectiveSystemPrompt =
+        systemParts.isNotEmpty ? systemParts.join('\n\n') : null;
+
     for (final msg in messages) {
       if (msg.role == ChatRole.system) continue;
 
@@ -1392,9 +1473,8 @@ class LLMService {
       request: gemini.GenerateContentRequest(
         contents: contentList,
         tools: geminiTools.isNotEmpty ? geminiTools : null,
-        systemInstruction:
-            systemPrompt != null && systemPrompt.trim().isNotEmpty
-            ? gemini.Content(parts: [gemini.Part.text(systemPrompt)])
+        systemInstruction: effectiveSystemPrompt != null
+            ? gemini.Content(parts: [gemini.Part.text(effectiveSystemPrompt)])
             : null,
         generationConfig: gemini.GenerationConfig(
           temperature: config.temperature,
@@ -1449,24 +1529,38 @@ class LLMService {
     String? systemPrompt,
   ) {
     final List<ollama.ChatMessage> ollamaMsgs = [];
+    final List<String> systemParts = [];
+
     if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      systemParts.add(systemPrompt.trim());
+    }
+
+    int i = 0;
+    while (i < messages.length && messages[i].role == ChatRole.system) {
+      final content = messages[i].content.trim();
+      if (content.isNotEmpty) {
+        systemParts.add(content);
+      }
+      i++;
+    }
+
+    if (systemParts.isNotEmpty) {
       ollamaMsgs.add(
         ollama.ChatMessage(
           role: ollama.MessageRole.system,
-          content: systemPrompt,
+          content: systemParts.join('\n\n'),
         ),
       );
     }
 
-    int i = 0;
     while (i < messages.length) {
       final msg = messages[i];
       if (msg.role == ChatRole.system) {
-        if (msg.content.isNotEmpty) {
+        if (msg.content.trim().isNotEmpty) {
           ollamaMsgs.add(
             ollama.ChatMessage(
-              role: ollama.MessageRole.system,
-              content: msg.content,
+              role: ollama.MessageRole.user,
+              content: '[System Notice]: ${msg.content.trim()}',
             ),
           );
         }
