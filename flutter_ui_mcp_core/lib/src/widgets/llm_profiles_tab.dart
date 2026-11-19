@@ -23,7 +23,7 @@ class LlmProfilesTab extends StatefulWidget {
 }
 
 class _LlmProfilesTabState extends State<LlmProfilesTab>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   TabController? _subTabController;
 
   // Editing state: null = profiles list; non-null = editing/adding profile ID
@@ -72,8 +72,7 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
 
   void _setupTabController() {
     if (EmbeddedLlmRegistry.isAvailable) {
-      _subTabController?.dispose();
-      _subTabController = TabController(length: 2, vsync: this);
+      _subTabController ??= TabController(length: 2, vsync: this);
     } else {
       _subTabController?.dispose();
       _subTabController = null;

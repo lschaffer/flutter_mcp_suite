@@ -3,6 +3,8 @@
 * **Embedded Model Discovery & Multi-Format Support (`.gguf` & `.litertlm`)**:
   * Extended `EmbeddedModelManager` (IO & Web), `HfDiscoverDialog`, `AddGgufDialog`, and `EmbeddedModelPickerWidget` to support both **GGUF (`.gguf`)** and **LiteRT-LM (`.litertlm`)** on-device model bundles (compatible with `llamadart ^0.20.1` across Android, iOS, macOS, Windows, Linux, and Web).
   * Added format category selector (`GGUF (.gguf)` / `LiteRT-LM (.litertlm)`) in the HuggingFace discovery dialog and dynamic runtime badges per model card.
+* **Bug Fixes**:
+  * Fixed `SingleTickerProviderStateMixin` crash in `LlmProfilesTab` when updating/activating models triggered `didUpdateWidget` (switched to `TickerProviderStateMixin` and preserved existing `TabController` instance).
 
 ## 1.5.13
 
