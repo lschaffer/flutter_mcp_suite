@@ -38,7 +38,7 @@ class EmbeddedLlmAdapter implements EmbeddedLlmDriver {
     int contextSize = 4096,
     void Function(double progress)? onProgress,
   }) async {
-    LlamaLogging.configure(level: LlamaLogLevel.debug);
+    LlamaLogging.configure(level: LlamaLogLevel.warn);
     final effectiveContextSize = _shouldTruncate
         ? contextSize.clamp(1, _mobileMaxContextSize)
         : contextSize;
