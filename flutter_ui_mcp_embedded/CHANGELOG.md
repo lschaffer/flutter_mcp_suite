@@ -1,3 +1,11 @@
+## 1.5.14
+
+* **Upgraded `llamadart` Runtime (`^0.20.1`)**:
+  * Bumped `llamadart` dependency to `^0.20.1` (`llamadart-native@v1.0.0-2` / upstream `llama.cpp v1.0.0`, `LiteRT-LM v0.19.1-5`, Windows CUDA `gpuMemoryFit` VRAM accounting, and model cache concurrency fix).
+  * Supports automatic routing of both `.gguf` (`llama.cpp`) and `.litertlm` (`LiteRT-LM`) bundles via `LlamaBackend()`.
+* **Synchronized Suite Upgrades**:
+  * Aligned `flutter_ui_mcp_core` dependency to `^1.5.14` (multi-format `.gguf` and `.litertlm` HuggingFace discovery and local file picker support).
+
 ## 1.5.13
 
 * **Upgraded llamadart Runtime (0.20.0 & llama.cpp v1.0.0)**:

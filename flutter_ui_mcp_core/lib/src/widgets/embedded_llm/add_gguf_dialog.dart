@@ -107,8 +107,8 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Enter the direct download URL of a .gguf file. '
-                    'You can find GGUF models on HuggingFace.',
+                    'Enter the direct download URL of a .gguf or .litertlm model file. '
+                    'You can find GGUF and LiteRT-LM models on HuggingFace.',
                     style: TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 16),
@@ -127,7 +127,7 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                     controller: _urlCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Model download URL *',
-                      hintText: 'https://huggingface.co/.../model.gguf',
+                      hintText: 'https://huggingface.co/.../model.gguf or .litertlm',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.link),
                       isDense: true,
@@ -137,9 +137,11 @@ class _AddGgufDialogState extends State<AddGgufDialog> {
                       final uri = Uri.tryParse(v.trim());
                       if (uri == null || !uri.hasScheme) return 'Enter a valid URL';
                       final clean = v.trim().toLowerCase();
-                      final isValid = clean.contains('.gguf') || clean.contains('?');
+                      final isValid = clean.contains('.gguf') ||
+                          clean.contains('.litertlm') ||
+                          clean.contains('?');
                       if (!isValid) {
-                        return 'URL should point to a .gguf model file';
+                        return 'URL should point to a .gguf or .litertlm model file';
                       }
                       return null;
                     },

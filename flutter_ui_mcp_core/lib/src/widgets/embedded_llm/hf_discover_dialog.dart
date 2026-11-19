@@ -2,10 +2,13 @@ import 'package:material_ui/material_ui.dart';
 import '../../services/embedded_llm/embedded_model.dart';
 import '../../services/embedded_llm/embedded_model_manager.dart';
 
-/// Full-screen dialog that searches HuggingFace for popular GGUF models and
-/// lets the user add them to the custom model list.
+/// Full-screen dialog that searches HuggingFace for popular GGUF and LiteRT-LM
+/// models and lets the user add them to the custom model list.
 class HfDiscoverDialog extends StatefulWidget {
-  const HfDiscoverDialog({super.key});
+  const HfDiscoverDialog({super.key, this.initialFormat});
+
+  /// Initial format filter: `'gguf'` (default) or `'litertlm'`.
+  final String? initialFormat;
 
   /// Open the dialog. Returns a list of [EmbeddedGgufModel] added by the user.
   static Future<List<EmbeddedGgufModel>?> show(
@@ -14,7 +17,7 @@ class HfDiscoverDialog extends StatefulWidget {
   }) {
     return Navigator.of(context).push<List<EmbeddedGgufModel>>(MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => const HfDiscoverDialog(),
+      builder: (_) => HfDiscoverDialog(initialFormat: initialFormat),
     ));
   }
 
@@ -24,6 +27,7 @@ class HfDiscoverDialog extends StatefulWidget {
 
 class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
   final _searchCtrl = TextEditingController();
+  late String _format;
   String _sort = 'downloads';
   bool _loading = false;
   String? _error;
@@ -37,6 +41,9 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
   @override
   void initState() {
     super.initState();
+    _format = widget.initialFormat?.toLowerCase() == 'litertlm'
+        ? 'litertlm'
+        : 'gguf';
     _search();
   }
 
@@ -47,6 +54,9 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
   }
 
   String _getSearchHint() {
+    if (_format == 'litertlm') {
+      return 'Search for LiteRT-LM models (e.g. Gemma, Qwen, Phi)…';
+    }
     return 'Search for GGUF models (e.g. Qwen, Llama, Gemma, SmolLM)…';
   }
 
@@ -58,6 +68,7 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
     try {
       final results = await EmbeddedModelManager.instance.discoverPopularModels(
         query: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
+        format: _format,
         sort: _sort,
         limit: 30,
       );
@@ -170,8 +181,33 @@ class _HfDiscoverDialogState extends State<HfDiscoverDialog> {
           const SizedBox(height: 6),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                ChoiceChip(
+                  label: const Text('GGUF (.gguf)'),
+                  selected: _format == 'gguf',
+                  onSelected: (v) {
+                    if (v && _format != 'gguf') {
+                      setState(() => _format = 'gguf');
+                      _search();
+                    }
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+                ChoiceChip(
+                  label: const Text('LiteRT-LM (.litertlm)'),
+                  selected: _format == 'litertlm',
+                  onSelected: (v) {
+                    if (v && _format != 'litertlm') {
+                      setState(() => _format = 'litertlm');
+                      _search();
+                    }
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
                 FilterChip(
                   label: const Text('Hide too large for CPU (>1.5 GB)'),
                   selected: _hideOversized,
@@ -321,7 +357,7 @@ class _RepoCardState extends State<_RepoCard> {
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
-                  'No compatible GGUF (.gguf) model files listed for this repo.',
+                  'No compatible model files (.gguf / .litertlm) listed for this repo.',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               )

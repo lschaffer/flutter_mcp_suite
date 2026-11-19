@@ -117,16 +117,27 @@ class EmbeddedModelManager {
 
   Future<List<HfDiscoveryResult>> discoverPopularModels({
     String? query,
+    String format = 'gguf',
     int? maxRamGb,
     String sort = 'downloads',
     int limit = 20,
   }) async {
+    final fmt = format.toLowerCase();
+    final isLitert = fmt == 'litertlm';
+    final isAll = fmt == 'all';
+    final effectiveSearch = isLitert
+        ? (query != null && query.isNotEmpty
+            ? (query.toLowerCase().contains('litert') ? query : '$query litertlm')
+            : 'litertlm')
+        : query;
+
     final queryParams = <String, String>{
-      'filter': 'gguf',
+      if (!isLitert && !isAll) 'filter': 'gguf',
       'sort': sort,
       'limit': '$limit',
       'full': 'true',
-      if (query != null && query.isNotEmpty) 'search': query,
+      if (effectiveSearch != null && effectiveSearch.isNotEmpty)
+        'search': effectiveSearch,
     };
 
     final uri = Uri.https('huggingface.co', '/api/models', queryParams);
@@ -153,6 +164,13 @@ class EmbeddedModelManager {
             final name =
                 (s as Map<String, dynamic>)['rfilename'] as String? ?? '';
             final lower = name.toLowerCase();
+            if (isLitert) {
+              return lower.endsWith('.litertlm');
+            }
+            if (isAll) {
+              return (lower.endsWith('.gguf') && !lower.contains('mmproj')) ||
+                  lower.endsWith('.litertlm');
+            }
             return lower.endsWith('.gguf') && !lower.contains('mmproj');
           })
           .map((s) {

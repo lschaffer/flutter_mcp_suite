@@ -1,3 +1,9 @@
+## 1.5.14
+
+* **Embedded Model Discovery & Multi-Format Support (`.gguf` & `.litertlm`)**:
+  * Extended `EmbeddedModelManager` (IO & Web), `HfDiscoverDialog`, `AddGgufDialog`, and `EmbeddedModelPickerWidget` to support both **GGUF (`.gguf`)** and **LiteRT-LM (`.litertlm`)** on-device model bundles (compatible with `llamadart ^0.20.1` across Android, iOS, macOS, Windows, Linux, and Web).
+  * Added format category selector (`GGUF (.gguf)` / `LiteRT-LM (.litertlm)`) in the HuggingFace discovery dialog and dynamic runtime badges per model card.
+
 ## 1.5.13
 
 * **Suite Synchronization**:

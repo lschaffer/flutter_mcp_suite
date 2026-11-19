@@ -122,7 +122,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
     for (final filename in _downloadedFilenames) {
       if (seen.add(filename)) {
         final name = filename
-            .replaceAll(RegExp(r'\.gguf$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\.(gguf|litertlm)$', caseSensitive: false), '')
             .replaceAll(RegExp(r'[-_]'), ' ');
         // If it maps to a custom model, keep the url/display info
         final custom = _customModels.firstWhere(
@@ -339,7 +339,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
     try {
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: const ['gguf'],
+        allowedExtensions: const ['gguf', 'litertlm'],
       );
       if (files.isEmpty) return;
       final file = files.first;
@@ -365,14 +365,17 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
         finalUrl = await copyToModelsDir(path, filename, modelsDirPath);
       }
 
+      final isLitert = filename.toLowerCase().endsWith('.litertlm');
       final model = EmbeddedGgufModel(
         id: 'disk_${DateTime.now().millisecondsSinceEpoch}',
         displayName: filename
-            .replaceAll(RegExp(r'\.gguf$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\.(gguf|litertlm)$', caseSensitive: false), '')
             .replaceAll(RegExp(r'[-_]'), ' '),
         filename: filename,
         url: finalUrl,
-        description: 'Local GGUF model added from disk.',
+        description: isLitert
+            ? 'Local LiteRT-LM model added from disk.'
+            : 'Local GGUF model added from disk.',
         sizeBytes: fileLengthSync(path),
       );
 
@@ -626,7 +629,7 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Use "Discover popular" to browse HuggingFace repos, "Add Model URL" to paste a link, or "Add from Disk" to select a local .gguf file.',
+                    'Use "Discover popular" to browse HuggingFace repos, "Add Model URL" to paste a link, or "Add from Disk" to select a local .gguf or .litertlm file.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -767,24 +770,22 @@ class _EmbeddedModelPickerWidgetState extends State<EmbeddedModelPickerWidget> {
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.macOS);
 
-    final String title = 'llama.cpp Cross-Platform Engine (.gguf)';
+    final String title = 'On-Device Engine (.gguf & .litertlm)';
     final String desc;
     final IconData icon = Icons.memory_rounded;
     final Color badgeColor = theme.colorScheme.primary;
 
     if (isApple) {
       desc =
-          '.gguf models run in-process using llama.cpp with Apple Metal GPU acceleration. '
-          'Broad community catalog of open-weights models.';
+          '.gguf (llama.cpp) and .litertlm (LiteRT-LM) models run in-process with Apple Metal GPU acceleration.';
     } else if (isAndroid) {
       desc =
-          '.gguf models run in-process via llama.cpp (optimized with ARM NEON). '
-          'Provides reliable, crash-safe on-device inference for open-weights models.';
+          '.gguf (llama.cpp) and .litertlm (LiteRT-LM GPU/NPU/CPU) models run in-process for on-device inference.';
     } else if (kIsWeb) {
-      desc = 'Embedded models run via WebGPU in the browser.';
+      desc = 'Embedded .gguf and .litertlm models run via WebGPU / WASM in the browser.';
     } else {
       desc =
-          'Embedded models run in-process on-device using llama.cpp with CPU/GPU shaders.';
+          'Embedded .gguf (llama.cpp) and .litertlm (LiteRT-LM) models run in-process with CPU/GPU acceleration.';
     }
 
     return Container(
@@ -941,10 +942,18 @@ class _ModelTile extends StatelessWidget {
                           spacing: 6,
                           runSpacing: 4,
                           children: [
-                            const _Chip(
-                              label: 'llama.cpp (.gguf)',
+                            _Chip(
+                              label: model.filename
+                                      .toLowerCase()
+                                      .endsWith('.litertlm')
+                                  ? 'LiteRT-LM (.litertlm)'
+                                  : 'llama.cpp (.gguf)',
                               icon: Icons.memory_rounded,
-                              color: Colors.blue,
+                              color: model.filename
+                                      .toLowerCase()
+                                      .endsWith('.litertlm')
+                                  ? Colors.deepPurple
+                                  : Colors.blue,
                             ),
                             if (model.sizeLabel.isNotEmpty)
                               _Chip(
