@@ -161,9 +161,12 @@ class _McpPlaygroundScreenState extends State<McpPlaygroundScreen> {
             children: [
               Icon(Icons.chat_bubble_outline, size: 20),
               SizedBox(width: 8),
-              Text(
-                'Headless Chat View',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              Flexible(
+                child: Text(
+                  'Headless Chat View',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -197,32 +200,39 @@ class _McpPlaygroundScreenState extends State<McpPlaygroundScreen> {
         messageContentBuilder: _buildCustomMessageContent,
         topBarBuilder: (context, controller, actions) {
           final theme = Theme.of(context);
+          final isWide = MediaQuery.sizeOf(context).width >= 520;
           return AppBar(
+            titleSpacing: isWide ? null : 12,
             title: Row(
               children: [
                 const Icon(Icons.memory, size: 22),
                 const SizedBox(width: 8),
-                const Text(
-                  'Embedded AI Agent',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                const Flexible(
                   child: Text(
-                    'Offline GGUF',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onPrimaryContainer,
+                    'Embedded AI Agent',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isWide) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Offline GGUF / LiteRT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
             actions: [
