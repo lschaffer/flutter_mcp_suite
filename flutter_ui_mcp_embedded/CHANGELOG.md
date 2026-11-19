@@ -1,9 +1,14 @@
+## 1.5.15
+
+* **LiteRT-LM (`.litertlm`) Loading & Logging Fixes**:
+  * Fixed `EmbeddedLlmAdapter` passing llama.cpp-specific `splitMode` and partial `gpuLayers` to `LiteRtLmBackend` when loading `.litertlm` models; `.litertlm` models now omit `splitMode` and map `gpuLayers` to all-or-CPU (`0` or `ModelParams.maxGpuLayers`).
+  * Changed default `LlamaLogging` level from `debug` to `warn` to suppress excessive native LiteRT/llama.cpp debug log spam.
+
 ## 1.5.14
 
 * **Upgraded `llamadart` Runtime (`^0.20.1`)**:
   * Bumped `llamadart` dependency to `^0.20.1` (`llamadart-native@v1.0.0-2` / upstream `llama.cpp v1.0.0`, `LiteRT-LM v0.19.1-5`, Windows CUDA `gpuMemoryFit` VRAM accounting, and model cache concurrency fix).
   * Supports automatic routing of both `.gguf` (`llama.cpp`) and `.litertlm` (`LiteRT-LM`) bundles via `LlamaBackend()`.
-  * Fixed `EmbeddedLlmAdapter` passing llama.cpp-specific `splitMode` and partial `gpuLayers` to `LiteRtLmBackend` when loading `.litertlm` models.
 * **Synchronized Suite Upgrades**:
   * Aligned `flutter_ui_mcp_core` dependency to `^1.5.14` (multi-format `.gguf` and `.litertlm` HuggingFace discovery and local file picker support).
 
