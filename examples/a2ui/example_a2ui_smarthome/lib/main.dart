@@ -219,13 +219,20 @@ class _ThermostatCardWidgetState extends State<_ThermostatCardWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(room, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text('Current: ${current.toStringAsFixed(1)}°C • $humidity% RH', style: theme.textTheme.bodySmall),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        room,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text('Current: ${current.toStringAsFixed(1)}°C • $humidity% RH', style: theme.textTheme.bodySmall),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Chip(
                   label: Text(mode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
@@ -363,15 +370,23 @@ class _DeviceGridWidgetState extends State<_DeviceGridWidget> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Icon(
-                isOn ? Icons.lightbulb : Icons.lightbulb_outline,
-                color: isOn ? Colors.amber : Colors.grey,
-              ),
-              const SizedBox(width: 10),
-              Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                Icon(
+                  isOn ? Icons.lightbulb : Icons.lightbulb_outline,
+                  color: isOn ? Colors.amber : Colors.grey,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
           Switch(
             value: isOn,
@@ -431,7 +446,14 @@ class _EnergyChartWidget extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Energy Consumption', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    'Energy Consumption',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Text('${total.toStringAsFixed(1)} kWh total', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
               ],
             ),

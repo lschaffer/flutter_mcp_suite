@@ -624,7 +624,14 @@ class _CostProjectionChartWidget extends StatelessWidget {
               children: [
                 Icon(Icons.show_chart, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             if (subtitle != null) ...[
@@ -763,22 +770,33 @@ class _ModelRoutingCardWidget extends StatelessWidget {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.alt_route, color: Colors.green, size: 20),
                       ),
-                      child: const Icon(Icons.alt_route, color: Colors.green, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                if (savings.isNotEmpty)
+                if (savings.isNotEmpty) ...[
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -790,6 +808,7 @@ class _ModelRoutingCardWidget extends StatelessWidget {
                       style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
+                ],
               ],
             ),
             if (summary != null) ...[
@@ -824,7 +843,14 @@ class _ModelRoutingCardWidget extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(t['tier_name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        Expanded(
+                          child: Text(
+                            t['tier_name']?.toString() ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Text('$pct% traffic', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                       ],
                     ),

@@ -550,14 +550,18 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Interactive Budget Adjuster', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    Text('Adjust categories to optimize savings', style: theme.textTheme.bodySmall),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Interactive Budget Adjuster', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      Text('Adjust categories to optimize savings', style: theme.textTheme.bodySmall),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
@@ -588,7 +592,14 @@ class _BudgetSlidersWidgetState extends State<_BudgetSlidersWidget> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             Text('\$${val.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
@@ -663,18 +674,22 @@ class _InvestmentGrowthWidget extends StatelessWidget {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Investment Growth Simulation', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Monthly: \$${pmt.toStringAsFixed(0)} | Return: ${(rate * 100).toStringAsFixed(1)}%/yr',
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[400]),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Investment Growth Simulation', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Monthly: \$${pmt.toStringAsFixed(0)} | Return: ${(rate * 100).toStringAsFixed(1)}%/yr',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -739,8 +754,10 @@ class _InvestmentGrowthWidget extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   Text(
                     '10-Yr Deposits: \$${total10YearDeposits.toStringAsFixed(0)}',

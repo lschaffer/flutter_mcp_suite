@@ -391,7 +391,14 @@ class _RadarQualityChartWidget extends StatelessWidget {
               children: [
                 const Icon(Icons.analytics, color: Colors.purple, size: 20),
                 const SizedBox(width: 8),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -525,7 +532,14 @@ class _LatencyCostScatterWidget extends StatelessWidget {
               children: [
                 const Icon(Icons.speed, color: Colors.purple, size: 20),
                 const SizedBox(width: 8),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),

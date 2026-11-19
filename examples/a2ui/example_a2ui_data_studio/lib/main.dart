@@ -202,7 +202,14 @@ class _MetricKpiGridWidget extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(kpi['value']?.toString() ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              kpi['value']?.toString() ?? '',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           Text(
                             kpi['change']?.toString() ?? '',
                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isPos ? Colors.green : Colors.red),
