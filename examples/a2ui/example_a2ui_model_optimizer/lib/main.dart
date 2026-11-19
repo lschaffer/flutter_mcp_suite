@@ -63,7 +63,7 @@ class QueryModelPricingTool extends McpLocalTool {
             'type': 'array',
             'items': {'type': 'string'},
             'description':
-                'List of model IDs (e.g. o3-mini, claude-3-7-sonnet, deepseek-chat, gemini-3.7-flash, llama3.3:70b)',
+                'List of model IDs (e.g. gpt-5, claude-sonnet-4-5, gemini-3.8-flash, deepseek-v3, gemma4:27b)',
           },
         },
       };
@@ -71,21 +71,23 @@ class QueryModelPricingTool extends McpLocalTool {
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final rawList = arguments['models'] as List? ?? [
-      'o3-mini',
-      'claude-3-7-sonnet',
-      'deepseek-chat',
-      'gemini-3.7-flash',
-      'llama3.3:70b',
+      'gpt-5',
+      'claude-sonnet-4-5',
+      'gemini-3.8-flash',
+      'deepseek-v3',
+      'gemma4:27b',
     ];
 
     final results = <Map<String, dynamic>>[];
 
     for (final raw in rawList) {
       final modelId = raw.toString();
-      final isLocal = modelId.toLowerCase().contains('llama') ||
-          modelId.toLowerCase().contains('ollama') ||
-          modelId.toLowerCase().contains('local') ||
-          modelId.toLowerCase().contains('qwen');
+      final lowerId = modelId.toLowerCase();
+      final isLocal = lowerId.contains('llama') ||
+          lowerId.contains('ollama') ||
+          lowerId.contains('local') ||
+          lowerId.contains('qwen') ||
+          lowerId.contains('gemma');
 
       final cfg = LlmConfig(
         provider: isLocal
@@ -169,11 +171,11 @@ class SimulateWorkloadTool extends McpLocalTool {
     final totalOut1M = (requests * outTokens) / 1000000.0;
 
     final modelsProfile = [
-      {'name': 'o3-mini', 'in': 1.10, 'out': 4.40, 'color': '#EF4444'},
-      {'name': 'claude-3-7-sonnet', 'in': 3.00, 'out': 15.00, 'color': '#F59E0B'},
-      {'name': 'gemini-3.7-flash', 'in': 0.075, 'out': 0.30, 'color': '#3B82F6'},
-      {'name': 'deepseek-chat', 'in': 0.14, 'out': 0.28, 'color': '#10B981'},
-      {'name': 'ollama-local', 'in': 0.0, 'out': 0.0, 'color': '#6B7280'},
+      {'name': 'gpt-5', 'in': 1.25, 'out': 10.00, 'color': '#EF4444'},
+      {'name': 'claude-sonnet-4-5', 'in': 3.00, 'out': 15.00, 'color': '#F59E0B'},
+      {'name': 'gemini-3.8-flash', 'in': 0.15, 'out': 0.60, 'color': '#3B82F6'},
+      {'name': 'deepseek-v3', 'in': 0.27, 'out': 1.10, 'color': '#10B981'},
+      {'name': 'gemma4:27b (Local)', 'in': 0.0, 'out': 0.0, 'color': '#6B7280'},
     ];
 
     final comparisons = <Map<String, dynamic>>[];
@@ -258,19 +260,19 @@ class RecommendRoutingTool extends McpLocalTool {
       'tiers': [
         {
           'tier_name': 'Tier 1: Complex Synthesis & Reasoning',
-          'model': 'claude-3-7-sonnet',
+          'model': 'claude-sonnet-4-5',
           'traffic_percent': 15,
           'role': 'Multi-step planning, intricate code refactoring, and root-cause analysis.',
         },
         {
           'tier_name': 'Tier 2: Standard RAG & Generation',
-          'model': 'deepseek-chat',
+          'model': 'gemini-3.8-flash',
           'traffic_percent': 65,
           'role': 'Query answer synthesis, summarization, and data translation.',
         },
         {
           'tier_name': 'Tier 3: Classification & Safety Triage',
-          'model': 'llama3:8b (Ollama Local)',
+          'model': 'gemma4:9b (Ollama Local)',
           'traffic_percent': 20,
           'role': 'Intent detection, guardrails, sensitive PII scrubbing (Zero Cost).',
         },
@@ -338,7 +340,11 @@ class _ModelComparisonWidget extends StatelessWidget {
     final data = itemContext.data as Map<String, dynamic>? ?? {};
     final title = data['title']?.toString() ?? 'Model Pricing & Context Matrix';
     final subtitle = data['subtitle']?.toString();
-    final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final models = (data['models'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        [];
     final theme = Theme.of(context);
 
     return Card(
@@ -538,14 +544,22 @@ class _CostProjectionChartWidget extends StatelessWidget {
     final title = data['title']?.toString() ?? 'Monthly Cost Scaling Projection';
     final subtitle = data['subtitle']?.toString();
     final currency = data['currency']?.toString() ?? '\$';
-    final series = (data['series'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final series = (data['series'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        [];
     final theme = Theme.of(context);
 
     if (series.isEmpty) {
       return const SizedBox();
     }
 
-    final firstPoints = (series.first['points'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final firstPoints = (series.first['points'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        [];
     final labels = firstPoints.map((p) => p['requests']?.toString() ?? '').toList();
 
     double maxVal = 10.0;
@@ -553,7 +567,11 @@ class _CostProjectionChartWidget extends StatelessWidget {
 
     for (var i = 0; i < series.length; i++) {
       final s = series[i];
-      final points = (s['points'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final points = (s['points'] as List?)
+              ?.whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [];
       final hex = s['color_hex']?.toString().replaceAll('#', '');
       final color = hex != null && hex.length == 6
           ? Color(int.parse('FF$hex', radix: 16))
@@ -724,7 +742,11 @@ class _ModelRoutingCardWidget extends StatelessWidget {
     final summary = data['summary']?.toString();
     final spend = data['projected_monthly_spend']?.toString() ?? '';
     final savings = data['savings_percentage']?.toString() ?? '';
-    final tiers = (data['tiers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final tiers = (data['tiers'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        [];
     final theme = Theme.of(context);
 
     return Card(
@@ -932,7 +954,7 @@ class ModelOptimizerScreen extends StatelessWidget {
 
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.7-flash'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.8-flash'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );

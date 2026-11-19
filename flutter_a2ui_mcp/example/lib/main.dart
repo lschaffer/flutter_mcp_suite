@@ -151,7 +151,7 @@ enum A2uiMcpDemo {
     icon: Icons.speed_rounded,
     badge: 'AI Ops',
     examplePrompts: [
-      'Compare latency, throughput, and costs between GPT-4o, Claude 3.5 Sonnet, and Gemini 1.5 Pro.',
+      'Compare latency, throughput, and costs between GPT-5, Claude 4.5 Sonnet, and Gemini 3.8 Flash.',
       'Generate monthly cost projection for 15M input tokens and 4M output tokens across top models.',
       'Recommend intelligent model routing rules to optimize cost for classification while preserving accuracy.',
     ],

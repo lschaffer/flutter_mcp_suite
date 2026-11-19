@@ -73,54 +73,54 @@ class RunPromptBenchmarkTool extends McpLocalTool {
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final prompt = arguments['test_prompt']?.toString() ?? 'Extract structured entities';
     final candidateModels = (arguments['models'] as List?)?.cast<String>() ?? [
-      'claude-3-7-sonnet',
-      'o3-mini',
-      'deepseek-chat',
-      'gemini-3.7-flash',
+      'claude-sonnet-4-5',
+      'gpt-5',
+      'deepseek-v3',
+      'gemini-3.8-flash',
     ];
 
     final runs = [
       {
-        'model': 'claude-3-7-sonnet',
-        'latency_ms': 690,
-        'accuracy_score': 98.6,
-        'instruction_score': 99.2,
-        'conciseness_score': 95.0,
-        'hallucination_resistance': 99.0,
+        'model': 'claude-sonnet-4-5',
+        'latency_ms': 640,
+        'accuracy_score': 98.8,
+        'instruction_score': 99.4,
+        'conciseness_score': 95.5,
+        'hallucination_resistance': 99.1,
         'cost_per_1k': 0.0090,
         'tokens_used': 340,
         'is_winner': true,
       },
       {
-        'model': 'o3-mini',
-        'latency_ms': 540,
-        'accuracy_score': 97.4,
-        'instruction_score': 97.5,
-        'conciseness_score': 93.0,
-        'hallucination_resistance': 97.5,
-        'cost_per_1k': 0.0035,
+        'model': 'gpt-5',
+        'latency_ms': 560,
+        'accuracy_score': 98.2,
+        'instruction_score': 98.6,
+        'conciseness_score': 94.5,
+        'hallucination_resistance': 98.4,
+        'cost_per_1k': 0.0056,
         'tokens_used': 350,
         'is_winner': false,
       },
       {
-        'model': 'deepseek-chat',
-        'latency_ms': 460,
-        'accuracy_score': 95.5,
-        'instruction_score': 95.0,
-        'conciseness_score': 92.5,
-        'hallucination_resistance': 94.5,
-        'cost_per_1k': 0.00042,
+        'model': 'deepseek-v3',
+        'latency_ms': 440,
+        'accuracy_score': 96.2,
+        'instruction_score': 95.8,
+        'conciseness_score': 93.0,
+        'hallucination_resistance': 95.2,
+        'cost_per_1k': 0.00068,
         'tokens_used': 320,
         'is_winner': false,
       },
       {
-        'model': 'gemini-3.7-flash',
-        'latency_ms': 280,
-        'accuracy_score': 93.8,
-        'instruction_score': 94.0,
-        'conciseness_score': 91.0,
-        'hallucination_resistance': 93.5,
-        'cost_per_1k': 0.00030,
+        'model': 'gemini-3.8-flash',
+        'latency_ms': 240,
+        'accuracy_score': 96.8,
+        'instruction_score': 97.0,
+        'conciseness_score': 94.0,
+        'hallucination_resistance': 96.5,
+        'cost_per_1k': 0.00038,
         'tokens_used': 305,
         'is_winner': false,
       },
@@ -168,15 +168,15 @@ class EvaluateModelTradeoffsTool extends McpLocalTool {
     final evaluation = {
       'optimization_priority': priority,
       'recommendation': priority == 'quality'
-          ? 'Claude 3.7 Sonnet delivers highest accuracy (98.6%) with superior instruction following.'
+          ? 'Claude 4.5 Sonnet delivers highest accuracy (98.8%) with superior instruction following.'
           : priority == 'speed'
-              ? 'Gemini 3.7 Flash delivers lowest TTFT and end-to-end latency (280ms).'
-              : 'DeepSeek-Chat offers optimal Pareto frontier: 95.5% accuracy at 95% lower cost than frontier models.',
+              ? 'Gemini 3.8 Flash delivers lowest TTFT and end-to-end latency (240ms).'
+              : 'Gemini 3.8 Flash offers optimal Pareto frontier: 96.8% accuracy at ultra-low latency and cost.',
       'winner_model': priority == 'quality'
-          ? 'claude-3-7-sonnet'
+          ? 'claude-sonnet-4-5'
           : priority == 'speed'
-              ? 'gemini-3.7-flash'
-              : 'deepseek-chat',
+              ? 'gemini-3.8-flash'
+              : 'gemini-3.8-flash',
     };
 
     return MCPToolResult(
@@ -368,7 +368,11 @@ class _RadarQualityChartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = itemContext.data as Map<String, dynamic>? ?? {};
     final title = data['title']?.toString() ?? 'Model Quality Criterion Breakdown';
-    final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final models = (data['models'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        [];
     final theme = Theme.of(context);
 
     return Card(
@@ -498,7 +502,11 @@ class _LatencyCostScatterWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = itemContext.data as Map<String, dynamic>? ?? {};
     final title = data['title']?.toString() ?? 'Speed vs. Cost Evaluation';
-    final models = (data['models'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final models = (data['models'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        [];
     final theme = Theme.of(context);
 
     return Card(
@@ -614,7 +622,7 @@ class BenchmarkLabScreen extends StatelessWidget {
 
     final initialLlm = LlmConfig(
       provider: EnvLoader.getProvider(),
-      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.7-flash'),
+      model: EnvLoader.get('LLM_MODEL', defaultValue: 'gemini-3.8-flash'),
       apiKey: EnvLoader.get('LLM_API_KEY'),
       baseUrl: EnvLoader.get('LLM_URL'),
     );
