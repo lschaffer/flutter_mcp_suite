@@ -1,3 +1,8 @@
+## 1.5.14
+
+* **Synchronized Suite Upgrades**:
+  * Bumped `flutter_ui_mcp_core` dependency to `^1.5.14` (multi-format `.gguf` and `.litertlm` embedded model discovery, URL import, file picker, and runtime badges).
+
 ## 1.5.13
 
 * **Synchronized Suite Upgrades**:
