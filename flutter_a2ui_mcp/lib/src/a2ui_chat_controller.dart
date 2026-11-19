@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:a2ui_core/a2ui_core.dart' hide Action;
 import 'package:a2ui_flutter/a2ui_flutter.dart';
+import 'package:a2ui_flutter/basic_catalog.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart' as mp;
 import 'package:flutter_ui_mcp_core/flutter_ui_mcp_core.dart';
 import 'package:uuid/uuid.dart';
@@ -97,7 +98,23 @@ class McpA2uiChatController extends ChangeNotifier {
         _processor.model.onSurfaceDeleted.subscribe((surfaceId) {
       _onSurfaceDeleted(surfaceId);
     });
+
+    _errorSubscription = _processor.model.onError.subscribe((error) {
+      _playgroundController?.addMessage(
+        mp.ChatMessage(
+          id: _newId(),
+          content: '[A2UI Validation/Render Error] ${error.code}: ${error.message}',
+          role: mp.ChatRole.system,
+          timestamp: DateTime.now(),
+          type: mp.MessageType.log,
+        ),
+      );
+    });
   }
+
+  static Set<String>? _cachedBasicComponentNames;
+  static Set<String> get _basicComponentNames =>
+      _cachedBasicComponentNames ??= basicCatalog().components.keys.toSet();
 
   final PlaygroundController? _playgroundController;
   mp.LlmConfig _llmConfig;
@@ -111,6 +128,7 @@ class McpA2uiChatController extends ChangeNotifier {
   Subscription? _actionSubscription;
   Subscription? _surfaceCreatedSubscription;
   Subscription? _surfaceDeletedSubscription;
+  Subscription? _errorSubscription;
 
   final List<A2uiChatEntry> _entries = [];
   final List<mp.ChatMessage> _conversationHistory = [];
@@ -296,7 +314,7 @@ class McpA2uiChatController extends ChangeNotifier {
 
       try {
         final stream = mp.LLMService.generateStream(
-          config: _llmConfig,
+          config: llmConfig,
           messages: _conversationHistory,
           tools: effectiveTools,
           systemPrompt: effectiveSystemPrompt,
@@ -582,6 +600,15 @@ class McpA2uiChatController extends ChangeNotifier {
         } else if (payload.containsKey('total_kwh') ||
             payload.containsKey('breakdown')) {
           payload['component'] = 'EnergyChart';
+        } else if (payload.containsKey('agents') &&
+            payload['agents'] is List) {
+          payload['component'] = 'AgentSwarmTimeline';
+        } else if (payload.containsKey('action_name') &&
+            payload.containsKey('risk_level')) {
+          payload['component'] = 'ApprovalGateWidget';
+        } else if (payload.containsKey('objective') &&
+            payload.containsKey('findings')) {
+          payload['component'] = 'SubagentCard';
         }
       }
 
@@ -592,8 +619,8 @@ class McpA2uiChatController extends ChangeNotifier {
         if (payload.containsKey('createSurface')) {
           final cs = payload['createSurface'];
           if (cs is Map<String, dynamic>) {
-            final cid = cs['catalogId'];
-            if (cid == null || cid.toString().trim().isEmpty) {
+            final cid = cs['catalogId']?.toString().trim();
+            if (cid == null || cid.isEmpty || cid != _catalog.id) {
               cs['catalogId'] = _catalog.id;
             }
           }
@@ -603,7 +630,7 @@ class McpA2uiChatController extends ChangeNotifier {
           if (uc is Map<String, dynamic> && uc['components'] is List) {
             for (final item in uc['components'] as List) {
               if (item is Map<String, dynamic>) {
-                _sanitizeV1ComponentEnvelope(item);
+                _sanitizeV1ComponentEnvelope(item, activeCatalogId: _catalog.id);
               }
             }
           }
@@ -616,9 +643,13 @@ class McpA2uiChatController extends ChangeNotifier {
   }
 
   /// Sanitizes component envelope keys for `a2ui_core` 0.8.0+ v1.0 validation:
-  /// - Removes `null` `@catalogId` / `catalogId` (rejected in 0.8.0).
+  /// - Removes `null` `@catalogId` / `catalogId` (rejected in 0.8.0) and aligns
+  ///   unknown catalog IDs with [activeCatalogId] when provided.
   /// - Deduplicates mixins when both `@`-prefixed and bare forms are emitted.
-  static void _sanitizeV1ComponentEnvelope(Map<String, dynamic> comp) {
+  static void _sanitizeV1ComponentEnvelope(
+    Map<String, dynamic> comp, {
+    String? activeCatalogId,
+  }) {
     if (comp.containsKey('@catalogId') && comp['@catalogId'] == null) {
       comp.remove('@catalogId');
     }
@@ -636,6 +667,15 @@ class McpA2uiChatController extends ChangeNotifier {
         comp.remove(bareKey);
       }
     }
+    if (activeCatalogId != null) {
+      if (comp.containsKey('@catalogId') &&
+          comp['@catalogId']?.toString() != activeCatalogId) {
+        comp['@catalogId'] = activeCatalogId;
+      } else if (comp.containsKey('catalogId') &&
+          comp['catalogId']?.toString() != activeCatalogId) {
+        comp['catalogId'] = activeCatalogId;
+      }
+    }
   }
 
   void _applyDirectComponent(Map<String, dynamic> comp) {
@@ -648,7 +688,7 @@ class McpA2uiChatController extends ChangeNotifier {
     compProps.remove('id');
     compProps.remove('component');
     compProps.remove('version');
-    _sanitizeV1ComponentEnvelope(compProps);
+    _sanitizeV1ComponentEnvelope(compProps, activeCatalogId: _catalog.id);
 
     try {
       _processor.processMessages([
@@ -789,19 +829,37 @@ class McpA2uiChatController extends ChangeNotifier {
     );
     buffer.writeln();
     buffer.writeln('Available components in catalog "${_catalog.id}":');
+    final customComps = <ComponentImplementation>[];
+    final basicNames = <String>[];
     for (final comp in _catalog.components.values) {
-      buffer.writeln('- **${comp.name}**');
+      if (_basicComponentNames.contains(comp.name) || comp.name == 'ChatMessage') {
+        basicNames.add(comp.name);
+      } else {
+        customComps.add(comp);
+      }
+    }
+    if (customComps.isNotEmpty) {
+      buffer.writeln('Custom domain components (PREFERRED — follow these exact JSON schemas):');
+      for (final comp in customComps) {
+        buffer.writeln('- **${comp.name}**: `${jsonEncode(comp.schema.value)}`');
+      }
+    }
+    if (basicNames.isNotEmpty) {
+      buffer.writeln('Standard layout/basic components: ${basicNames.join(', ')}');
     }
     buffer.writeln();
     buffer.writeln(
       'Standard protocol messages:\n'
-      '1. Direct shorthand (RECOMMENDED): {"component": "ComponentName", ...properties}\n'
+      '1. Direct shorthand (RECOMMENDED — emit one JSON object per widget): {"component": "ComponentName", ...requiredPropertiesFromSchema}\n'
       '2. Standard A2UI batch: [{"version": "1.0", "createSurface": {"surfaceId": "...", "catalogId": "${_catalog.id}"}}, {"version": "1.0", "updateComponents": {"surfaceId": "...", "components": [{"id": "root", "component": "ComponentName", ...}]}}]\n'
-      'Always include "component": "<ComponentName>" in any UI JSON payload.',
+      'Always include "component": "<ComponentName>" and all required properties from the component schema.',
     );
 
     return buffer.toString();
   }
+
+  /// Exposes the generated A2UI system prompt (visible for testing).
+  String buildEffectiveSystemPrompt() => _buildSystemPrompt();
 
   /// Cancels any active generation in progress.
   void stopGeneration() {
@@ -842,6 +900,7 @@ class McpA2uiChatController extends ChangeNotifier {
     _actionSubscription?.unsubscribe();
     _surfaceCreatedSubscription?.unsubscribe();
     _surfaceDeletedSubscription?.unsubscribe();
+    _errorSubscription?.unsubscribe();
     super.dispose();
   }
 }

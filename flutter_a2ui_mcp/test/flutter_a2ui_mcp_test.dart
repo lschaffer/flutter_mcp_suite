@@ -304,4 +304,46 @@ Some intro text here.
       a2uiCtrl.dispose();
     },
   );
+
+  test(
+    'buildEffectiveSystemPrompt includes JSON schemas for custom components',
+    () {
+      final a2uiCtrl = McpA2uiChatController(
+        llmConfig: const LlmConfig(
+          provider: LlmProvider.none,
+          model: '',
+          apiKey: '',
+        ),
+        customComponents: [
+          ComponentImplementation(
+            name: 'AgentSwarmTimeline',
+            schema: S.object(
+              properties: {
+                'title': S.string(),
+                'agents': S.list(
+                  items: S.object(
+                    properties: {
+                      'id': S.string(),
+                      'role': S.string(),
+                      'status': S.string(),
+                      'current_task': S.string(),
+                    },
+                    required: ['id', 'role', 'status', 'current_task'],
+                  ),
+                ),
+              },
+              required: ['title', 'agents'],
+            ),
+            builder: (ctx, node, props, buildChild) => const SizedBox(),
+          ),
+        ],
+      );
+
+      final prompt = a2uiCtrl.buildEffectiveSystemPrompt();
+      expect(prompt, contains('AgentSwarmTimeline'));
+      expect(prompt, contains('current_task'));
+      expect(prompt, contains('"required":["title","agents"]'));
+      a2uiCtrl.dispose();
+    },
+  );
 }

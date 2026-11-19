@@ -245,7 +245,11 @@ class _AgentSwarmTimelineWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = itemContext.data as Map<String, dynamic>? ?? {};
     final title = data['title']?.toString() ?? 'Multi-Agent Pipeline Progression';
-    final agents = (data['agents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final rawAgents = data['agents'] as List? ?? const [];
+    final agents = rawAgents
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
     final theme = Theme.of(context);
 
     return Card(
@@ -575,13 +579,22 @@ class _ApprovalGateWidgetState extends State<_ApprovalGateWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.gavel, color: riskColor, size: 22),
-                    const SizedBox(width: 8),
-                    Text('Human-in-the-Loop Decision Gate', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.gavel, color: riskColor, size: 22),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Human-in-the-Loop Decision Gate',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(

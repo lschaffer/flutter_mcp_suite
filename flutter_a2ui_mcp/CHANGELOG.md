@@ -5,7 +5,11 @@
   - **v1.0 Envelope Normalization & Hardening (`McpA2uiChatController`)**:
     - Added `_sanitizeV1ComponentEnvelope` to guard against `a2ui_core 0.8.0` strict validation errors when models emit `null` `@catalogId`/`catalogId` or mix `@`-prefixed (`@catalogId`, `@metadata`, `@accessibility`, `@checks`) and legacy bare mixin keys on the same component.
     - Stripped leaked `version` keys when transforming direct component shorthand payloads into `updateComponents`.
-    - Ensured `createSurface` falls back to the active catalog ID if `catalogId` is `null` or blank.
+    - Ensured `createSurface` and component `@catalogId`/`catalogId` normalize unknown or blank catalog IDs to the active catalog ID.
+  - **Custom Component Schema Injection & Error Logging (`McpA2uiChatController`)**:
+    - Included full JSON schemas of custom domain components in the generated A2UI system prompt so LLMs emit valid property names and required fields instead of guessing.
+    - Subscribed to `MessageProcessor.model.onError` and logged A2UI validation/render errors to the Agent Inspector execution log.
+    - Added heuristic component inference for `AgentSwarmTimeline`, `SubagentCard`, and `ApprovalGateWidget`.
   - Updated all A2UI example apps to align with `a2ui_core: ^0.8.0` and `a2ui_flutter: ^0.4.0`.
 
 ## 1.0.2
