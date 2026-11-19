@@ -88,6 +88,7 @@ class EmbeddedLlmAdapter implements EmbeddedLlmDriver {
     if (contextSize > 2048) sizesToTry.add(contextSize ~/ 2);
     if (contextSize > 1024) sizesToTry.add(1024);
 
+    final isLitertLm = modelPath.toLowerCase().contains('.litertlm');
     final gpuLayerAttempts = <int>[gpuLayers];
     if (gpuLayers > 0) {
       gpuLayerAttempts.add(0);
@@ -98,12 +99,24 @@ class EmbeddedLlmAdapter implements EmbeddedLlmDriver {
       for (final size in sizesToTry) {
         _engine ??= LlamaEngine(_backend);
         try {
-          final params = ModelParams(
-            contextSize: size,
-            gpuLayers: currentGpuLayers,
-            device: currentGpuLayers == 0 ? ComputeDevice.cpu : ComputeDevice.auto,
-            splitMode: ModelSplitMode.none,
-          );
+          final params = isLitertLm
+              ? ModelParams(
+                  contextSize: size,
+                  gpuLayers: currentGpuLayers == 0
+                      ? 0
+                      : ModelParams.maxGpuLayers,
+                  device: currentGpuLayers == 0
+                      ? ComputeDevice.cpu
+                      : ComputeDevice.auto,
+                )
+              : ModelParams(
+                  contextSize: size,
+                  gpuLayers: currentGpuLayers,
+                  device: currentGpuLayers == 0
+                      ? ComputeDevice.cpu
+                      : ComputeDevice.auto,
+                  splitMode: ModelSplitMode.none,
+                );
           if (_backend.supportsUrlLoading &&
               (modelPath.startsWith('http://') || modelPath.startsWith('https://'))) {
             await _engine!.setModel(
