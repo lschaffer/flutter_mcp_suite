@@ -591,8 +591,21 @@ class McpA2uiChatController extends ChangeNotifier {
           payload.containsKey('deleteSurface')) {
         if (payload.containsKey('createSurface')) {
           final cs = payload['createSurface'];
-          if (cs is Map<String, dynamic> && !cs.containsKey('catalogId')) {
-            cs['catalogId'] = _catalog.id;
+          if (cs is Map<String, dynamic>) {
+            final cid = cs['catalogId'];
+            if (cid == null || cid.toString().trim().isEmpty) {
+              cs['catalogId'] = _catalog.id;
+            }
+          }
+        }
+        if (payload.containsKey('updateComponents')) {
+          final uc = payload['updateComponents'];
+          if (uc is Map<String, dynamic> && uc['components'] is List) {
+            for (final item in uc['components'] as List) {
+              if (item is Map<String, dynamic>) {
+                _sanitizeV1ComponentEnvelope(item);
+              }
+            }
           }
         }
         _processor.processMessages(payload);
@@ -600,6 +613,29 @@ class McpA2uiChatController extends ChangeNotifier {
         _applyDirectComponent(payload);
       }
     } catch (_) {}
+  }
+
+  /// Sanitizes component envelope keys for `a2ui_core` 0.8.0+ v1.0 validation:
+  /// - Removes `null` `@catalogId` / `catalogId` (rejected in 0.8.0).
+  /// - Deduplicates mixins when both `@`-prefixed and bare forms are emitted.
+  static void _sanitizeV1ComponentEnvelope(Map<String, dynamic> comp) {
+    if (comp.containsKey('@catalogId') && comp['@catalogId'] == null) {
+      comp.remove('@catalogId');
+    }
+    if (comp.containsKey('catalogId') && comp['catalogId'] == null) {
+      comp.remove('catalogId');
+    }
+    const mixinPairs = [
+      ('@catalogId', 'catalogId'),
+      ('@metadata', 'metadata'),
+      ('@accessibility', 'accessibility'),
+      ('@checks', 'checks'),
+    ];
+    for (final (atKey, bareKey) in mixinPairs) {
+      if (comp.containsKey(atKey) && comp.containsKey(bareKey)) {
+        comp.remove(bareKey);
+      }
+    }
   }
 
   void _applyDirectComponent(Map<String, dynamic> comp) {
@@ -611,6 +647,8 @@ class McpA2uiChatController extends ChangeNotifier {
     final compProps = Map<String, dynamic>.from(comp);
     compProps.remove('id');
     compProps.remove('component');
+    compProps.remove('version');
+    _sanitizeV1ComponentEnvelope(compProps);
 
     try {
       _processor.processMessages([

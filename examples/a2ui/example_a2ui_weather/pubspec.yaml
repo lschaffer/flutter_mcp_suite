@@ -26,7 +26,7 @@ dependency_overrides:
     path: ../../../flutter_ui_mcp_core
   flutter_a2ui_mcp:
     path: ../../../flutter_a2ui_mcp
-  a2ui_core: ^0.7.0
+  a2ui_core: ^0.8.0
 
 dev_dependencies:
   flutter_test:

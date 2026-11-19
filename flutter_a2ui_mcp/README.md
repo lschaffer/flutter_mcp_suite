@@ -62,9 +62,9 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_a2ui_mcp: ^1.0.0
-  a2ui_flutter: ^0.3.0
-  a2ui_core: ^0.7.0
+  flutter_a2ui_mcp: ^1.1.0
+  a2ui_flutter: ^0.4.0
+  a2ui_core: ^0.8.0
 ```
 
 Then import:

@@ -1,3 +1,13 @@
+## 1.1.0
+
+- **A2UI Ecosystem Upgrade (`a2ui_core ^0.8.0`, `a2ui_flutter ^0.4.0`, `a2ui_agent ^0.4.0`)**:
+  - Upgraded `a2ui_core` from `^0.7.0` to `^0.8.0`, `a2ui_flutter` from `^0.3.0` to `^0.4.0`, and `a2ui_agent` from `^0.3.0` to `^0.4.0`.
+  - **v1.0 Envelope Normalization & Hardening (`McpA2uiChatController`)**:
+    - Added `_sanitizeV1ComponentEnvelope` to guard against `a2ui_core 0.8.0` strict validation errors when models emit `null` `@catalogId`/`catalogId` or mix `@`-prefixed (`@catalogId`, `@metadata`, `@accessibility`, `@checks`) and legacy bare mixin keys on the same component.
+    - Stripped leaked `version` keys when transforming direct component shorthand payloads into `updateComponents`.
+    - Ensured `createSurface` falls back to the active catalog ID if `catalogId` is `null` or blank.
+  - Updated all A2UI example apps to align with `a2ui_core: ^0.8.0` and `a2ui_flutter: ^0.4.0`.
+
 ## 1.0.2
 
 - **Synchronized Suite Upgrades**:

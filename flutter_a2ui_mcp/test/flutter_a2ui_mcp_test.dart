@@ -261,4 +261,47 @@ Some intro text here.
       a2uiCtrl.dispose();
     },
   );
+
+  test(
+    'a2ui_core 0.8.0 v1.0 @-prefixed envelope attributes (@accessibility, @catalogId) process cleanly',
+    () {
+      final a2uiCtrl = McpA2uiChatController(
+        llmConfig: const LlmConfig(
+          provider: LlmProvider.none,
+          model: '',
+          apiKey: '',
+        ),
+      );
+
+      expect(() {
+        a2uiCtrl.processor.processMessages([
+          {
+            'version': '1.0',
+            'createSurface': {
+              'surfaceId': 'surface_v1_at_envelope',
+              'catalogId': a2uiCtrl.catalog.id,
+            },
+          },
+          {
+            'version': '1.0',
+            'updateComponents': {
+              'surfaceId': 'surface_v1_at_envelope',
+              'components': [
+                {
+                  'id': 'root',
+                  'component': 'Text',
+                  '@catalogId': a2uiCtrl.catalog.id,
+                  '@accessibility': {'label': 'Greeting'},
+                  'text': 'Hello A2UI 0.8',
+                },
+              ],
+            },
+          },
+        ]);
+      }, returnsNormally);
+
+      expect(a2uiCtrl.activeSurfaceIds, contains('surface_v1_at_envelope'));
+      a2uiCtrl.dispose();
+    },
+  );
 }
