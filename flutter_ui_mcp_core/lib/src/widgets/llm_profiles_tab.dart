@@ -315,20 +315,23 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
               _editingProfileId != null
                   ? _buildProfileEditor(theme)
                   : _buildProfilesList(theme),
-              EmbeddedModelPickerWidget(
-                selectedFilename:
-                    EmbeddedLlmRegistry.driver?.loadedModelPath
-                        ?.split(RegExp(r'[\\/]'))
-                        .last ??
-                    '',
-                onFilenameSelected: (filename) {
-                  final activeConfig = widget.controller.llmConfig;
-                  if (activeConfig.provider == LlmProvider.embedded) {
-                    widget.controller.updateLlmConfig(
-                      activeConfig.copyWith(model: filename),
-                    );
-                  }
-                },
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: EmbeddedModelPickerWidget(
+                  selectedFilename:
+                      EmbeddedLlmRegistry.driver?.loadedModelPath
+                          ?.split(RegExp(r'[\\/]'))
+                          .last ??
+                      '',
+                  onFilenameSelected: (filename) {
+                    final activeConfig = widget.controller.llmConfig;
+                    if (activeConfig.provider == LlmProvider.embedded) {
+                      widget.controller.updateLlmConfig(
+                        activeConfig.copyWith(model: filename),
+                      );
+                    }
+                  },
+                ),
               ),
             ],
           ),

@@ -5,6 +5,7 @@
   * Added format category selector (`GGUF (.gguf)` / `LiteRT-LM (.litertlm)`) in the HuggingFace discovery dialog and dynamic runtime badges per model card.
 * **Bug Fixes**:
   * Fixed `SingleTickerProviderStateMixin` crash in `LlmProfilesTab` when updating/activating models triggered `didUpdateWidget` (switched to `TickerProviderStateMixin` and preserved existing `TabController` instance).
+  * Wrapped `EmbeddedModelPickerWidget` inside `SingleChildScrollView` in the `LlmProfilesTab` Embedded sub-tab to prevent bottom overflow when listing multiple on-device models.
 
 ## 1.5.13
 
