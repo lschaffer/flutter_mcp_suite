@@ -1,3 +1,9 @@
+## 1.5.16
+
+* **Built-In AI Image Generation (`GenerateImageTool`) & Suite Synchronization**:
+  * Upgraded dependencies to `dart_mcp_core: ^1.5.15` and `flutter_ui_mcp_core: ^1.5.16`.
+  * Registered `GenerateImageTool` (`generate_image`) in the flagship `flutter_ui_mcp` example playground so users can prompt `"Generate an image of ..."` and receive inline PNG output in chat.
+
 ## 1.5.15
 
 * **Synchronized Suite & SDK Upgrades**:

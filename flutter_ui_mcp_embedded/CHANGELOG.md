@@ -1,3 +1,8 @@
+## 1.5.18
+
+* **Synchronized Suite Upgrades**:
+  * Aligned dependencies with `dart_mcp_core: ^1.5.15` (adds `GenerateImageTool` with static `embeddedImageHandler` hook) and `flutter_ui_mcp_core: ^1.5.16`.
+
 ## 1.5.17
 
 * **Upgraded `llamadart` Runtime (`^0.20.4`)**:

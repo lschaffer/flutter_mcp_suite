@@ -1,3 +1,8 @@
+## 1.5.16
+
+* **Suite Synchronization**:
+  * Upgraded `dart_mcp_core` dependency to `^1.5.15` (adds built-in `GenerateImageTool` supporting OpenAI, Gemini, and pluggable embedded image generation rendered inline in `ChatBubble`).
+
 ## 1.5.15
 
 * **Cross-Platform Pure-Dart PDF Export & Mobile Document Export Fixes (`DocumentExportService`)**:

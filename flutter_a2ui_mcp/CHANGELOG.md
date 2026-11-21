@@ -1,3 +1,8 @@
+## 1.1.2
+
+- **Synchronized Suite Upgrades**:
+  - Bumped dependencies to `dart_mcp_core: ^1.5.15` (adds built-in `GenerateImageTool` for inline AI image generation) and `flutter_ui_mcp_core: ^1.5.16`.
+
 ## 1.1.1
 
 - **Synchronized Suite Upgrades**:

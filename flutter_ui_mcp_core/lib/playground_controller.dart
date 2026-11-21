@@ -721,6 +721,8 @@ class PlaygroundController extends ChangeNotifier {
       _localTools.addAll(customLocalTools);
     }
     _registerEmbeddedLlmHandlers();
+    GenerateImageTool.activeConfigProvider = () => _llmConfig;
+    GenerateImageTool.configuredProfilesProvider = () => List.unmodifiable(_llmConfigs);
     _mcpManager.addListener(notifyListeners);
     _initAndLoad();
   }
@@ -2923,6 +2925,7 @@ class PlaygroundController extends ChangeNotifier {
                   return await McpCallToolTool(
                     mcpManager: _mcpManager,
                     localTools: activeCatalogTools,
+                    fallbackLlmConfig: _llmConfig,
                   ).execute(call.arguments);
                 } else if (memoryTool != null && call.name == 'retrieve_memory') {
                   return await memoryTool.execute(call.arguments);

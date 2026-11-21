@@ -1,4 +1,5 @@
 import '../models/models.dart';
+import '../tools/generate_image_tool.dart';
 import 'local_tools.dart';
 import 'mcp_client_def.dart';
 
@@ -111,8 +112,13 @@ class McpListToolsTool extends McpLocalTool {
 class McpCallToolTool extends McpLocalTool {
   final MultiMCPManager mcpManager;
   final List<McpLocalTool>? localTools;
+  final LlmConfig? fallbackLlmConfig;
 
-  McpCallToolTool({required this.mcpManager, this.localTools});
+  McpCallToolTool({
+    required this.mcpManager,
+    this.localTools,
+    this.fallbackLlmConfig,
+  });
 
   @override
   String get name => 'mcp_call_tool';
@@ -156,7 +162,14 @@ class McpCallToolTool extends McpLocalTool {
       final localMatch = localTools!.where((t) => t.name == toolName).toList();
       if (localMatch.isNotEmpty) {
         try {
-          return await localMatch.first.execute(toolArgs);
+          final localTool = localMatch.first;
+          if (localTool is GenerateImageTool) {
+            return await localTool.executeWithFallbackConfig(
+              toolArgs,
+              fallbackLlmConfig,
+            );
+          }
+          return await localTool.execute(toolArgs);
         } catch (e) {
           return MCPToolResult.error('Failed to execute local tool "$toolName": $e');
         }

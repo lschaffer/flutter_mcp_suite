@@ -55,6 +55,7 @@ enum FlutterMcpDemo {
     badge: 'Flagship',
     examplePrompts: [
       'What is the current weather and 3-day forecast in Vienna and Zurich? Create a temperature comparison chart.',
+      'Generate an image of a cute cat sitting on a sunlit windowsill in watercolor style.',
       'Generate a bar chart showing quarterly cloud revenue: Q1 \$42k, Q2 \$58k, Q3 \$73k, Q4 \$91k.',
       'List the files in the current directory and display git branch status.',
     ],
@@ -1038,6 +1039,10 @@ class McpPlaygroundScreen extends StatelessWidget {
       baseUrl: EnvLoader.get('LLM_URL'),
     );
 
+    // Add AI image generation tool (automatically uses the active OpenAI / Gemini
+    // profile from Settings, or GenerateImageTool.embeddedImageHandler, and renders PNG inline in chat).
+    demoLocalTools.add(GenerateImageTool());
+
     final isDesktop =
         !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.windows ||
@@ -1078,6 +1083,7 @@ class McpPlaygroundScreen extends StatelessWidget {
         'get_hourly_forecast',
         'get_daily_forecast',
         'geocode_weather_city',
+        'generate_image',
       ],
       customAppBarActions: [
         IconButton(

@@ -1,3 +1,11 @@
+## 1.5.15
+
+- **Built-In AI Image Generation Tool (`GenerateImageTool`)**:
+  - Added `GenerateImageTool` (`generate_image`), a Dart-native `McpLocalTool` that generates images from text prompts and returns them as `MCPToolResult.image` for inline rendering in chat UIs.
+  - Supports **OpenAI / OpenAI-compatible** (`openai_dart` `images.generate`, default `gpt-image-1` with `dall-e-*` fallback), **Google Gemini** (`googleai_dart` `generateContent` with `ResponseModality.image`, default `gemini-2.5-flash-image`), and pluggable **Embedded / Custom** handlers via `customHandler` or static `GenerateImageTool.embeddedImageHandler` (e.g. `llamadart` Stable Diffusion).
+  - Updated `McpAgentEngine` to automatically pass the active `agent.llmConfig` as a fallback to `GenerateImageTool` instances when no explicit config or provider callback is supplied.
+  - Added unit tests in `test/generate_image_tool_test.dart`.
+
 ## 1.5.14
 
 - **Fix Infinite Context Compression Thrashing Loop (`ContextCompressor`)**:

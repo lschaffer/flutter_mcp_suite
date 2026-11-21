@@ -20,6 +20,7 @@ import '../context/retrieve_memory_tool.dart';
 import '../memory/workflow_memory_store.dart';
 import '../skills/skill_definition.dart';
 import '../skills/dynamic_skill_tools.dart';
+import '../tools/generate_image_tool.dart';
 import '../tools/tool_loop_guard.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -1051,6 +1052,7 @@ class McpAgentEngine {
         final callTool = McpCallToolTool(
           mcpManager: mcpManager,
           localTools: List.unmodifiable(localTools),
+          fallbackLlmConfig: agent.llmConfig,
         );
         localTools.add(listTool);
         localTools.add(callTool);
@@ -1645,7 +1647,15 @@ class McpAgentEngine {
             MCPToolResult result;
             try {
               if (localMatch.isNotEmpty) {
-                result = await localMatch.first.execute(toolArgs);
+                final localTool = localMatch.first;
+                if (localTool is GenerateImageTool) {
+                  result = await localTool.executeWithFallbackConfig(
+                    toolArgs,
+                    agent.llmConfig,
+                  );
+                } else {
+                  result = await localTool.execute(toolArgs);
+                }
               } else {
                 result = await mcpManager.callTool(call.name, toolArgs);
               }

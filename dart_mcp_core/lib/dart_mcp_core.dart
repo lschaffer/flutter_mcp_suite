@@ -37,9 +37,10 @@ export 'src/skills/skill_importer.dart';
 export 'src/skills/skill_definition.dart';
 export 'src/skills/dynamic_skill_tools.dart';
 
-// Coding Tools
+// Coding & Media Tools
 export 'src/tools/coding_tools_stub.dart'
     if (dart.library.io) 'src/tools/coding_tools.dart';
+export 'src/tools/generate_image_tool.dart';
 
 // Evaluation Harness
 export 'src/eval/eval_task.dart';
