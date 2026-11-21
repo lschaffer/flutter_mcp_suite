@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="mcp_playground_example"
+        android:label="MCP Playground"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,10 +1,15 @@
 import 'dart:convert';
-import 'package:universal_io/io.dart';
-import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
+import 'package:universal_io/io.dart';
+import 'dart:typed_data';
 
 /// Document Export Service for exporting structured markdown plans and analyses
 /// into publication-ready PDF, Word (.docx), or Markdown (.md) documents.
@@ -61,7 +66,8 @@ class DocumentExportService {
     String? workspaceDirectory,
   }) async {
     final title = _extractDocumentTitle(markdownContent);
-    final defaultDir = _resolveDefaultDirectory(workspaceDirectory);
+    final defaultDir = await _resolveDefaultDirectory(workspaceDirectory);
+    if (!context.mounted) return;
 
     final savedPath = await showDialog<String>(
       context: context,
@@ -75,6 +81,7 @@ class DocumentExportService {
     );
 
     if (savedPath != null && savedPath.isNotEmpty && context.mounted) {
+      final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -88,7 +95,7 @@ class DocumentExportService {
           ),
           duration: const Duration(seconds: 6),
           action: SnackBarAction(
-            label: 'Open',
+            label: isMobile ? 'Share' : 'Open',
             textColor: accentOrange,
             onPressed: () {
               _openExportedFile(savedPath);
@@ -99,31 +106,85 @@ class DocumentExportService {
     }
   }
 
-  static String _resolveDefaultDirectory(String? workspaceDirectory) {
+  static bool _isWritableDirectory(String dirPath) {
+    try {
+      final dir = Directory(dirPath);
+      if (!dir.existsSync()) return false;
+      final probe = File(p.join(dirPath, '.export_probe_${DateTime.now().microsecondsSinceEpoch}'));
+      probe.writeAsBytesSync(const []);
+      probe.deleteSync();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<String> _resolveDefaultDirectory(String? workspaceDirectory) async {
+    if (kIsWeb) return '';
+
     if (workspaceDirectory != null &&
         workspaceDirectory.isNotEmpty &&
-        Directory(workspaceDirectory).existsSync()) {
+        _isWritableDirectory(workspaceDirectory)) {
       return workspaceDirectory;
     }
 
-    final userProfile = Platform.environment['USERPROFILE'];
-    if (userProfile != null) {
-      final docs = p.join(userProfile, 'Documents');
-      if (Directory(docs).existsSync()) return docs;
-      final downloads = p.join(userProfile, 'Downloads');
-      if (Directory(downloads).existsSync()) return downloads;
-    }
+    try {
+      if (Platform.isAndroid) {
+        const publicDocs = '/storage/emulated/0/Documents';
+        if (_isWritableDirectory(publicDocs)) return publicDocs;
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null && extDir.existsSync()) return extDir.path;
+        final appDocs = await getApplicationDocumentsDirectory();
+        return appDocs.path;
+      }
+
+      if (Platform.isIOS) {
+        final appDocs = await getApplicationDocumentsDirectory();
+        return appDocs.path;
+      }
+
+      if (Platform.isWindows) {
+        final userProfile = Platform.environment['USERPROFILE'];
+        if (userProfile != null) {
+          final docs = p.join(userProfile, 'Documents');
+          if (Directory(docs).existsSync()) return docs;
+          final downloads = p.join(userProfile, 'Downloads');
+          if (Directory(downloads).existsSync()) return downloads;
+        }
+        final appDocs = await getApplicationDocumentsDirectory();
+        return appDocs.path;
+      }
+
+      if (Platform.isMacOS || Platform.isLinux) {
+        final home = Platform.environment['HOME'];
+        if (home != null) {
+          final docs = p.join(home, 'Documents');
+          if (_isWritableDirectory(docs)) return docs;
+        }
+        final appDocs = await getApplicationDocumentsDirectory();
+        return appDocs.path;
+      }
+    } catch (_) {}
+
     return Directory.current.path;
   }
 
-  static void _openExportedFile(String filePath) {
+  static Future<void> _openExportedFile(String filePath) async {
+    if (kIsWeb) return;
     try {
-      if (Platform.isWindows) {
-        Process.run('cmd.exe', ['/c', 'start', '', filePath]);
+      if (Platform.isAndroid || Platform.isIOS) {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(filePath)],
+            text: p.basename(filePath),
+          ),
+        );
+      } else if (Platform.isWindows) {
+        await Process.run('cmd.exe', ['/c', 'start', '', filePath]);
       } else if (Platform.isMacOS) {
-        Process.run('open', [filePath]);
+        await Process.run('open', [filePath]);
       } else {
-        Process.run('xdg-open', [filePath]);
+        await Process.run('xdg-open', [filePath]);
       }
     } catch (_) {}
   }
@@ -433,276 +494,335 @@ class DocumentExportService {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Headless PDF Generator via Chromium / Edge
+  // Pure-Dart Cross-Platform PDF Generator (package:pdf)
   // ─────────────────────────────────────────────────────────────
 
-  /// Converts markdown into a styled PDF via headless browser printing.
+  /// Sanitizes Unicode text for standard PDF Type1 fonts (Latin-1 range).
+  static String _sanitizePdfText(String input) {
+    final normalized = input
+        .replaceAll('\u2014', '--') // em-dash
+        .replaceAll('\u2013', '-') // en-dash
+        .replaceAll('\u2018', "'") // left single quote
+        .replaceAll('\u2019', "'") // right single quote
+        .replaceAll('\u201C', '"') // left double quote
+        .replaceAll('\u201D', '"') // right double quote
+        .replaceAll('\u2022', '*') // bullet
+        .replaceAll('\u2026', '...') // ellipsis
+        .replaceAll('\u2192', '->') // right arrow
+        .replaceAll('\u2190', '<-') // left arrow
+        .replaceAll('\u2194', '<->') // left-right arrow
+        .replaceAll('\u2265', '>=') // >=
+        .replaceAll('\u2264', '<=') // <=
+        .replaceAll('\u2260', '!=') // !=
+        .replaceAll('\u00D7', 'x') // multiplication sign
+        .replaceAll('\u00F7', '/') // division sign
+        .replaceAll('\u00A0', ' '); // nbsp
+
+    final buf = StringBuffer();
+    for (final rune in normalized.runes) {
+      if (rune == 0x0A || rune == 0x09 || (rune >= 0x20 && rune <= 0xFF)) {
+        buf.writeCharCode(rune);
+      }
+    }
+    return buf.toString();
+  }
+
+  static pw.RichText _buildPdfInlineRichText(
+    String text, {
+    required pw.TextStyle baseStyle,
+    required pw.TextStyle boldStyle,
+    required pw.TextStyle italicStyle,
+    required pw.TextStyle codeStyle,
+  }) {
+    final tokens = _tokenizeMarkdownInline(text);
+    if (tokens.isEmpty) {
+      return pw.RichText(text: pw.TextSpan(text: _sanitizePdfText(text), style: baseStyle));
+    }
+    return pw.RichText(
+      text: pw.TextSpan(
+        style: baseStyle,
+        children: tokens.map((tok) {
+          final safe = _sanitizePdfText(tok.text);
+          if (tok.isCode) {
+            return pw.TextSpan(text: safe, style: codeStyle);
+          }
+          if (tok.isBold) {
+            return pw.TextSpan(text: safe, style: boldStyle);
+          }
+          if (tok.isItalic) {
+            return pw.TextSpan(text: safe, style: italicStyle);
+          }
+          return pw.TextSpan(text: safe, style: baseStyle);
+        }).toList(),
+      ),
+    );
+  }
+
+  /// Converts markdown into a styled PDF using the pure-Dart `pdf` package.
+  /// Works identically on Android, iOS, macOS, Linux, Windows, and Web.
   static Future<Uint8List> generatePdfBytes({
     required String title,
     required String markdown,
   }) async {
-    final html = _markdownToPrintHtml(title: title, markdown: markdown);
+    final doc = pw.Document(
+      title: _sanitizePdfText(title),
+      author: 'TealKit Coder',
+    );
 
-    try {
-      final tempDir = Directory.systemTemp.createTempSync('tealkit_export_');
-      final tempHtml = File(p.join(tempDir.path, 'report.html'));
-      final tempPdf = File(p.join(tempDir.path, 'report.pdf'));
-
-      await tempHtml.writeAsString(html, encoding: utf8);
-
-      final edgeCandidates = [
-        r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
-        r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
-        r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-        r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
-        'msedge.exe',
-        'chrome.exe',
-      ];
-
-      String? executable;
-      for (final candidate in edgeCandidates) {
-        if (candidate.contains('\\')) {
-          if (File(candidate).existsSync()) {
-            executable = candidate;
-            break;
-          }
-        } else {
-          executable = candidate;
-          break;
-        }
-      }
-
-      if (executable != null) {
-        final result = await Process.run(executable, [
-          '--headless',
-          '--disable-gpu',
-          '--no-pdf-header-footer',
-          '--run-all-compositor-stages-before-draw',
-          '--print-to-pdf=${tempPdf.path}',
-          tempHtml.path,
-        ]);
-
-        if (result.exitCode == 0 && tempPdf.existsSync() && tempPdf.lengthSync() > 0) {
-          final pdfBytes = await tempPdf.readAsBytes();
-          try {
-            tempDir.deleteSync(recursive: true);
-          } catch (_) {}
-          return pdfBytes;
-        }
-      }
-    } catch (_) {}
-
-    return Uint8List.fromList(utf8.encode(html));
-  }
-
-  static String _markdownToPrintHtml({required String title, required String markdown}) {
     final now = DateTime.now();
     final dateStr =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-    final bodyBuf = StringBuffer();
+    final fontRegular = pw.Font.helvetica();
+    final fontBold = pw.Font.helveticaBold();
+    final fontItalic = pw.Font.helveticaOblique();
+    final fontMono = pw.Font.courier();
+
+    final colorOrange = PdfColor.fromInt(0xFFEA580C);
+    final colorTeal = PdfColor.fromInt(0xFF0D9488);
+    final colorSlate900 = PdfColor.fromInt(0xFF0F172A);
+    final colorSlate800 = PdfColor.fromInt(0xFF1E293B);
+    final colorSlate600 = PdfColor.fromInt(0xFF475569);
+    final colorSlate400 = PdfColor.fromInt(0xFF94A3B8);
+    final colorBorder = PdfColor.fromInt(0xFFE2E8F0);
+    final colorCodeBg = PdfColor.fromInt(0xFFF8FAFC);
+    final colorInlineCode = PdfColor.fromInt(0xFFB91C1C);
+
+    final bodyStyle = pw.TextStyle(font: fontRegular, fontSize: 10.5, lineSpacing: 3.5, color: colorSlate800);
+    final boldStyle = pw.TextStyle(font: fontBold, fontSize: 10.5, lineSpacing: 3.5, color: colorSlate900);
+    final italicStyle = pw.TextStyle(font: fontItalic, fontSize: 10.5, lineSpacing: 3.5, color: colorSlate800);
+    final inlineCodeStyle = pw.TextStyle(
+      font: fontMono,
+      fontSize: 9.5,
+      color: colorInlineCode,
+      background: pw.BoxDecoration(color: colorCodeBg),
+    );
+    final codeBlockStyle = pw.TextStyle(font: fontMono, fontSize: 8.8, lineSpacing: 2.5, color: colorSlate800);
+
+    final widgets = <pw.Widget>[];
+
+    // Header banner
+    widgets.add(
+      pw.Container(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        margin: const pw.EdgeInsets.only(bottom: 16),
+        decoration: pw.BoxDecoration(
+          border: pw.Border(bottom: pw.BorderSide(color: colorOrange, width: 2)),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                _sanitizePdfText(title),
+                style: pw.TextStyle(font: fontBold, fontSize: 15, color: colorOrange),
+              ),
+            ),
+            pw.SizedBox(width: 12),
+            pw.Text(
+              'Generated: $dateStr',
+              style: pw.TextStyle(font: fontRegular, fontSize: 8.5, color: colorSlate600),
+            ),
+          ],
+        ),
+      ),
+    );
+
     final lines = markdown.split('\n');
     bool inCodeBlock = false;
-    bool inUl = false;
-    bool inOl = false;
+    final codeBuf = StringBuffer();
 
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i];
+    void flushCodeBlock() {
+      final codeText = _sanitizePdfText(codeBuf.toString().trimRight());
+      codeBuf.clear();
+      if (codeText.isEmpty) return;
+      widgets.add(
+        pw.Container(
+          width: double.infinity,
+          margin: const pw.EdgeInsets.symmetric(vertical: 6),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: pw.BoxDecoration(
+            color: colorCodeBg,
+            border: pw.Border(
+              left: pw.BorderSide(color: colorOrange, width: 3),
+              top: pw.BorderSide(color: colorBorder, width: 0.5),
+              right: pw.BorderSide(color: colorBorder, width: 0.5),
+              bottom: pw.BorderSide(color: colorBorder, width: 0.5),
+            ),
+          ),
+          child: pw.Text(codeText, style: codeBlockStyle),
+        ),
+      );
+    }
+
+    for (final rawLine in lines) {
+      final line = rawLine.replaceAll('\r', '');
       final trimmed = line.trim();
 
       if (trimmed.startsWith('```')) {
         if (inCodeBlock) {
-          bodyBuf.writeln('</code></pre>');
+          flushCodeBlock();
           inCodeBlock = false;
         } else {
-          if (inUl) {
-            bodyBuf.writeln('</ul>');
-            inUl = false;
-          }
-          if (inOl) {
-            bodyBuf.writeln('</ol>');
-            inOl = false;
-          }
-          bodyBuf.writeln('<pre><code>');
           inCodeBlock = true;
         }
         continue;
       }
 
       if (inCodeBlock) {
-        bodyBuf.writeln(_htmlEscape(line));
+        codeBuf.writeln(line);
         continue;
-      }
-
-      if (inUl && !RegExp(r'^[\*\-]\s+').hasMatch(trimmed)) {
-        bodyBuf.writeln('</ul>');
-        inUl = false;
-      }
-      if (inOl && !RegExp(r'^\d+\.\s+').hasMatch(trimmed)) {
-        bodyBuf.writeln('</ol>');
-        inOl = false;
       }
 
       if (trimmed.isEmpty) continue;
 
-      if (trimmed.startsWith('# ')) {
-        bodyBuf.writeln('<h1>${_formatInlineHtml(trimmed.substring(2))}</h1>');
+      if (RegExp(r'^(-{3,}|\*{3,}|_{3,})$').hasMatch(trimmed)) {
+        widgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 8),
+            child: pw.Divider(color: colorBorder, thickness: 1),
+          ),
+        );
+      } else if (trimmed.startsWith('# ')) {
+        widgets.add(
+          pw.Container(
+            width: double.infinity,
+            margin: const pw.EdgeInsets.only(top: 14, bottom: 6),
+            padding: const pw.EdgeInsets.only(bottom: 3),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(bottom: pw.BorderSide(color: colorBorder, width: 1)),
+            ),
+            child: pw.Text(
+              _sanitizePdfText(trimmed.substring(2).trim()),
+              style: pw.TextStyle(font: fontBold, fontSize: 15, color: colorSlate900),
+            ),
+          ),
+        );
       } else if (trimmed.startsWith('## ')) {
-        bodyBuf.writeln('<h2>${_formatInlineHtml(trimmed.substring(3))}</h2>');
-      } else if (trimmed.startsWith('### ')) {
-        bodyBuf.writeln('<h3>${_formatInlineHtml(trimmed.substring(4))}</h3>');
-      } else if (trimmed.startsWith('#### ')) {
-        bodyBuf.writeln('<h4>${_formatInlineHtml(trimmed.substring(5))}</h4>');
+        widgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 12, bottom: 5),
+            child: pw.Text(
+              _sanitizePdfText(trimmed.substring(3).trim()),
+              style: pw.TextStyle(font: fontBold, fontSize: 13, color: colorTeal),
+            ),
+          ),
+        );
+      } else if (trimmed.startsWith('### ') || trimmed.startsWith('#### ')) {
+        final headingText = trimmed.replaceFirst(RegExp(r'^#+\s*'), '').trim();
+        widgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 10, bottom: 4),
+            child: pw.Text(
+              _sanitizePdfText(headingText),
+              style: pw.TextStyle(font: fontBold, fontSize: 11.5, color: colorSlate800),
+            ),
+          ),
+        );
       } else if (RegExp(r'^[\*\-]\s+').hasMatch(trimmed)) {
-        if (!inUl) {
-          bodyBuf.writeln('<ul>');
-          inUl = true;
-        }
         final text = trimmed.replaceFirst(RegExp(r'^[\*\-]\s+'), '');
-        bodyBuf.writeln('<li>${_formatInlineHtml(text)}</li>');
+        widgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 12, bottom: 4),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.SizedBox(
+                  width: 12,
+                  child: pw.Text('-', style: boldStyle),
+                ),
+                pw.Expanded(
+                  child: _buildPdfInlineRichText(
+                    text,
+                    baseStyle: bodyStyle,
+                    boldStyle: boldStyle,
+                    italicStyle: italicStyle,
+                    codeStyle: inlineCodeStyle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       } else if (RegExp(r'^\d+\.\s+').hasMatch(trimmed)) {
-        if (!inOl) {
-          bodyBuf.writeln('<ol>');
-          inOl = true;
-        }
-        final text = trimmed.replaceFirst(RegExp(r'^\d+\.\s+'), '');
-        bodyBuf.writeln('<li>${_formatInlineHtml(text)}</li>');
+        final match = RegExp(r'^(\d+)\.\s+(.*)$').firstMatch(trimmed);
+        final numPrefix = match != null ? '${match.group(1)}.' : '1.';
+        final text = match != null ? match.group(2)! : trimmed;
+        widgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 12, bottom: 4),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.SizedBox(
+                  width: 20,
+                  child: pw.Text(numPrefix, style: boldStyle),
+                ),
+                pw.Expanded(
+                  child: _buildPdfInlineRichText(
+                    text,
+                    baseStyle: bodyStyle,
+                    boldStyle: boldStyle,
+                    italicStyle: italicStyle,
+                    codeStyle: inlineCodeStyle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       } else {
-        bodyBuf.writeln('<p>${_formatInlineHtml(trimmed)}</p>');
+        widgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 6),
+            child: _buildPdfInlineRichText(
+              trimmed,
+              baseStyle: bodyStyle,
+              boldStyle: boldStyle,
+              italicStyle: italicStyle,
+              codeStyle: inlineCodeStyle,
+            ),
+          ),
+        );
       }
     }
 
-    if (inCodeBlock) bodyBuf.writeln('</code></pre>');
-    if (inUl) bodyBuf.writeln('</ul>');
-    if (inOl) bodyBuf.writeln('</ol>');
+    if (inCodeBlock) {
+      flushCodeBlock();
+    }
 
-    return '''<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${_htmlEscape(title)}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 18mm 16mm 18mm 16mm;
-    }
-    body {
-      font-family: 'Segoe UI', -apple-system, Roboto, Helvetica, Arial, sans-serif;
-      font-size: 10.5pt;
-      line-height: 1.55;
-      color: #1e293b;
-      margin: 0;
-      padding: 0;
-    }
-    .header-banner {
-      border-bottom: 2.5px solid #ea580c;
-      padding-bottom: 8px;
-      margin-bottom: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-    .header-title {
-      font-size: 15pt;
-      font-weight: 700;
-      color: #ea580c;
-    }
-    .header-meta {
-      font-size: 9pt;
-      color: #64748b;
-    }
-    h1 {
-      font-size: 17pt;
-      color: #0f172a;
-      border-bottom: 1.5px solid #cbd5e1;
-      padding-bottom: 4px;
-      margin-top: 22px;
-      margin-bottom: 10px;
-    }
-    h2 {
-      font-size: 13.5pt;
-      color: #0d9488;
-      margin-top: 18px;
-      margin-bottom: 8px;
-    }
-    h3 {
-      font-size: 11.5pt;
-      color: #334155;
-      margin-top: 14px;
-      margin-bottom: 6px;
-    }
-    p {
-      margin: 6px 0 10px 0;
-    }
-    ul, ol {
-      margin: 6px 0 12px 20px;
-      padding: 0;
-    }
-    li {
-      margin-bottom: 4px;
-    }
-    pre {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-left: 4px solid #ea580c;
-      border-radius: 4px;
-      padding: 10px 12px;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 9pt;
-      line-height: 1.4;
-      overflow-x: auto;
-      page-break-inside: avoid;
-    }
-    code {
-      font-family: 'Consolas', monospace;
-      background: #f1f5f9;
-      color: #b91c1c;
-      padding: 1px 4px;
-      border-radius: 3px;
-      font-size: 9.5pt;
-    }
-    pre code {
-      background: transparent;
-      color: #1e293b;
-      padding: 0;
-    }
-    .footer {
-      margin-top: 32px;
-      border-top: 1px solid #e2e8f0;
-      padding-top: 8px;
-      font-size: 8.5pt;
-      color: #94a3b8;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <div class="header-banner">
-    <span class="header-title">TealKit Coder • Technical Report</span>
-    <span class="header-meta">Generated: $dateStr</span>
-  </div>
-  ${bodyBuf.toString()}
-  <div class="footer">
-    Generated by TealKit Coder Autonomous Engineering Agent
-  </div>
-</body>
-</html>''';
-  }
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 42, vertical: 44),
+        footer: (context) => pw.Container(
+          alignment: pw.Alignment.centerRight,
+          margin: const pw.EdgeInsets.only(top: 12),
+          padding: const pw.EdgeInsets.only(top: 6),
+          decoration: pw.BoxDecoration(
+            border: pw.Border(top: pw.BorderSide(color: colorBorder, width: 0.5)),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Generated by TealKit Coder',
+                style: pw.TextStyle(font: fontRegular, fontSize: 8, color: colorSlate400),
+              ),
+              pw.Text(
+                'Page ${context.pageNumber} of ${context.pagesCount}',
+                style: pw.TextStyle(font: fontRegular, fontSize: 8, color: colorSlate400),
+              ),
+            ],
+          ),
+        ),
+        build: (context) => widgets,
+      ),
+    );
 
-  static String _formatInlineHtml(String text) {
-    var s = _htmlEscape(text);
-    s = s.replaceAllMapped(RegExp(r'\*\*([^\*]+)\*\*'), (m) => '<strong>${m.group(1)}</strong>');
-    s = s.replaceAllMapped(RegExp(r'\*([^\*]+)\*'), (m) => '<em>${m.group(1)}</em>');
-    s = s.replaceAllMapped(RegExp(r'`([^`]+)`'), (m) => '<code>${m.group(1)}</code>');
-    return s;
-  }
-
-  static String _htmlEscape(String input) {
-    return input
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
+    return Uint8List.fromList(await doc.save());
   }
 }
 
@@ -819,11 +939,23 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
         bytes = Uint8List.fromList(utf8.encode(widget.markdownContent));
       }
 
-      final file = File(targetPath);
-      await file.writeAsBytes(bytes);
+      String savedPath = targetPath;
+      try {
+        final file = File(targetPath);
+        await file.writeAsBytes(bytes);
+      } on FileSystemException {
+        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+          // Scoped Storage fallback on mobile: save via app documents directory
+          final fallbackDir = await getApplicationDocumentsDirectory();
+          savedPath = p.join(fallbackDir.path, '$fileName.$ext');
+          await File(savedPath).writeAsBytes(bytes);
+        } else {
+          rethrow;
+        }
+      }
 
       if (mounted) {
-        Navigator.pop(context, targetPath);
+        Navigator.pop(context, savedPath);
       }
     } catch (e) {
       if (mounted) {
@@ -840,102 +972,139 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 520;
 
     return AlertDialog(
       title: const Row(
         children: [
           Icon(Icons.file_download_outlined, color: DocumentExportService.accentOrange, size: 24),
           SizedBox(width: 10),
-          Text('Export Plan / Analysis', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(
+              'Export Plan / Analysis',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: SizedBox(
         width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Format Selector Segmented Pills
-            const Text('Export Format', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildFormatChoice(
-                    id: 'pdf',
-                    label: 'PDF (.pdf)',
-                    icon: Icons.picture_as_pdf,
-                    color: Colors.redAccent,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildFormatChoice(
-                    id: 'docx',
-                    label: 'Word (.docx)',
-                    icon: Icons.description,
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildFormatChoice(
-                    id: 'md',
-                    label: 'Markdown (.md)',
-                    icon: Icons.article_outlined,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-
-            // Destination Folder with Browse Button (Folder Chooser)
-            const Text('Destination Folder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _dirCtrl,
-                    readOnly: true,
-                    style: const TextStyle(fontSize: 12.5),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.folder_outlined, size: 18),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      hintText: 'Select folder...',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Format Selector Segmented Pills
+              const Text('Export Format', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildFormatChoice(
+                      id: 'pdf',
+                      label: isCompact ? 'PDF' : 'PDF (.pdf)',
+                      icon: Icons.picture_as_pdf,
+                      color: Colors.redAccent,
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.folder_open, size: 16),
-                  label: const Text('Browse...'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildFormatChoice(
+                      id: 'docx',
+                      label: isCompact ? 'Word' : 'Word (.docx)',
+                      icon: Icons.description,
+                      color: Colors.blueAccent,
+                    ),
                   ),
-                  onPressed: _isExporting ? null : _chooseFolder,
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-
-            // Base Filename
-            const Text('Filename', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _nameCtrl,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                suffixText: '.$_format',
-                hintText: 'Filename without extension',
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildFormatChoice(
+                      id: 'md',
+                      label: isCompact ? 'MD' : 'Markdown (.md)',
+                      icon: Icons.article_outlined,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+
+              // Destination Folder with Browse Button (Folder Chooser)
+              const Text('Destination Folder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              if (isCompact)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _dirCtrl,
+                      readOnly: true,
+                      style: const TextStyle(fontSize: 12.5),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.folder_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        hintText: 'Select folder...',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      icon: const Icon(Icons.folder_open, size: 16),
+                      label: const Text('Browse...'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _isExporting ? null : _chooseFolder,
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _dirCtrl,
+                        readOnly: true,
+                        style: const TextStyle(fontSize: 12.5),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          prefixIcon: const Icon(Icons.folder_outlined, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          hintText: 'Select folder...',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      icon: const Icon(Icons.folder_open, size: 16),
+                      label: const Text('Browse...'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _isExporting ? null : _chooseFolder,
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 18),
+
+              // Base Filename
+              const Text('Filename', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _nameCtrl,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  suffixText: '.$_format',
+                  hintText: 'Filename without extension',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

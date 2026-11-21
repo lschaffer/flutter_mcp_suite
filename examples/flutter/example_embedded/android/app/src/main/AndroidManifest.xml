@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="mcp_playground_example"
+        android:label="MCP Embedded"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- Optional vendor OpenCL for LiteRT-LM (.litertlm) and llama.cpp GPU on Android 12+ (API 31+) -->

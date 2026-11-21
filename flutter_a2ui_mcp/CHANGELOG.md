@@ -1,3 +1,8 @@
+## 1.1.1
+
+- **Synchronized Suite Upgrades**:
+  - Bumped dependencies to `dart_mcp_core: ^1.5.14` (fixes infinite context compression thrashing loop, `openai_dart ^13.0.0`, `anthropic_sdk_dart ^11.0.0`) and `flutter_ui_mcp_core: ^1.5.15` (pure-Dart cross-platform PDF export, writable mobile default directories, responsive export dialog, and mobile share sheet).
+
 ## 1.1.0
 
 - **A2UI Ecosystem Upgrade (`a2ui_core ^0.8.0`, `a2ui_flutter ^0.4.0`, `a2ui_agent ^0.4.0`)**:

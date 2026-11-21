@@ -18,7 +18,7 @@ dependencies:
   fl_chart: ^1.2.0
   image: ^4.8.0
   file_picker: ^13.0.0
-  material_ui: ^1.8.0
+  material_ui: ^1.11.1
 dependency_overrides:
   dart_mcp_core:
     path: ../../../dart_mcp_core

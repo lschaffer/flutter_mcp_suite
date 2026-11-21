@@ -16,7 +16,7 @@ dependencies:
   flutter_ui_mcp_core: ^1.5.10
   json_schema_builder: ^0.1.7
   fl_chart: ^1.2.0
-  material_ui: ^1.8.0
+  material_ui: ^1.11.1
 
 dependency_overrides:
   dart_mcp_core:

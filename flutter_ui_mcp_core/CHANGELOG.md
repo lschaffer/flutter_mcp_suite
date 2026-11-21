@@ -1,3 +1,13 @@
+## 1.5.15
+
+* **Cross-Platform Pure-Dart PDF Export & Mobile Document Export Fixes (`DocumentExportService`)**:
+  * Replaced the Windows-only `msedge.exe`/`chrome.exe` headless PDF generator and HTML fallback in `generatePdfBytes()` with pure-Dart PDF generation via `package:pdf` (`^3.11.3`), rendering headers, headings, paragraphs, inline bold/italic/code, bullet & numbered lists, fenced code blocks, horizontal rules, and page footers cleanly across Android, iOS, macOS, Linux, Windows, and Web.
+  * Updated `_resolveDefaultDirectory()` to asynchronously resolve writable platform default folders using `path_provider` (Android writable Documents / external storage / app documents, iOS app documents, macOS/Linux `$HOME/Documents`, Windows `%USERPROFILE%\Documents`) with mobile Scoped Storage fallback.
+  * Made `ExportDocumentDialog` responsive on narrow mobile screens (`< 520px`): stacked the **Browse...** button below the Destination Folder field, used compact format pills (`PDF`, `Word`, `MD`), wrapped content in `SingleChildScrollView`, and prevented title overflow.
+  * Added mobile share support in `_openExportedFile()` via `share_plus` (`^13.3.1`) on Android and iOS (with `'Share'` SnackBar action on mobile and `'Open'` on desktop).
+* **Suite Synchronization & Dependency Upgrades**:
+  * Upgraded `dart_mcp_core` to `^1.5.14`, `openai_dart` to `^13.0.0`, `anthropic_sdk_dart` to `^11.0.0`, and `archive` to `^4.7.1`.
+
 ## 1.5.14
 
 * **Embedded Model Discovery & Multi-Format Support (`.gguf` & `.litertlm`)**:

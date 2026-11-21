@@ -19,7 +19,7 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.6
   http: ^1.6.0
-  material_ui: ^1.8.0
+  material_ui: ^1.11.1
 dependency_overrides:
   dart_mcp_core:
     path: ../../../dart_mcp_core

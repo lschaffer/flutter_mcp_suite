@@ -240,25 +240,37 @@ class ContextCompressor {
     final List<ChatMessage> recentMessages;
     final ChatMessage? preservedUserPrompt;
 
-    if (lastUserIdx > 0) {
+    // Only split cleanly at lastUserIdx when there is real non-system conversation
+    // history before it. If messages[0..lastUserIdx-1] contains only prior
+    // ChatRole.system summary message(s), fall through to single-turn in-flight
+    // tool-call compression instead of re-summarizing the summary in an infinite loop.
+    final hasPriorNonSystem =
+        lastUserIdx > 0 &&
+        messages.sublist(0, lastUserIdx).any((m) => m.role != ChatRole.system);
+
+    if (hasPriorNonSystem) {
       // Multiple user turns exist: split cleanly at the latest user turn boundary
       oldMessages = messages.sublist(0, lastUserIdx);
       recentMessages = messages.sublist(lastUserIdx);
       preservedUserPrompt = null;
     } else {
-      // Single in-flight user turn with extensive tool executions:
-      // Preserve the user's root prompt (messages[0]), compress intermediate tool calls
+      // Single in-flight user turn with extensive tool executions (optionally
+      // preceded by prior ChatRole.system summary messages):
+      // Preserve the active user prompt and compress any prior summary together
+      // with older tool calls/results of the current turn.
+      final userIdx = lastUserIdx >= 0 ? lastUserIdx : 0;
       var splitIndex = totalMessages - preserveRecentCount;
-      while (splitIndex > 1 && messages[splitIndex].role == ChatRole.tool) {
+      while (splitIndex > userIdx + 1 &&
+          messages[splitIndex].role == ChatRole.tool) {
         splitIndex--;
       }
-      while (splitIndex > 1 &&
+      while (splitIndex > userIdx + 1 &&
           messages[splitIndex].role == ChatRole.assistant &&
           messages[splitIndex].type == MessageType.toolCall) {
         splitIndex--;
       }
 
-      if (splitIndex <= 3) {
+      if (splitIndex <= userIdx + 1) {
         return CompressionResult(
           compressedMessages: List.of(messages),
           originalTokens: originalTokens,
@@ -268,9 +280,27 @@ class ContextCompressor {
         );
       }
 
-      preservedUserPrompt = messages.first;
-      oldMessages = messages.sublist(1, splitIndex);
+      preservedUserPrompt = messages[userIdx];
+      oldMessages = <ChatMessage>[
+        if (userIdx > 0) ...messages.sublist(0, userIdx),
+        ...messages.sublist(userIdx + 1, splitIndex),
+      ];
       recentMessages = messages.sublist(splitIndex);
+    }
+
+    // No-op guard: never call the LLM to re-summarize only prior system summaries
+    // or fewer than 2 non-system messages.
+    final nonSystemOldCount = oldMessages
+        .where((m) => m.role != ChatRole.system)
+        .length;
+    if (nonSystemOldCount < 2) {
+      return CompressionResult(
+        compressedMessages: List.of(messages),
+        originalTokens: originalTokens,
+        compressedTokens: originalTokens,
+        summary: '',
+        compressedTurnCount: 0,
+      );
     }
 
     // Build the transcript text for older messages
@@ -331,17 +361,6 @@ class ContextCompressor {
     }
 
     final archiveId = 'mem_${_uuid.v4().substring(0, 8)}';
-    if (memoryStore != null) {
-      final entry = EpisodicMemoryEntry(
-        archiveId: archiveId,
-        startTurnIndex: 0,
-        endTurnIndex: oldMessages.length,
-        timestamp: DateTime.now(),
-        rawMessages: List.unmodifiable(oldMessages),
-        summary: summary,
-      );
-      memoryStore!.addEntry(entry);
-    }
 
     final summaryMessage = ChatMessage(
       id: _uuid.v4(),
@@ -364,6 +383,30 @@ class ContextCompressor {
       compressedList,
       systemPrompt: systemPrompt,
     );
+
+    // Anti-inflation guard: abort replacing messages if compression did not
+    // reduce token count, preventing thrashing loops.
+    if (compressedTokens >= originalTokens) {
+      return CompressionResult(
+        compressedMessages: List.of(messages),
+        originalTokens: originalTokens,
+        compressedTokens: originalTokens,
+        summary: '',
+        compressedTurnCount: 0,
+      );
+    }
+
+    if (memoryStore != null) {
+      final entry = EpisodicMemoryEntry(
+        archiveId: archiveId,
+        startTurnIndex: 0,
+        endTurnIndex: oldMessages.length,
+        timestamp: DateTime.now(),
+        rawMessages: List.unmodifiable(oldMessages),
+        summary: summary,
+      );
+      memoryStore!.addEntry(entry);
+    }
 
     return CompressionResult(
       compressedMessages: compressedList,

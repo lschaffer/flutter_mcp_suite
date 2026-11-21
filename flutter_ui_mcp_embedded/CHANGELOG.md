@@ -1,3 +1,15 @@
+## 1.5.17
+
+* **Upgraded `llamadart` Runtime (`^0.20.4`)**:
+  * Bumped `llamadart` dependency to `^0.20.4` adopting `llamadart-native@v1.0.0-4`, `LiteRT-LM v0.19.1-6`, and WebGPU bridge assets `v0.1.87` (fixes Qwen3-0.6B LiteRT-LM split emoji decoding, Qwen3-Coder thinking budget tool-call interruption, and LiteRT-LM Qwen3.5 request drift/echoes).
+
+## 1.5.16
+
+* **Upgraded `llamadart` Runtime (`^0.20.3`)**:
+  * Bumped `llamadart` dependency to `^0.20.3` adopting `llamadart-native@v1.0.0-3` (Windows VC++ runtime and GPU memory fit fixes, Android Vulkan fallback settings, Gemma 4 tool-call parsing & prose preservation fixes, and Qwen3-ASR windowed streaming improvements).
+* **Synchronized Suite Upgrades**:
+  * Aligned dependencies with `dart_mcp_core: ^1.5.14` and `flutter_ui_mcp_core: ^1.5.15`.
+
 ## 1.5.15
 
 * **LiteRT-LM (`.litertlm`) Loading & Logging Fixes**:

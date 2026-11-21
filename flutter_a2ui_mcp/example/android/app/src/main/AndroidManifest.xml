@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="a2ui_mcp_playground_example"
+        android:label="A2UI Playground"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

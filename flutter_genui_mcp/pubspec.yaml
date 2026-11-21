@@ -19,7 +19,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  material_ui: ^1.8.0
+  material_ui: ^1.11.1
   dart_mcp_core: ^1.5.9
   flutter_ui_mcp_core: ^1.5.9
   genui: ^0.10.4

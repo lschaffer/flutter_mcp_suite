@@ -126,5 +126,87 @@ void main() {
       expect(updated.contextCompressor, isNotNull);
       expect(updated.contextCompressor!.tokenThreshold, equals(2000));
     });
+
+    test('compresses in-flight tool turns after initial summary without thrashing loop', () async {
+      final memoryStore = EpisodicMemoryStore();
+      final compressor = ContextCompressor(
+        tokenThreshold: 200,
+        preserveRecentCount: 4,
+        memoryStore: memoryStore,
+      );
+
+      final messages = <ChatMessage>[
+        ChatMessage(
+          id: 'sys_summary_0',
+          content: '[Prior Conversation Summary] (Archive ID: mem_prev0001):\n- Earlier setup completed.',
+          role: ChatRole.system,
+          type: MessageType.log,
+          timestamp: DateTime.now(),
+        ),
+        ChatMessage(
+          id: 'active_user_prompt',
+          content: 'Inspect all 20 modules and refactor the database layer.',
+          role: ChatRole.user,
+          timestamp: DateTime.now(),
+        ),
+      ];
+
+      // Add 20 large tool call/result pairs within the single active user turn
+      for (int i = 0; i < 20; i++) {
+        messages.add(
+          ChatMessage(
+            id: 'call_$i',
+            content: '',
+            role: ChatRole.assistant,
+            type: MessageType.toolCall,
+            toolName: 'fs_read_file',
+            toolArguments: {'path': 'lib/module_$i.dart'},
+            timestamp: DateTime.now(),
+          ),
+        );
+        messages.add(
+          ChatMessage(
+            id: 'res_$i',
+            content: 'File lib/module_$i.dart contents: ${'class Module$i { void run() {} }\n' * 12}',
+            role: ChatRole.tool,
+            type: MessageType.toolResponse,
+            toolName: 'fs_read_file',
+            timestamp: DateTime.now(),
+          ),
+        );
+      }
+
+      const llmConfig = LlmConfig(
+        provider: LlmProvider.openaiCompatible,
+        model: 'test-model',
+        apiKey: 'test',
+        baseUrl: 'http://localhost:99999/v1',
+      );
+
+      // 1. First pass must compress the prior summary + older tool turns (not just messages[0])
+      final firstResult = await compressor.compress(
+        messages: messages,
+        llmConfig: llmConfig,
+      );
+
+      expect(firstResult.compressedTurnCount, greaterThan(1));
+      expect(firstResult.compressedTokens, lessThan(firstResult.originalTokens));
+      expect(firstResult.compressedMessages[0].role, equals(ChatRole.system));
+      expect(firstResult.compressedMessages[0].content, contains('[Prior Conversation Summary]'));
+      expect(firstResult.compressedMessages[1].id, equals('active_user_prompt'));
+      expect(firstResult.compressedMessages[1].role, equals(ChatRole.user));
+      expect(memoryStore.entries.length, equals(1));
+
+      // 2. Second pass on already-compressed list must be a no-op (must NOT re-summarize messages[0] alone)
+      final secondResult = await compressor.compress(
+        messages: firstResult.compressedMessages,
+        llmConfig: llmConfig,
+      );
+
+      expect(secondResult.compressedTurnCount, equals(0));
+      expect(secondResult.compressedTokens, equals(secondResult.originalTokens));
+      expect(secondResult.compressedMessages.length, equals(firstResult.compressedMessages.length));
+      expect(memoryStore.entries.length, equals(1));
+    });
   });
 }

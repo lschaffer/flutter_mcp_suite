@@ -1,3 +1,12 @@
+## 1.5.14
+
+- **Fix Infinite Context Compression Thrashing Loop (`ContextCompressor`)**:
+  - Fixed the split condition when `messages[0..lastUserIdx-1]` contains only prior `ChatRole.system` summary message(s) so `compress()` falls through to in-flight single-turn tool compression instead of repeatedly re-summarizing `messages[0]` alone.
+  - Added no-op and anti-inflation guards: skips LLM summarization when fewer than 2 non-system messages exist in `oldMessages`, and aborts replacing `messages` (without polluting `EpisodicMemoryStore`) if `compressedTokens >= originalTokens`.
+  - Added unit test verifying single-turn tool compression after an initial summary does not thrash or inflate context.
+- **Dependency Upgrades**:
+  - Upgraded `openai_dart` to `^13.0.0` and `anthropic_sdk_dart` to `^11.0.0`.
+
 ## 1.5.13
 
 - **Single System Message Normalization for OpenAI-Compatible & Ollama Adapters (`LLMService`)**:

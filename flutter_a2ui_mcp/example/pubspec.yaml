@@ -26,7 +26,7 @@ dependencies:
   image: ^4.8.0
   file_picker: ^13.1.0
   url_launcher: ^6.3.1
-  material_ui: ^1.8.0
+  material_ui: ^1.11.1
   example_a2ui_weather:
     path: ../../examples/a2ui/example_a2ui_weather
   example_a2ui_smarthome:

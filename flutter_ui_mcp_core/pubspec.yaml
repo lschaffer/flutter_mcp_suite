@@ -1,6 +1,6 @@
 name: flutter_ui_mcp_core
 description: "Shared UI components, dialogs, drawers, controllers, and services for the Flutter MCP Suite ecosystem."
-version: 1.5.14
+version: 1.5.15
 homepage: https://github.com/lschaffer/flutter_mcp_suite
 repository: https://github.com/lschaffer/flutter_mcp_suite/tree/main/flutter_ui_mcp_core
 
@@ -20,13 +20,13 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.11.0
-  dart_mcp_core: ^1.5.13
+  dart_mcp_core: ^1.5.14
   universal_io: ^2.3.1
   http: ^1.6.0
   uuid: ^4.6.0
   shared_preferences: ^2.5.5
-  openai_dart: ^12.0.0
-  anthropic_sdk_dart: ^10.0.0
+  openai_dart: ^13.0.0
+  anthropic_sdk_dart: ^11.0.0
   ollama_dart: ^5.0.0
   flutter_markdown_plus: ^1.0.12
   markdown: ^7.3.0
@@ -36,7 +36,9 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.6
   flutter_widget_from_html_core: ^0.17.4
-  archive: ^4.3.0
+  archive: ^4.7.1
+  pdf: ^3.11.3
+  share_plus: ^13.3.1
 
 dev_dependencies:
   flutter_test:

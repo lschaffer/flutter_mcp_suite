@@ -1,3 +1,9 @@
+## 1.5.15
+
+* **Synchronized Suite & SDK Upgrades**:
+  * Bumped dependencies to `dart_mcp_core: ^1.5.14` (fixes infinite context compression thrashing loop) and `flutter_ui_mcp_core: ^1.5.15` (pure-Dart cross-platform PDF export, writable mobile default directories, responsive export dialog, and mobile share sheet).
+  * Upgraded `openai_dart` to `^13.0.0`, `anthropic_sdk_dart` to `^11.0.0`, and `archive` to `^4.7.1`.
+
 ## 1.5.14
 
 * **Synchronized Suite Upgrades**:
