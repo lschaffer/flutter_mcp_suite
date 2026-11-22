@@ -5,6 +5,104 @@ import 'package:openai_dart/openai_dart.dart' as openai;
 import '../mcp/local_tools.dart';
 import '../models/models.dart';
 
+/// Configuration for [GenerateImageTool], allowing users to choose a preset
+/// image generator (DeepInfra FLUX, Gemini Nano Banana, OpenAI GPT Image) or a
+/// custom model/endpoint with an optional dedicated API key.
+class ImageGenConfig {
+  /// Preset identifier: `'auto'`, `'deepinfra_flux'`, `'gemini_nano_banana'`,
+  /// `'openai_gpt_image'`, or `'custom'`.
+  final String preset;
+
+  /// Target provider (`LlmProvider.openaiCompatible`, `LlmProvider.gemini`,
+  /// `LlmProvider.openai`, or `LlmProvider.none` for auto).
+  final LlmProvider provider;
+
+  /// Base endpoint URL (used for OpenAI / DeepInfra / custom OpenAI-compatible).
+  final String baseUrl;
+
+  /// Image generation model ID (e.g. `black-forest-labs/FLUX-1-schnell`,
+  /// `gemini-2.5-flash-image`, `gpt-image-1`).
+  final String model;
+
+  /// Optional dedicated API key. If blank, [GenerateImageTool] automatically
+  /// reuses the API key from the matching active or saved LLM profile.
+  final String apiKey;
+
+  const ImageGenConfig({
+    this.preset = 'auto',
+    this.provider = LlmProvider.none,
+    this.baseUrl = '',
+    this.model = '',
+    this.apiKey = '',
+  });
+
+  bool get isAuto => preset == 'auto' || preset.isEmpty;
+
+  factory ImageGenConfig.deepInfraFlux({String apiKey = ''}) => ImageGenConfig(
+        preset: 'deepinfra_flux',
+        provider: LlmProvider.openaiCompatible,
+        baseUrl: 'https://api.deepinfra.com/v1/openai',
+        model: 'black-forest-labs/FLUX-1-schnell',
+        apiKey: apiKey,
+      );
+
+  factory ImageGenConfig.geminiNanoBanana({String apiKey = ''}) => ImageGenConfig(
+        preset: 'gemini_nano_banana',
+        provider: LlmProvider.gemini,
+        baseUrl: '',
+        model: 'gemini-2.5-flash-image',
+        apiKey: apiKey,
+      );
+
+  factory ImageGenConfig.openAiGptImage({String apiKey = ''}) => ImageGenConfig(
+        preset: 'openai_gpt_image',
+        provider: LlmProvider.openai,
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-image-1',
+        apiKey: apiKey,
+      );
+
+  String get displayLabel {
+    if (isAuto) return 'Auto';
+    if (model.trim().isNotEmpty) return model.trim();
+    return preset;
+  }
+
+  ImageGenConfig copyWith({
+    String? preset,
+    LlmProvider? provider,
+    String? baseUrl,
+    String? model,
+    String? apiKey,
+  }) {
+    return ImageGenConfig(
+      preset: preset ?? this.preset,
+      provider: provider ?? this.provider,
+      baseUrl: baseUrl ?? this.baseUrl,
+      model: model ?? this.model,
+      apiKey: apiKey ?? this.apiKey,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'preset': preset,
+        'provider': provider.configKey,
+        'baseUrl': baseUrl,
+        'model': model,
+        'apiKey': apiKey,
+      };
+
+  factory ImageGenConfig.fromJson(Map<String, dynamic> json) {
+    return ImageGenConfig(
+      preset: json['preset'] as String? ?? 'auto',
+      provider: LlmProvider.fromConfigKey(json['provider'] as String? ?? 'none'),
+      baseUrl: json['baseUrl'] as String? ?? '',
+      model: json['model'] as String? ?? '',
+      apiKey: json['apiKey'] as String? ?? '',
+    );
+  }
+}
+
 /// Result returned by a custom or embedded image generation handler.
 class GeneratedImagePayload {
   /// Base64-encoded image bytes (without `data:image/...;base64,` prefix).
@@ -44,6 +142,12 @@ class GenerateImageTool extends McpLocalTool {
   /// Optional static delegate for on-device image generation (e.g. `llamadart`
   /// Stable Diffusion), mirroring `LLMService.embeddedHandler`.
   static ImageGenerationHandler? embeddedImageHandler;
+
+  /// Optional static provider returning the user-configured [ImageGenConfig]
+  /// (wired automatically by `PlaygroundController`). When set to a non-auto
+  /// preset (e.g. DeepInfra FLUX, Gemini Nano Banana, OpenAI, or Custom), it
+  /// takes precedence over automatic provider detection.
+  static ImageGenConfig? Function()? imageGenConfigProvider;
 
   /// Optional static provider returning the currently active LLM config
   /// (wired automatically by `PlaygroundController`).
@@ -87,7 +191,7 @@ class GenerateImageTool extends McpLocalTool {
     this.llmConfigProvider,
     this.customHandler,
     this.openaiImageModel = 'gpt-image-1',
-    this.deepInfraImageModel = 'black-forest-labs/FLUX.1-schnell',
+    this.deepInfraImageModel = 'black-forest-labs/FLUX-1-schnell',
     this.geminiImageModel = 'gemini-2.5-flash-image',
     this.stopAfterGeneration = false,
     this.httpClient,
@@ -126,7 +230,7 @@ class GenerateImageTool extends McpLocalTool {
           'model': {
             'type': 'string',
             'description':
-                'Optional image model override (e.g. "gpt-image-1", "black-forest-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1-dev").',
+                'Optional image model override (e.g. "gpt-image-1", "black-forest-labs/FLUX-1-schnell", "black-forest-labs/FLUX-1-dev").',
           },
         },
         'required': ['prompt'],
@@ -168,6 +272,65 @@ class GenerateImageTool extends McpLocalTool {
           llmConfig ??
           fallbackConfig ??
           activeConfigProvider?.call();
+      final savedProfiles = configuredProfilesProvider?.call() ?? const [];
+
+      // 1b. Dedicated user-configured ImageGenConfig (preset or custom)
+      final imgCfg = imageGenConfigProvider?.call();
+      if (imgCfg != null && !imgCfg.isAuto) {
+        final effectiveApiKey = _resolveApiKeyForImageConfig(
+          imgCfg,
+          activeConfig: config,
+          savedProfiles: savedProfiles,
+        );
+        if (effectiveApiKey.isEmpty) {
+          return MCPToolResult.error(
+            'Image generator "${imgCfg.displayLabel}" requires an API key. '
+            'Enter an API key in the generate_image tool settings (Agent & Tools tab) '
+            'or add a matching provider profile in LLM Settings.',
+          );
+        }
+
+        final effectiveConfig = LlmConfig(
+          provider: imgCfg.provider == LlmProvider.none
+              ? LlmProvider.openaiCompatible
+              : imgCfg.provider,
+          apiKey: effectiveApiKey,
+          baseUrl: imgCfg.baseUrl,
+          model: imgCfg.model,
+        );
+
+        final effectiveModel = (modelOverride != null && modelOverride.isNotEmpty)
+            ? modelOverride
+            : (imgCfg.model.trim().isNotEmpty ? imgCfg.model.trim() : null);
+
+        if (effectiveConfig.provider == LlmProvider.gemini) {
+          final result = await _generateWithGemini(
+            config: effectiveConfig,
+            prompt: prompt,
+            modelOverride: effectiveModel,
+          );
+          return _toToolResult(result, prompt: prompt, backend: 'gemini');
+        } else {
+          final isDeepInfra =
+              effectiveConfig.baseUrl.toLowerCase().contains('deepinfra.com');
+          final result = await _generateWithOpenAI(
+            config: effectiveConfig,
+            prompt: prompt,
+            size: size,
+            quality: quality,
+            modelOverride: effectiveModel,
+          );
+          return _toToolResult(
+            result,
+            prompt: prompt,
+            backend: isDeepInfra
+                ? 'deepinfra'
+                : (effectiveConfig.provider == LlmProvider.openai
+                    ? 'openai'
+                    : 'custom_endpoint'),
+          );
+        }
+      }
 
       // 2. If active config is OpenAI or Gemini, use it directly.
       if (config != null && config.isConfigured) {
@@ -207,7 +370,6 @@ class GenerateImageTool extends McpLocalTool {
       // 4. Search saved LLM profiles for a configured OpenAI or Gemini profile
       //    so image generation works seamlessly even while chatting with
       //    DeepSeek, Claude, Ollama, or Embedded models.
-      final savedProfiles = configuredProfilesProvider?.call() ?? const [];
       for (final profile in savedProfiles) {
         if (!profile.isConfigured) continue;
         if (profile.provider == LlmProvider.openai) {
@@ -448,6 +610,39 @@ class GenerateImageTool extends McpLocalTool {
     } finally {
       client.close();
     }
+  }
+
+  static String _resolveApiKeyForImageConfig(
+    ImageGenConfig imgCfg, {
+    required LlmConfig? activeConfig,
+    required List<LlmConfig> savedProfiles,
+  }) {
+    if (imgCfg.apiKey.trim().isNotEmpty) return imgCfg.apiKey.trim();
+
+    final candidates = <LlmConfig>[
+      ?activeConfig,
+      ...savedProfiles,
+    ];
+    final targetHost = Uri.tryParse(imgCfg.baseUrl.trim())?.host.toLowerCase() ?? '';
+
+    // 1. Exact host match (e.g. api.deepinfra.com)
+    if (targetHost.isNotEmpty) {
+      for (final c in candidates) {
+        final host = Uri.tryParse(c.baseUrl.trim())?.host.toLowerCase() ?? '';
+        if (host == targetHost && c.apiKey.trim().isNotEmpty) {
+          return c.apiKey.trim();
+        }
+      }
+    }
+
+    // 2. Same provider match (e.g. gemini or openai)
+    for (final c in candidates) {
+      if (c.provider == imgCfg.provider && c.apiKey.trim().isNotEmpty) {
+        return c.apiKey.trim();
+      }
+    }
+
+    return '';
   }
 
   static openai.ImageSize? _parseOpenAiSize(String? raw) {

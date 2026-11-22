@@ -5,6 +5,7 @@ import 'package:test/test.dart';
 void main() {
   tearDown(() {
     GenerateImageTool.embeddedImageHandler = null;
+    GenerateImageTool.imageGenConfigProvider = null;
     GenerateImageTool.activeConfigProvider = null;
     GenerateImageTool.configuredProfilesProvider = null;
   });
@@ -137,6 +138,21 @@ void main() {
       expect(result.isError, isTrue);
       // Proves fallbackLlmConfig was forwarded (reports Claude provider rather than "No configured...")
       expect(result.text, contains('Claude'));
+    });
+
+    test('ImageGenConfig serializes roundtrip and reports missing API key clearly', () async {
+      final cfg = ImageGenConfig.deepInfraFlux(apiKey: 'di-test-key');
+      final roundtrip = ImageGenConfig.fromJson(cfg.toJson());
+      expect(roundtrip.preset, 'deepinfra_flux');
+      expect(roundtrip.model, 'black-forest-labs/FLUX-1-schnell');
+      expect(roundtrip.baseUrl, 'https://api.deepinfra.com/v1/openai');
+      expect(roundtrip.apiKey, 'di-test-key');
+
+      GenerateImageTool.imageGenConfigProvider = () => ImageGenConfig.geminiNanoBanana();
+      final tool = GenerateImageTool();
+      final result = await tool.execute({'prompt': 'a cat'});
+      expect(result.isError, isTrue);
+      expect(result.text, contains('requires an API key'));
     });
   });
 }

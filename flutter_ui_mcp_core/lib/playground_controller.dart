@@ -721,10 +721,41 @@ class PlaygroundController extends ChangeNotifier {
       _localTools.addAll(customLocalTools);
     }
     _registerEmbeddedLlmHandlers();
+    GenerateImageTool.imageGenConfigProvider = () => _imageGenConfig;
     GenerateImageTool.activeConfigProvider = () => _llmConfig;
     GenerateImageTool.configuredProfilesProvider = () => List.unmodifiable(_llmConfigs);
     _mcpManager.addListener(notifyListeners);
     _initAndLoad();
+    _loadImageGenConfig();
+  }
+
+  Future<void> _loadImageGenConfig() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawImgCfg = prefs.getString(_kImageGenConfig);
+      if (rawImgCfg != null && rawImgCfg.isNotEmpty) {
+        _imageGenConfig = ImageGenConfig.fromJson(
+          jsonDecode(rawImgCfg) as Map<String, dynamic>,
+        );
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  static const _kImageGenConfig = 'mcp_playground_image_gen_config';
+  ImageGenConfig _imageGenConfig = const ImageGenConfig();
+
+  /// Active configuration for [GenerateImageTool] (preset or custom model/endpoint/API key).
+  ImageGenConfig get imageGenConfig => _imageGenConfig;
+
+  /// Updates and persists the [GenerateImageTool] configuration.
+  Future<void> updateImageGenConfig(ImageGenConfig config) async {
+    _imageGenConfig = config;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kImageGenConfig, jsonEncode(config.toJson()));
+    } catch (_) {}
   }
 
   /// Adds a message to the conversation history and notifies listeners.
