@@ -1,3 +1,8 @@
+## 1.1.3
+
+- **Synchronized Suite & Dependency Floor Alignment**:
+  - Upgraded `dart_mcp_core: ^1.5.16`, `flutter_ui_mcp_core: ^1.5.17`, and `file_picker: ^13.4.1`.
+
 ## 1.1.2
 
 - **Synchronized Suite Upgrades**:

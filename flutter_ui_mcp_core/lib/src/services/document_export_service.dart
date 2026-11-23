@@ -889,14 +889,19 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
   }
 
   Future<void> _chooseFolder() async {
-    final picked = await FilePicker.getDirectoryPath(
+    final pickedUri = await FilePicker.pickDirectory(
       dialogTitle: 'Select Destination Folder for Export',
       initialDirectory: Directory(_dirCtrl.text).existsSync() ? _dirCtrl.text : null,
     );
-    if (picked != null && picked.isNotEmpty && mounted) {
-      setState(() {
-        _dirCtrl.text = picked;
-      });
+    if (pickedUri != null && mounted) {
+      final pathStr = pickedUri.scheme == 'file'
+          ? pickedUri.toFilePath()
+          : pickedUri.toString();
+      if (pathStr.isNotEmpty) {
+        setState(() {
+          _dirCtrl.text = pathStr;
+        });
+      }
     }
   }
 

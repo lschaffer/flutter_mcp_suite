@@ -1,3 +1,8 @@
+## 1.5.17
+
+* **Synchronized Suite & Dependency Floor Alignment**:
+  * Upgraded `dart_mcp_core: ^1.5.16`, `flutter_ui_mcp_core: ^1.5.17` (adds Image Generator Settings dialog & DeepInfra/Gemini/OpenAI/Custom image model selector), `file_picker: ^13.4.1`, `url_launcher: ^6.3.3`, and `shared_preferences: ^2.5.6`.
+
 ## 1.5.16
 
 * **Built-In AI Image Generation (`GenerateImageTool`) & Suite Synchronization**:

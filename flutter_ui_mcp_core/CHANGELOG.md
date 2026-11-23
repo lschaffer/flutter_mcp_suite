@@ -1,3 +1,11 @@
+## 1.5.17
+
+* **Image Generator Settings Dialog & Multi-Profile Wiring**:
+  * Added **Image Generator Settings** dialog on the `generate_image` tool row in **Agent & Tools** (`SettingsPanel`) to select between `Auto`, DeepInfra `FLUX-1-schnell`, Gemini `Nano Banana` (`gemini-2.5-flash-image`), OpenAI `gpt-image-1`, or a custom model/endpoint with an optional dedicated API key.
+  * Persisted `imageGenConfig` in `PlaygroundController` and wired `GenerateImageTool.activeConfigProvider`, `configuredProfilesProvider`, and `imageGenConfigProvider`.
+* **Dependency Floor Alignment**:
+  * Upgraded `dart_mcp_core: ^1.5.16`, `pdf: ^3.13.1`, `file_picker: ^13.4.1`, `url_launcher: ^6.3.3`, `markdown: ^7.3.1`, `material_ui: ^1.11.1`, and `shared_preferences: ^2.5.6`.
+
 ## 1.5.16
 
 * **Suite Synchronization**:

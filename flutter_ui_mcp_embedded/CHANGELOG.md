@@ -1,3 +1,9 @@
+## 1.5.19
+
+* **Upgraded `llamadart` Runtime (`^0.20.7`) & Suite Synchronization**:
+  * Bumped `llamadart` dependency to `^0.20.7`.
+  * Aligned dependencies with `dart_mcp_core: ^1.5.16` and `flutter_ui_mcp_core: ^1.5.17`.
+
 ## 1.5.18
 
 * **Synchronized Suite Upgrades**:

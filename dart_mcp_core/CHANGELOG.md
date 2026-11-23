@@ -1,3 +1,10 @@
+## 1.5.16
+
+- **Image Generator Configuration (`ImageGenConfig`) & Dependency Alignment**:
+  - Added `ImageGenConfig` with presets (`Auto`, DeepInfra `black-forest-labs/FLUX-1-schnell`, Google Gemini `gemini-2.5-flash-image` / Nano Banana, OpenAI `gpt-image-1`, and Custom Model/Endpoint with optional dedicated API key).
+  - Fixed `McpCallToolTool` forwarding active `LlmConfig` to `GenerateImageTool` in progressive discovery mode.
+  - Bumped dev dependency floors: `test: ^1.33.0`, `lints: ^6.1.0`.
+
 ## 1.5.15
 
 - **Built-In AI Image Generation Tool (`GenerateImageTool`)**:
