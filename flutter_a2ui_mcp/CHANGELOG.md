@@ -1,3 +1,8 @@
+## 1.2.1
+
+- **Synchronized Suite Upgrade**:
+  - Upgraded `flutter_ui_mcp_core` dependency to `^1.5.18` (Android/iOS `FilePicker.saveFile` / `ACTION_CREATE_DOCUMENT` export sheet allowing direct saves to `Downloads/`, `Documents/`, and Google Drive).
+
 ## 1.2.0
 
 - **Built-In A2UI 1.0 Express Support (`useExpressFormat = true` by default)**:

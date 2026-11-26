@@ -1,3 +1,8 @@
+## 1.5.21
+
+* **Synchronized Suite Upgrade**:
+  * Aligned `flutter_ui_mcp_core` dependency to `^1.5.18` (Android/iOS `FilePicker.saveFile` / `ACTION_CREATE_DOCUMENT` export sheet allowing direct saves to `Downloads/`, `Documents/`, and Google Drive).
+
 ## 1.5.20
 
 * **Upgraded `llamadart` Runtime (`^0.21.0`)**:
