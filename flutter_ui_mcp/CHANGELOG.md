@@ -1,3 +1,8 @@
+## 1.5.18
+
+* **Synchronized Suite Upgrade**:
+  * Upgraded `flutter_ui_mcp_core` to `^1.5.18` (Android/iOS `FilePicker.saveFile` / `ACTION_CREATE_DOCUMENT` export sheet allowing direct saves to `Downloads/`, `Documents/`, and Google Drive).
+
 ## 1.5.17
 
 * **Synchronized Suite & Dependency Floor Alignment**:

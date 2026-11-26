@@ -1,3 +1,9 @@
+## 1.5.18
+
+* **Android / iOS Document Export Save Sheet (`DocumentExportService`)**:
+  * On Android and iOS, `ExportDocumentDialog` now hides the Destination Folder row and uses `FilePicker.saveFile(bytes: bytes, fileName: ...)` (`ACTION_CREATE_DOCUMENT`), allowing users to save PDF, Word (`.docx`), and Markdown (`.md`) exports directly into `Downloads/`, `Documents/`, or Google Drive without Android 11+ Scoped Storage directory-tree blocks.
+  * Handled `Uri?` return values (`file://` and `content://`) cleanly in the export confirmation SnackBar while keeping the desktop folder picker unchanged on Windows, macOS, and Linux.
+
 ## 1.5.17
 
 * **Image Generator Settings Dialog & Multi-Profile Wiring**:

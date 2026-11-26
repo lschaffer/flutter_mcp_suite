@@ -82,6 +82,10 @@ class DocumentExportService {
 
     if (savedPath != null && savedPath.isNotEmpty && context.mounted) {
       final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+      final isContentUri = savedPath.startsWith('content://');
+      final displayName = isContentUri
+          ? Uri.decodeComponent(savedPath.split('/').last)
+          : p.basename(savedPath);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -89,18 +93,20 @@ class DocumentExportService {
               const Icon(Icons.check_circle, color: Colors.greenAccent, size: 20),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Exported to ${p.basename(savedPath)}'),
+                child: Text('Exported to $displayName'),
               ),
             ],
           ),
           duration: const Duration(seconds: 6),
-          action: SnackBarAction(
-            label: isMobile ? 'Share' : 'Open',
-            textColor: accentOrange,
-            onPressed: () {
-              _openExportedFile(savedPath);
-            },
-          ),
+          action: isContentUri
+              ? null
+              : SnackBarAction(
+                  label: isMobile ? 'Share' : 'Open',
+                  textColor: accentOrange,
+                  onPressed: () {
+                    _openExportedFile(savedPath);
+                  },
+                ),
         ),
       );
     }
@@ -905,9 +911,12 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
     }
   }
 
+  bool get _isMobile => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
   Future<void> _doExport() async {
+    final isMobile = _isMobile;
     final dir = _dirCtrl.text.trim();
-    if (dir.isEmpty || !Directory(dir).existsSync()) {
+    if (!isMobile && (dir.isEmpty || !Directory(dir).existsSync())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a valid destination folder.')),
       );
@@ -927,7 +936,6 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
 
     try {
       final ext = _format;
-      final targetPath = p.join(dir, '$fileName.$ext');
 
       Uint8List bytes;
       if (_format == 'docx') {
@@ -944,23 +952,36 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
         bytes = Uint8List.fromList(utf8.encode(widget.markdownContent));
       }
 
-      String savedPath = targetPath;
-      try {
-        final file = File(targetPath);
-        await file.writeAsBytes(bytes);
-      } on FileSystemException {
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-          // Scoped Storage fallback on mobile: save via app documents directory
-          final fallbackDir = await getApplicationDocumentsDirectory();
-          savedPath = p.join(fallbackDir.path, '$fileName.$ext');
-          await File(savedPath).writeAsBytes(bytes);
-        } else {
-          rethrow;
+      if (isMobile) {
+        // On Android/iOS, use ACTION_CREATE_DOCUMENT / native save dialog via
+        // FilePicker.saveFile(bytes: ...) so users can save directly into
+        // Downloads/, Documents/, Google Drive, etc. without Scoped Storage blocks.
+        final savedUri = await FilePicker.saveFile(
+          dialogTitle: 'Export Document',
+          fileName: '$fileName.$ext',
+          bytes: bytes,
+        );
+        if (savedUri == null) {
+          if (mounted) {
+            setState(() => _isExporting = false);
+          }
+          return;
         }
+        final savedPath = savedUri.scheme == 'file'
+            ? savedUri.toFilePath()
+            : savedUri.toString();
+        if (mounted) {
+          Navigator.pop(context, savedPath);
+        }
+        return;
       }
 
+      final targetPath = p.join(dir, '$fileName.$ext');
+      final file = File(targetPath);
+      await file.writeAsBytes(bytes);
+
       if (mounted) {
-        Navigator.pop(context, savedPath);
+        Navigator.pop(context, targetPath);
       }
     } catch (e) {
       if (mounted) {
@@ -1035,41 +1056,15 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
               ),
               const SizedBox(height: 18),
 
-              // Destination Folder with Browse Button (Folder Chooser)
-              const Text('Destination Folder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              if (isCompact)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: _dirCtrl,
-                      readOnly: true,
-                      style: const TextStyle(fontSize: 12.5),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        prefixIcon: const Icon(Icons.folder_outlined, size: 18),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        hintText: 'Select folder...',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton.tonalIcon(
-                      icon: const Icon(Icons.folder_open, size: 16),
-                      label: const Text('Browse...'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: _isExporting ? null : _chooseFolder,
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
+              // Destination Folder with Browse Button (Desktop only — mobile uses OS save sheet)
+              if (!_isMobile) ...[
+                const Text('Destination Folder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                if (isCompact)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
                         controller: _dirCtrl,
                         readOnly: true,
                         style: const TextStyle(fontSize: 12.5),
@@ -1080,20 +1075,48 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
                           hintText: 'Select folder...',
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.tonalIcon(
-                      icon: const Icon(Icons.folder_open, size: 16),
-                      label: const Text('Browse...'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      const SizedBox(height: 8),
+                      FilledButton.tonalIcon(
+                        icon: const Icon(Icons.folder_open, size: 16),
+                        label: const Text('Browse...'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: _isExporting ? null : _chooseFolder,
                       ),
-                      onPressed: _isExporting ? null : _chooseFolder,
-                    ),
-                  ],
-                ),
-              const SizedBox(height: 18),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _dirCtrl,
+                          readOnly: true,
+                          style: const TextStyle(fontSize: 12.5),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            prefixIcon: const Icon(Icons.folder_outlined, size: 18),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            hintText: 'Select folder...',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.tonalIcon(
+                        icon: const Icon(Icons.folder_open, size: 16),
+                        label: const Text('Browse...'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: _isExporting ? null : _chooseFolder,
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 18),
+              ],
 
               // Base Filename
               const Text('Filename', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
