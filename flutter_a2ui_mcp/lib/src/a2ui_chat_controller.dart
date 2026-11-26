@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:a2ui_agent/a2ui_agent.dart' as a2ui_agent;
 import 'package:a2ui_core/a2ui_core.dart' hide Action;
 import 'package:a2ui_flutter/a2ui_flutter.dart';
 import 'package:a2ui_flutter/basic_catalog.dart';
@@ -69,6 +70,7 @@ class McpA2uiChatController extends ChangeNotifier {
     List<FunctionImplementation>? customFunctions,
     String? systemPrompt,
     this.maxToolIterations = 10,
+    this.useExpressFormat = true,
     PlaygroundController? playgroundController,
   })  : _llmConfig = llmConfig,
         _tools = List.unmodifiable(tools),
@@ -84,6 +86,7 @@ class McpA2uiChatController extends ChangeNotifier {
     _processor = MessageProcessor<ComponentImplementation>(
       catalogs: [_catalog],
     );
+    _expressParser = a2ui_agent.ExpressParser([_catalog]);
 
     _actionSubscription = _processor.model.onAction.subscribe((action) {
       _handleAction(action);
@@ -122,8 +125,14 @@ class McpA2uiChatController extends ChangeNotifier {
   final String? _systemPrompt;
   final int maxToolIterations;
 
+  /// Whether to use the compact **A2UI 1.0 Express** format (`<a2ui>...</a2ui>`)
+  /// from `a2ui_agent` by default (~50% fewer tokens than raw JSON) with local
+  /// catalog compilation and automatic JSON fallback.
+  final bool useExpressFormat;
+
   final CatalogImplementation _catalog;
   late final MessageProcessor<ComponentImplementation> _processor;
+  late final a2ui_agent.ExpressParser _expressParser;
 
   Subscription? _actionSubscription;
   Subscription? _surfaceCreatedSubscription;
@@ -492,8 +501,48 @@ class McpA2uiChatController extends ChangeNotifier {
     return results;
   }
 
+  /// Parses and applies any A2UI Express (`<a2ui>`) or JSON payloads in [text].
+  /// Exposed for testing and external response integration.
+  void processModelOutput(String text) => _parseAndProcessA2uiPayloads(text);
+
   void _parseAndProcessA2uiPayloads(String text) {
-    // 1. Check code fences and tags first
+    bool processedAny = false;
+
+    // 0. Compile A2UI Express blocks (<a2ui>...</a2ui>) via a2ui_agent ExpressParser
+    if (_expressParser.hasFormatContent(text, complete: true)) {
+      final parts = _expressParser.unwrap(text);
+      for (final part in parts) {
+        if (part is a2ui_agent.RawA2uiPart && part.a2uiRaw.trim().isNotEmpty) {
+          try {
+            final messages = _expressParser.compile(part.a2uiRaw);
+            for (final msg in messages) {
+              _processDecodedPayload(Map<String, dynamic>.from(msg.toJson()));
+              processedAny = true;
+            }
+          } catch (e) {
+            _playgroundController?.addMessage(
+              mp.ChatMessage(
+                id: _newId(),
+                content: '[A2UI Express Compile Error] $e',
+                role: mp.ChatRole.system,
+                timestamp: DateTime.now(),
+                type: mp.MessageType.log,
+              ),
+            );
+            // Fall back to JSON extraction if the model put raw JSON inside <a2ui>
+            final fallbackObjs = extractJsonObjects(part.a2uiRaw);
+            for (final obj in fallbackObjs) {
+              _processDecodedPayload(obj);
+              processedAny = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (processedAny) return;
+
+    // 1. Check code fences and <a2ui-json> tags
     final fenceRegex = RegExp(
       r'```(?:json)?\s*([\s\S]*?)\s*```|<a2ui-json>([\s\S]*?)</a2ui-json>',
       caseSensitive: false,
@@ -504,7 +553,6 @@ class McpA2uiChatController extends ChangeNotifier {
       if (s != null && s.isNotEmpty) rawBlocks.add(s);
     }
 
-    bool processedAny = false;
     for (final block in rawBlocks) {
       try {
         final decoded = jsonDecode(block);
@@ -717,21 +765,26 @@ class McpA2uiChatController extends ChangeNotifier {
   }
 
   static final RegExp _a2uiJsonBlockRegex = RegExp(
-    r'```(?:json)?\s*[\s\S]*?```|<a2ui-json>[\s\S]*?</a2ui-json>|\{\s*"version"\s*:\s*"v?[0-9\.]+"[\s\S]*\}|,\s*\{\s*"id"\s*:[\s\S]*\}|\{\s*"id"\s*:[\s\S]*?"component"[\s\S]*?\}|\{\s*"component"\s*:[\s\S]*?\}',
+    r'<a2ui(?:\s[^>]*)?>[\s\S]*?</a2ui\s*>|```(?:json|a2ui)?\s*[\s\S]*?```|<a2ui-json>[\s\S]*?</a2ui-json>|\{\s*"version"\s*:\s*"v?[0-9\.]+"[\s\S]*\}|,\s*\{\s*"id"\s*:[\s\S]*\}|\{\s*"id"\s*:[\s\S]*?"component"[\s\S]*?\}|\{\s*"component"\s*:[\s\S]*?\}',
     caseSensitive: false,
   );
 
-  /// Strips A2UI JSON code blocks so they are not displayed in the chat view.
+  /// Strips A2UI Express (`<a2ui>`) and JSON code blocks so they are not displayed in the chat view.
+  static String sanitizeAssistantText(String raw) => _sanitizeAssistantText(raw);
+
   static String _sanitizeAssistantText(String raw) {
     String cleaned = raw;
-    // Strip in-progress code blocks during streaming
+    // Strip closed A2UI Express and JSON blocks first
+    cleaned = cleaned.replaceAll(_a2uiJsonBlockRegex, '');
+    // Strip in-progress code blocks and tags during streaming
+    final unclosedExpressTag =
+        RegExp(r'<a2ui(?:\s[^>]*)?>[\s\S]*$', caseSensitive: false);
+    cleaned = cleaned.replaceAll(unclosedExpressTag, '');
     final unclosedCodeBlock =
-        RegExp(r'```(?:json)?\s*\{?[\s\S]*$', caseSensitive: false);
+        RegExp(r'```(?:json|a2ui)?\s*[\s\S]*$', caseSensitive: false);
     cleaned = cleaned.replaceAll(unclosedCodeBlock, '');
     final unclosedTag = RegExp(r'<a2ui-json>[\s\S]*$', caseSensitive: false);
     cleaned = cleaned.replaceAll(unclosedTag, '');
-    // Strip closed A2UI and component JSON blocks
-    cleaned = cleaned.replaceAll(_a2uiJsonBlockRegex, '');
     // Strip trailing/dangling JSON fragments like ", { ... " or indented JSON
     final danglingJson = RegExp(
       r',?\s*\{\s*"(?:id|component|title|version|createSurface)"[\s\S]*$',
@@ -818,6 +871,29 @@ class McpA2uiChatController extends ChangeNotifier {
     if (sysPrompt != null && sysPrompt.trim().isNotEmpty) {
       buffer.writeln(sysPrompt.trim());
       buffer.writeln();
+    }
+
+    if (useExpressFormat) {
+      try {
+        final expressSnippet = a2ui_agent.ExpressPromptGenerator(
+          [_catalog],
+        ).generate();
+        buffer.writeln('### Agent-to-User Interface (A2UI 1.0 Express) Instructions');
+        buffer.writeln(expressSnippet.trim());
+        final customNames = _catalog.components.values
+            .where((c) => !_basicComponentNames.contains(c.name) && c.name != 'ChatMessage')
+            .map((c) => c.name)
+            .toList();
+        if (customNames.isNotEmpty) {
+          buffer.writeln();
+          buffer.writeln(
+            'Prefer these custom domain components whenever applicable: ${customNames.join(', ')}.',
+          );
+        }
+        return buffer.toString();
+      } catch (_) {
+        // Fall through to raw JSON prompt if ExpressPromptGenerator cannot describe the catalog
+      }
     }
 
     buffer.writeln('### Agent-to-User Interface (A2UI) Instructions');

@@ -108,11 +108,16 @@ class A2uiMcpPlayground extends StatefulWidget {
   /// Optional list of initial LLM profile configurations. Empty is allowed.
   final List<LlmConfig>? initialLlmConfigs;
 
+  /// Whether to use the compact A2UI 1.0 Express format (`<a2ui>...</a2ui>`)
+  /// by default (~50% fewer tokens than raw JSON).
+  final bool useExpressFormat;
+
   /// Creates a new [A2uiMcpPlayground] widget instance.
   const A2uiMcpPlayground({
     super.key,
     this.initialLlmConfig,
     this.initialLlmConfigs,
+    this.useExpressFormat = true,
     this.initialServers,
     this.initialLocalMcpServers,
     this.storageDelegate,
@@ -648,6 +653,7 @@ class _A2uiMcpPlaygroundState extends State<A2uiMcpPlayground> {
     _a2uiController = McpA2uiChatController(
       llmConfig: activeLlm,
       tools: _controller.localTools,
+      useExpressFormat: widget.useExpressFormat,
       systemPrompt: _systemPromptCtrl.text.isNotEmpty
           ? _systemPromptCtrl.text
           : (widget.initialSystemPrompt ??

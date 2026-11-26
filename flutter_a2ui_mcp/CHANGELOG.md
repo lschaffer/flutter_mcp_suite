@@ -1,3 +1,13 @@
+## 1.2.0
+
+- **Built-In A2UI 1.0 Express Support (`useExpressFormat = true` by default)**:
+  - Integrated `a2ui_agent`'s `ExpressPromptGenerator` and `ExpressParser` into `McpA2uiChatController` and `A2uiMcpPlayground`, cutting UI token output roughly in half compared to raw JSON while compiling `<a2ui>...</a2ui>` Express blocks into validated A2UI 1.0 JSON envelopes locally.
+  - Preserved seamless fallback to `<a2ui-json>`, fenced JSON, and shorthand component JSON for models that emit raw JSON, and updated streaming text sanitization to strip both closed and in-progress `<a2ui>` Express blocks.
+- **A2UI 0.5.0 / 0.9.0 Ecosystem Upgrade**:
+  - Upgraded `a2ui_flutter` to `^0.5.0`, `a2ui_core` to `^0.9.0`, and `a2ui_agent` to `^0.5.0` (adds `MessageProcessor.addCatalog`, direct `FunctionCall` resolution & `oneOf` boolean coercion in `GenericBinder`, improved JSON Pointer error reporting, and updated `Slider` accessibility semantics).
+  - **Breaking:** Raised minimum Dart/Flutter SDK bounds to `sdk: ^3.13.0` and `flutter: ">=3.47.0"` to align with `a2ui_core ^0.9.0` and `a2ui_flutter ^0.5.0`.
+  - Updated all A2UI example apps to `a2ui_flutter: ^0.5.0` and `a2ui_core: ^0.9.0`.
+
 ## 1.1.3
 
 - **Synchronized Suite & Dependency Floor Alignment**:

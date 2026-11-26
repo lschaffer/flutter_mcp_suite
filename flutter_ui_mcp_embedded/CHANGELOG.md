@@ -1,3 +1,8 @@
+## 1.5.20
+
+* **Upgraded `llamadart` Runtime (`^0.21.0`)**:
+  * Bumped `llamadart` dependency to `^0.21.0` adopting native LiteRT-LM `v0.20.0` (C API 1.1.0), `@litert-lm/core@0.20.0`, WebGPU bridge `v0.1.94`, `stable-diffusion` `v0.4.0-1`, `GenerationParams.ignoreEos`, cancellable streamed Web GGUF loads, and bundled MTP on LiteRT-LM WebGPU.
+
 ## 1.5.19
 
 * **Upgraded `llamadart` Runtime (`^0.20.7`) & Suite Synchronization**:

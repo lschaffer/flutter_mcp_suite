@@ -306,7 +306,7 @@ Some intro text here.
   );
 
   test(
-    'buildEffectiveSystemPrompt includes JSON schemas for custom components',
+    'buildEffectiveSystemPrompt includes JSON schemas for custom components when useExpressFormat is false',
     () {
       final a2uiCtrl = McpA2uiChatController(
         llmConfig: const LlmConfig(
@@ -314,6 +314,7 @@ Some intro text here.
           model: '',
           apiKey: '',
         ),
+        useExpressFormat: false,
         customComponents: [
           ComponentImplementation(
             name: 'AgentSwarmTimeline',
@@ -343,6 +344,63 @@ Some intro text here.
       expect(prompt, contains('AgentSwarmTimeline'));
       expect(prompt, contains('current_task'));
       expect(prompt, contains('"required":["title","agents"]'));
+      a2uiCtrl.dispose();
+    },
+  );
+
+  test(
+    'A2UI 1.0 Express prompt generation, compilation, and text sanitization work by default',
+    () {
+      final a2uiCtrl = McpA2uiChatController(
+        llmConfig: const LlmConfig(
+          provider: LlmProvider.none,
+          model: '',
+          apiKey: '',
+        ),
+        customComponents: [
+          ComponentImplementation(
+            name: 'WeatherCard',
+            schema: S.object(
+              properties: {
+                'city': S.string(),
+                'temp': S.number(),
+              },
+              required: ['city', 'temp'],
+            ),
+            builder: (ctx, node, props, buildChild) => const SizedBox(),
+          ),
+        ],
+      );
+
+      // 1. Default prompt uses A2UI Express format
+      final prompt = a2uiCtrl.buildEffectiveSystemPrompt();
+      expect(prompt, contains('A2UI 1.0 Express'));
+      expect(prompt, contains('<a2ui>'));
+      expect(prompt, contains('WeatherCard'));
+
+      // 2. Compiling an <a2ui> Express block creates a live rendered surface
+      const expressOutput = '''
+Here is the forecast for Vienna:
+<a2ui>
+surface("weather_vienna")
+root = WeatherCard(city="Vienna", temp=18)
+</a2ui>
+''';
+      a2uiCtrl.processModelOutput(expressOutput);
+      expect(a2uiCtrl.activeSurfaceIds, contains('weather_vienna'));
+
+      // 3. Assistant text sanitization strips both closed and streaming <a2ui> blocks
+      expect(
+        McpA2uiChatController.sanitizeAssistantText(expressOutput),
+        equals('Here is the forecast for Vienna:'),
+      );
+      expect(
+        McpA2uiChatController.sanitizeAssistantText(
+          'Building UI...\n<a2ui>\nsurface("s1")\nroot = Text(text="hi',
+        ),
+        equals('Building UI...'),
+      );
+
       a2uiCtrl.dispose();
     },
   );
