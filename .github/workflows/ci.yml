@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  dart_mcp_core:
+    name: dart_mcp_core (analyze & test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dart_mcp_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Install dependencies
+        run: dart pub get
+      - name: Analyze
+        run: dart analyze --fatal-infos
+      - name: Run unit tests
+        run: dart test
+
+  flutter_packages:
+    name: Flutter packages (analyze & test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Configure local monorepo overrides for CI
+        run: |
+          cat <<'EOF' > flutter_ui_mcp_core/pubspec_overrides.yaml
+          dependency_overrides:
+            dart_mcp_core:
+              path: ../dart_mcp_core
+          EOF
+          for pkg in flutter_ui_mcp flutter_ui_mcp_embedded flutter_a2ui_mcp; do
+            cat <<'EOF' > "$pkg/pubspec_overrides.yaml"
+          dependency_overrides:
+            dart_mcp_core:
+              path: ../dart_mcp_core
+            flutter_ui_mcp_core:
+              path: ../flutter_ui_mcp_core
+          EOF
+          done
+
+      - name: flutter_ui_mcp_core
+        working-directory: flutter_ui_mcp_core
+        run: |
+          flutter pub get
+          flutter analyze lib test
+          flutter test
+
+      - name: flutter_ui_mcp
+        working-directory: flutter_ui_mcp
+        run: |
+          flutter pub get
+          flutter analyze lib test
+          flutter test
+
+      - name: flutter_ui_mcp_embedded
+        working-directory: flutter_ui_mcp_embedded
+        run: |
+          flutter pub get
+          flutter analyze lib
+
+      - name: flutter_a2ui_mcp
+        working-directory: flutter_a2ui_mcp
+        run: |
+          flutter pub get
+          flutter analyze lib test
+          flutter test

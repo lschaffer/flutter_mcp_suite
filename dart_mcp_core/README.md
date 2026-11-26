@@ -1,5 +1,9 @@
 # dart_mcp_core
 
+[![CI](https://github.com/lschaffer/flutter_mcp_suite/actions/workflows/ci.yml/badge.svg)](https://github.com/lschaffer/flutter_mcp_suite/actions/workflows/ci.yml)
+[![pub package](https://img.shields.io/pub/v/dart_mcp_core.svg)](https://pub.dev/packages/dart_mcp_core)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 Pure Dart core for the **Flutter MCP Suite**. Contains the agent execution engine, LLM SDK adapters, Model Context Protocol (MCP) clients, and tool orchestration — with zero Flutter dependencies.
 
 Ideal for building pure Dart CLI applications, background workers, backend services, or scripting agents using the Model Context Protocol.
