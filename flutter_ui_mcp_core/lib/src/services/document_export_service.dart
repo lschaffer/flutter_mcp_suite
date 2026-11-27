@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +10,24 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:universal_io/io.dart';
 import 'dart:typed_data';
+
+/// Result returned by [ExportDocumentDialog] containing both the saved
+/// destination path/URI and the in-memory exported bytes so mobile share
+/// sheets (`share_plus`) can share via `XFile.fromData` reliably even after
+/// saving to external storage or Google Drive (`content://` URIs).
+class ExportedDocumentResult {
+  final String savedPath;
+  final String fileName;
+  final Uint8List bytes;
+  final String mimeType;
+
+  const ExportedDocumentResult({
+    required this.savedPath,
+    required this.fileName,
+    required this.bytes,
+    required this.mimeType,
+  });
+}
 
 /// Document Export Service for exporting structured markdown plans and analyses
 /// into publication-ready PDF, Word (.docx), or Markdown (.md) documents.
@@ -69,7 +87,7 @@ class DocumentExportService {
     final defaultDir = await _resolveDefaultDirectory(workspaceDirectory);
     if (!context.mounted) return;
 
-    final savedPath = await showDialog<String>(
+    final result = await showDialog<ExportedDocumentResult>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => ExportDocumentDialog(
@@ -80,12 +98,8 @@ class DocumentExportService {
       ),
     );
 
-    if (savedPath != null && savedPath.isNotEmpty && context.mounted) {
+    if (result != null && result.savedPath.isNotEmpty && context.mounted) {
       final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
-      final isContentUri = savedPath.startsWith('content://');
-      final displayName = isContentUri
-          ? Uri.decodeComponent(savedPath.split('/').last)
-          : p.basename(savedPath);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -93,18 +107,18 @@ class DocumentExportService {
               const Icon(Icons.check_circle, color: Colors.greenAccent, size: 20),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Exported to $displayName'),
+                child: Text('Exported to ${result.fileName}'),
               ),
             ],
           ),
           duration: const Duration(seconds: 6),
-          action: (kIsWeb || isContentUri)
+          action: kIsWeb
               ? null
               : SnackBarAction(
                   label: isMobile ? 'Share' : 'Open',
                   textColor: accentOrange,
                   onPressed: () {
-                    _openExportedFile(savedPath);
+                    _openExportedFile(result, context: context);
                   },
                 ),
         ),
@@ -175,24 +189,51 @@ class DocumentExportService {
     return Directory.current.path;
   }
 
-  static Future<void> _openExportedFile(String filePath) async {
+  static Future<void> _openExportedFile(
+    ExportedDocumentResult result, {
+    BuildContext? context,
+  }) async {
     if (kIsWeb) return;
     try {
       if (Platform.isAndroid || Platform.isIOS) {
+        final box = (context != null && context.mounted)
+            ? context.findRenderObject() as RenderBox?
+            : null;
+        final origin = (box != null && box.hasSize)
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null;
+
         await SharePlus.instance.share(
           ShareParams(
-            files: [XFile(filePath)],
-            text: p.basename(filePath),
+            files: [
+              XFile.fromData(
+                result.bytes,
+                name: result.fileName,
+                mimeType: result.mimeType,
+              ),
+            ],
+            text: result.fileName,
+            sharePositionOrigin: origin,
           ),
         );
       } else if (Platform.isWindows) {
-        await Process.run('cmd.exe', ['/c', 'start', '', filePath]);
+        await Process.run('cmd.exe', ['/c', 'start', '', result.savedPath]);
       } else if (Platform.isMacOS) {
-        await Process.run('open', [filePath]);
+        await Process.run('open', [result.savedPath]);
       } else {
-        await Process.run('xdg-open', [filePath]);
+        await Process.run('xdg-open', [result.savedPath]);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('DocumentExportService: Failed to open/share exported file: $e\n$st');
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open/share ${result.fileName}: $e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
+    }
   }
 
   /// Extracts a human-readable title from the first heading or line of markdown.
@@ -954,13 +995,21 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
         bytes = Uint8List.fromList(utf8.encode(widget.markdownContent));
       }
 
+      final fullFileName = '$fileName.$ext';
+      final mimeType = switch (_format) {
+        'pdf' => 'application/pdf',
+        'docx' =>
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        _ => 'text/markdown',
+      };
+
       if (useSaveDialog) {
         // On Web, Android, and iOS, use FilePicker.saveFile(bytes: ...) so Web
         // triggers a browser download and mobile opens ACTION_CREATE_DOCUMENT /
         // native save sheet (supporting Downloads/, Documents/, Google Drive).
         final savedUri = await FilePicker.saveFile(
           dialogTitle: 'Export Document',
-          fileName: '$fileName.$ext',
+          fileName: fullFileName,
           bytes: bytes,
         );
         if (savedUri == null) {
@@ -973,17 +1022,33 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
             ? savedUri.toFilePath()
             : savedUri.toString();
         if (mounted) {
-          Navigator.pop(context, savedPath);
+          Navigator.pop(
+            context,
+            ExportedDocumentResult(
+              savedPath: savedPath,
+              fileName: fullFileName,
+              bytes: bytes,
+              mimeType: mimeType,
+            ),
+          );
         }
         return;
       }
 
-      final targetPath = p.join(dir, '$fileName.$ext');
+      final targetPath = p.join(dir, fullFileName);
       final file = File(targetPath);
       await file.writeAsBytes(bytes);
 
       if (mounted) {
-        Navigator.pop(context, targetPath);
+        Navigator.pop(
+          context,
+          ExportedDocumentResult(
+            savedPath: targetPath,
+            fileName: fullFileName,
+            bytes: bytes,
+            mimeType: mimeType,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

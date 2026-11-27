@@ -1,3 +1,8 @@
+## 1.5.23
+
+* **Synchronized Suite Upgrade**:
+  * Aligned `flutter_ui_mcp_core` dependency to `^1.5.20` (fixes Android/iOS `"Share"` SnackBar action via `XFile.fromData`).
+
 ## 1.5.22
 
 * **Synchronized Suite Upgrade (Web / WASM Support)**:

@@ -1,3 +1,10 @@
+## 1.5.20
+
+* **Fixed Mobile Export `"Share"` SnackBar Action (`DocumentExportService`)**:
+  * `ExportDocumentDialog` now returns an `ExportedDocumentResult` carrying `savedPath`, `fileName`, `bytes`, and `mimeType`.
+  * On Android and iOS, tapping **`Share`** now invokes `SharePlus.instance.share` with `XFile.fromData(bytes, name: fileName, mimeType: mimeType)` and `sharePositionOrigin`, working reliably after saving to both device storage (`Downloads/`, `Documents/`) and Google Drive (`content://` URIs) without `FileProvider` permission failures.
+  * Logged and surfaced open/share errors via `debugPrint` and SnackBar instead of silently swallowing them.
+
 ## 1.5.19
 
 * **Flutter Web / WASM (`dart2wasm`) Startup & Document Export Fixes**:

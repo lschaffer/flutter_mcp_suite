@@ -99,3 +99,20 @@ In `ExportDocumentDialog`, `_isMobile` is `!kIsWeb && (Platform.isAndroid || Pla
 - [x] Run `dart analyze` and `flutter test` in `flutter_ui_mcp_core`.
 - [x] Verify Web/WASM build (`flutter build web --wasm`) boots cleanly with zero `Unsupported operation: _Namespace` errors in the browser console.
 - [x] Bump `flutter_ui_mcp_core` version & changelog once verified.
+
+---
+
+## 6. `flutter_ui_mcp_core` — Fix Mobile Export `"Share"` SnackBar Action (`DocumentExportService`)
+
+**File:** `flutter_ui_mcp_core/lib/src/services/document_export_service.dart` (lines 72–112, 178–196, 957–979)
+
+### Root Cause
+1. After `FilePicker.saveFile(bytes: bytes)` saves a PDF/DOCX/MD file to device storage or Google Drive on Android/iOS, tapping the bottom SnackBar **`Share`** button invokes `_openExportedFile(savedPath)` → `SharePlus.instance.share(ShareParams(files: [XFile(filePath)], ...))`.
+2. On Android, `share_plus`'s `FileProvider` only has permission to share files inside the app's cache/private storage (or `XFile.fromData(...)`, which `share_plus` writes into its own `cache/share_plus/` directory). Passing an external storage path throws `IllegalArgumentException` / `FileNotFoundException`, which is **silently swallowed by `catch (_) {}`** (line 195), so tapping **Share** does nothing.
+3. When saving to Google Drive (`content://` URI), line 101 hides the **Share** action completely because `ExportDocumentDialog` only returns the URI string instead of keeping the exported `bytes`.
+
+### Required Fixes
+- [x] Return exported metadata + in-memory bytes from `ExportDocumentDialog` (e.g. `({String savedPath, String fileName, Uint8List bytes, String mimeType})`), or save a temporary shareable copy in `getTemporaryDirectory()`.
+- [x] On Android / iOS, invoke `SharePlus.instance.share(ShareParams(files: [XFile.fromData(bytes, name: fileName, mimeType: mimeType)], text: fileName, sharePositionOrigin: ...))` so **Share** works reliably after saving to either device storage or Google Drive (`content://`).
+- [x] Log or surface errors from `_openExportedFile()` instead of silently swallowing them in `catch (_) {}`.
+- [x] Run `dart analyze` / `flutter test` and bump `flutter_ui_mcp_core` version.
