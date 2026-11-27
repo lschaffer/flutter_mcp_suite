@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 
@@ -82,11 +83,11 @@ class EnvLoader {
   }
 
   static String get(String key, {String defaultValue = ''}) {
-    return _env[key] ?? Platform.environment[key] ?? defaultValue;
+    return _env[key] ?? (kIsWeb ? null : Platform.environment[key]) ?? defaultValue;
   }
 
   static bool has(String key) {
-    return _env.containsKey(key) || Platform.environment.containsKey(key);
+    return _env.containsKey(key) || (!kIsWeb && Platform.environment.containsKey(key));
   }
 
   static LlmProvider getProvider() {

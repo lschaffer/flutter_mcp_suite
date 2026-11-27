@@ -1,3 +1,8 @@
+## 1.5.19
+
+* **Synchronized Suite Upgrade (Web / WASM Support)**:
+  * Upgraded `flutter_ui_mcp_core` to `^1.5.19` (fixes Flutter Web/WASM `dart2wasm` startup and document export crashes).
+
 ## 1.5.18
 
 * **Synchronized Suite Upgrade**:

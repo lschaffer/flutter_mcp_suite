@@ -55,3 +55,47 @@ It then asks the LLM to re-summarize the 1 existing summary (`1 turns archived i
 ## 3. Release & Version Bump
 - [x] Run `dart test` / `dart analyze` across `dart_mcp_core` and `flutter_ui_mcp_core`.
 - [x] Bump versions (e.g. `1.5.14` / `1.5.16`) and publish/update changelogs so `mobile_ai_agent` (`cli`, `cli.vscode`, Flutter app) can pick them up.
+
+---
+
+## 4. `flutter_ui_mcp_core` — Fix Flutter Web / WASM (`dart2wasm`) `Unsupported operation: _Namespace` Startup & Export Crashes
+
+### 4a. Startup Crash in `ToolPermissionSettings` (CRITICAL — blocks Web / WASM app load)
+
+**Files:**
+- `flutter_ui_mcp_core/lib/playground_controller.dart` (line 577: `ToolPermissionSettings _permissions = ToolPermissionSettings.load();`)
+- `flutter_ui_mcp_core/lib/src/services/tool_permission_service.dart` (lines 102–163)
+
+#### Root Cause
+`PlaygroundController` unconditionally calls `ToolPermissionSettings.load()` in its field initializer. On Flutter Web / WASM (`dart2wasm`), `universal_io` stubs `Platform.environment` to `{}` (so `USERPROFILE` and `HOME` are `null`), **but does not stub `Directory` or `File`** — they still forward straight to `dart:io`.
+- `defaultStoragePath` falls through to `Directory.current.path`, which invokes `dart:io`'s `_Namespace._namespace` and throws `UnsupportedError: Unsupported operation: _Namespace`.
+- `File(path).existsSync()` (line 114) and `save()` (lines 152–153) also execute outside `try/catch` without a `kIsWeb` guard.
+- Throwing inside `PlaygroundController`'s constructor aborts `initState()` in host apps (e.g. `ThiesA2uiScreen`), leaving `late final PlaygroundController` uninitialized and sticking the Web/WASM app on a grey loading screen.
+
+#### Required Fixes
+- [x] **`defaultStoragePath` (lines 103–108)**: Guard with `if (kIsWeb) return '';` before reading `Platform.environment` or `Directory.current.path`.
+- [x] **`load([String? customPath])` (lines 111–148)**: Early-return `ToolPermissionSettings()` when `kIsWeb`, and move `defaultStoragePath`, empty-path check, `File(path)`, and `file.existsSync()` inside the `try { ... } catch (_) { return ToolPermissionSettings(); }` block.
+- [x] **`save([String? customPath])` (lines 151–163)**: Early-return when `kIsWeb`, and wrap `defaultStoragePath`, empty-path check, and `File(path)` inside `try { ... } catch (_) {}`.
+
+---
+
+### 4b. Web / WASM Export Crash in `DocumentExportService`
+
+**File:** `flutter_ui_mcp_core/lib/src/services/document_export_service.dart` (lines 83–112, 914–986, 1060)
+
+#### Root Cause
+In `ExportDocumentDialog`, `_isMobile` is `!kIsWeb && (Platform.isAndroid || Platform.isIOS)`, so on Web (`kIsWeb == true`):
+- Line 1060 shows the desktop **Destination Folder** field even though `_resolveDefaultDirectory()` returns `''` on Web.
+- Line 919 evaluates `if (!isMobile && (dir.isEmpty || !Directory(dir).existsSync()))`, which either blocks export or throws `Unsupported operation: _Namespace` if `dir` is non-empty, instead of triggering a browser download via `FilePicker.saveFile(bytes: bytes)`.
+- Lines 101–109 show an `Open` snackbar button that calls `_openExportedFile()` (which uses native `Process.run`).
+
+#### Required Fixes
+- [x] **Treat Web like mobile for saving**: Replace `_isMobile` in `ExportDocumentDialog` with `bool get _useSaveDialog => kIsWeb || Platform.isAndroid || Platform.isIOS;` (lines 914, 917, 919, 955, 1060) so Web hides the Destination Folder picker and exports PDF / DOCX / Markdown via `FilePicker.saveFile(bytes: bytes)` browser download.
+- [x] **Skip native `Open` snackbar action on Web** (line 101): Change `action: isContentUri ? null : ...` to `action: (kIsWeb || isContentUri) ? null : ...`.
+
+---
+
+## 5. Verification & Release (Web / WASM Fix)
+- [x] Run `dart analyze` and `flutter test` in `flutter_ui_mcp_core`.
+- [x] Verify Web/WASM build (`flutter build web --wasm`) boots cleanly with zero `Unsupported operation: _Namespace` errors in the browser console.
+- [x] Bump `flutter_ui_mcp_core` version & changelog once verified.

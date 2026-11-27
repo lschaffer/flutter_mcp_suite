@@ -1,3 +1,9 @@
+## 1.2.2
+
+- **Flutter Web / WASM (`dart2wasm`) Compatibility & Suite Upgrade**:
+  - Upgraded `flutter_ui_mcp_core` dependency to `^1.5.19` (fixes Web/WASM `ToolPermissionSettings` startup crash and `DocumentExportService` browser download).
+  - Guarded `Platform.environment` with `kIsWeb` across `flutter_a2ui_mcp/example` and all A2UI example `env_loader.dart` files so the example gallery boots cleanly under `flutter run -d chrome --wasm`.
+
 ## 1.2.1
 
 - **Synchronized Suite Upgrade**:

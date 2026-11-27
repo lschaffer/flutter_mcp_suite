@@ -101,21 +101,29 @@ class ToolPermissionSettings with ChangeNotifier {
 
   /// Path to persistent permissions configuration file.
   static String get defaultStoragePath {
-    final home = Platform.environment['USERPROFILE'] ??
-        Platform.environment['HOME'] ??
-        Directory.current.path;
-    return p.join(home, '.tealkit', 'permissions.yaml');
+    if (kIsWeb) return '';
+    try {
+      final home = Platform.environment['USERPROFILE'] ??
+          Platform.environment['HOME'] ??
+          Directory.current.path;
+      return p.join(home, '.tealkit', 'permissions.yaml');
+    } catch (_) {
+      return '';
+    }
   }
 
   /// Load permissions from YAML/JSON storage file.
   static ToolPermissionSettings load([String? customPath]) {
-    final path = customPath ?? defaultStoragePath;
-    final file = File(path);
-    if (!file.existsSync()) {
-      return ToolPermissionSettings();
-    }
+    if (kIsWeb) return ToolPermissionSettings();
 
     try {
+      final path = customPath ?? defaultStoragePath;
+      if (path.isEmpty) return ToolPermissionSettings();
+      final file = File(path);
+      if (!file.existsSync()) {
+        return ToolPermissionSettings();
+      }
+
       final raw = file.readAsStringSync();
       // Simple parser for auto_approve_* fields
       bool? readVal;
@@ -149,9 +157,11 @@ class ToolPermissionSettings with ChangeNotifier {
 
   /// Save permissions to YAML storage file.
   void save([String? customPath]) {
-    final path = customPath ?? defaultStoragePath;
-    final file = File(path);
+    if (kIsWeb) return;
     try {
+      final path = customPath ?? defaultStoragePath;
+      if (path.isEmpty) return;
+      final file = File(path);
       file.parent.createSync(recursive: true);
       file.writeAsStringSync('''# TealKit Human-in-the-Loop Tool Permissions
 auto_approve_read: $autoApproveRead

@@ -1,3 +1,9 @@
+## 1.5.19
+
+* **Flutter Web / WASM (`dart2wasm`) Startup & Document Export Fixes**:
+  * Guarded `ToolPermissionSettings.defaultStoragePath`, `load()`, and `save()` in `tool_permission_service.dart` with `kIsWeb` and `try/catch`, fixing the `Unsupported operation: _Namespace` crash during `PlaygroundController` initialization on Web/WASM.
+  * Updated `ExportDocumentDialog` in `document_export_service.dart` to use `_useSaveDialog => kIsWeb || Platform.isAndroid || Platform.isIOS`, hiding the desktop Destination Folder picker on Web and triggering browser downloads via `FilePicker.saveFile(bytes: bytes)` while skipping the native `Open` SnackBar action on Web.
+
 ## 1.5.18
 
 * **Android / iOS Document Export Save Sheet (`DocumentExportService`)**:

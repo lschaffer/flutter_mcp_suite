@@ -98,7 +98,7 @@ class DocumentExportService {
             ],
           ),
           duration: const Duration(seconds: 6),
-          action: isContentUri
+          action: (kIsWeb || isContentUri)
               ? null
               : SnackBarAction(
                   label: isMobile ? 'Share' : 'Open',
@@ -911,12 +911,14 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
     }
   }
 
-  bool get _isMobile => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  /// Whether to save via OS/browser save sheet (`FilePicker.saveFile(bytes: ...)`)
+  /// instead of a local desktop directory picker + `dart:io` `File.writeAsBytes`.
+  bool get _useSaveDialog => kIsWeb || Platform.isAndroid || Platform.isIOS;
 
   Future<void> _doExport() async {
-    final isMobile = _isMobile;
+    final useSaveDialog = _useSaveDialog;
     final dir = _dirCtrl.text.trim();
-    if (!isMobile && (dir.isEmpty || !Directory(dir).existsSync())) {
+    if (!useSaveDialog && (dir.isEmpty || !Directory(dir).existsSync())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a valid destination folder.')),
       );
@@ -952,10 +954,10 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
         bytes = Uint8List.fromList(utf8.encode(widget.markdownContent));
       }
 
-      if (isMobile) {
-        // On Android/iOS, use ACTION_CREATE_DOCUMENT / native save dialog via
-        // FilePicker.saveFile(bytes: ...) so users can save directly into
-        // Downloads/, Documents/, Google Drive, etc. without Scoped Storage blocks.
+      if (useSaveDialog) {
+        // On Web, Android, and iOS, use FilePicker.saveFile(bytes: ...) so Web
+        // triggers a browser download and mobile opens ACTION_CREATE_DOCUMENT /
+        // native save sheet (supporting Downloads/, Documents/, Google Drive).
         final savedUri = await FilePicker.saveFile(
           dialogTitle: 'Export Document',
           fileName: '$fileName.$ext',
@@ -1056,8 +1058,8 @@ class _ExportDocumentDialogState extends State<ExportDocumentDialog> {
               ),
               const SizedBox(height: 18),
 
-              // Destination Folder with Browse Button (Desktop only — mobile uses OS save sheet)
-              if (!_isMobile) ...[
+              // Destination Folder with Browse Button (Desktop only — Web & mobile use OS/browser save sheet)
+              if (!_useSaveDialog) ...[
                 const Text('Destination Folder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 if (isCompact)
