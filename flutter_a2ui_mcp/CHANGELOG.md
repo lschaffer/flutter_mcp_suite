@@ -1,3 +1,8 @@
+## 1.2.4
+
+- **Synchronized Suite Upgrade**:
+  - Upgraded `dart_mcp_core` dependency to `^1.5.17` and `flutter_ui_mcp_core` dependency to `^1.5.21` (resilient HTTP/stream retry, truncated stream guard, 180s default timeout, and Request Timeout UI setting).
+
 ## 1.2.3
 
 - **Synchronized Suite Upgrade**:

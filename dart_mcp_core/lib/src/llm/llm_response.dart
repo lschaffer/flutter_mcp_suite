@@ -61,6 +61,31 @@ class LLMResponse {
   });
 }
 
+/// Exception thrown when an LLM streaming response terminates prematurely
+/// (e.g., socket drop, stream error, or inactivity timeout) before a clean
+/// completion marker (`finish_reason` / `isDone`) is received.
+class IncompleteStreamException implements Exception {
+  /// Human-readable description of why the stream was considered incomplete.
+  final String message;
+
+  /// Any partial text accumulated before the stream terminated prematurely.
+  final String partialText;
+
+  /// Optional underlying transport or timeout error that caused the drop.
+  final Object? cause;
+
+  const IncompleteStreamException(
+    this.message, {
+    this.partialText = '',
+    this.cause,
+  });
+
+  @override
+  String toString() =>
+      'IncompleteStreamException: $message'
+      '${cause != null ? ' (cause: $cause)' : ''}';
+}
+
 /// Represents a chunk of text or progress emitted during a streaming LLM call.
 class LLMStreamChunk {
   /// The incremental text piece.
@@ -73,10 +98,15 @@ class LLMStreamChunk {
   /// This field is only non-null when [isDone] is true.
   final LLMResponse? finalResponse;
 
+  /// Optional non-content progress or heartbeat message emitted while the model
+  /// is reasoning or buffering tool call arguments (e.g. `'Model reasoning...'`).
+  final String? statusMessage;
+
   /// Creates a new [LLMStreamChunk] instance.
   const LLMStreamChunk({
     required this.textDelta,
     this.isDone = false,
     this.finalResponse,
+    this.statusMessage,
   });
 }

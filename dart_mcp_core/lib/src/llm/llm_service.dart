@@ -45,14 +45,13 @@ class LLMService {
     return client;
   }
 
-  /// Clears cached LLM clients and closes any GoogleAIClient instances.
+  /// Clears cached LLM clients and closes underlying HTTP clients so subsequent
+  /// calls establish fresh TCP connections.
   static void clearCache() {
     for (final client in _clientCache.values) {
-      if (client is gemini.GoogleAIClient) {
-        try {
-          client.close();
-        } catch (_) {}
-      }
+      try {
+        (client as dynamic).close();
+      } catch (_) {}
     }
     _clientCache.clear();
   }
@@ -496,6 +495,9 @@ class LLMService {
         : 'https://api.openai.com/v1';
     final cacheKey =
         'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final connectTimeout = config.timeout < const Duration(seconds: 60)
+        ? config.timeout
+        : const Duration(seconds: 60);
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -503,7 +505,7 @@ class LLMService {
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
           timeout: config.timeout,
-          connectTimeout: const Duration(seconds: 60),
+          connectTimeout: connectTimeout,
         ),
         httpClient: _OpenAiCompatiblePatchClient(
           http.Client(),
@@ -531,6 +533,9 @@ class LLMService {
         : 'https://api.mistral.ai/v1';
     final cacheKey =
         'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final connectTimeout = config.timeout < const Duration(seconds: 60)
+        ? config.timeout
+        : const Duration(seconds: 60);
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -538,7 +543,7 @@ class LLMService {
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
           timeout: config.timeout,
-          connectTimeout: const Duration(seconds: 60),
+          connectTimeout: connectTimeout,
         ),
         httpClient: _MistralPatchClient(http.Client(), timeout: config.timeout),
       ),
@@ -563,6 +568,9 @@ class LLMService {
         : 'https://api.openai.com/v1';
     final cacheKey =
         'openai_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final connectTimeout = config.timeout < const Duration(seconds: 60)
+        ? config.timeout
+        : const Duration(seconds: 60);
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -570,7 +578,7 @@ class LLMService {
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
           timeout: config.timeout,
-          connectTimeout: const Duration(seconds: 60),
+          connectTimeout: connectTimeout,
         ),
         httpClient: _OpenAiCompatiblePatchClient(
           http.Client(),
@@ -598,6 +606,9 @@ class LLMService {
         : 'https://api.mistral.ai/v1';
     final cacheKey =
         'mistral_${config.apiKey}_${baseUrl}_${config.timeout.inSeconds}';
+    final connectTimeout = config.timeout < const Duration(seconds: 60)
+        ? config.timeout
+        : const Duration(seconds: 60);
     final client = _getOrCreateClient(
       key: cacheKey,
       create: () => openai.OpenAIClient(
@@ -605,7 +616,7 @@ class LLMService {
           authProvider: openai.ApiKeyProvider(config.apiKey),
           baseUrl: baseUrl,
           timeout: config.timeout,
-          connectTimeout: const Duration(seconds: 60),
+          connectTimeout: connectTimeout,
         ),
         httpClient: _MistralPatchClient(http.Client(), timeout: config.timeout),
       ),
@@ -656,25 +667,60 @@ class LLMService {
     final textBuffer = StringBuffer();
     final Map<int, Map<String, dynamic>> toolCallAccumulators = {};
 
+    bool timedOut = false;
+    bool sawFinishReason = false;
+    DateTime? lastHeartbeatAt;
+    const heartbeatInterval = Duration(seconds: 5);
+
     Object? streamError;
     try {
       final timedStream = stream.timeout(
         config.timeout,
         onTimeout: (sink) {
+          timedOut = true;
+          sink.addError(
+            TimeoutException(
+              'LLM stream inactivity timeout after ${config.timeout.inSeconds}s',
+              config.timeout,
+            ),
+          );
           sink.close();
         },
       );
       await for (final event in timedStream) {
         final choice = event.choices?.firstOrNull;
         if (choice != null) {
+          if (choice.finishReason != null) {
+            sawFinishReason = true;
+          }
+
           final content = choice.delta.content;
           if (content != null && content.isNotEmpty) {
             textBuffer.write(content);
             yield LLMStreamChunk(textDelta: content);
+          } else if (choice.delta.hasReasoningContent) {
+            final now = DateTime.now();
+            if (lastHeartbeatAt == null ||
+                now.difference(lastHeartbeatAt) >= heartbeatInterval) {
+              lastHeartbeatAt = now;
+              yield const LLMStreamChunk(
+                textDelta: '',
+                statusMessage: 'Model reasoning...',
+              );
+            }
           }
 
           final deltas = choice.delta.toolCalls;
           if (deltas != null) {
+            final now = DateTime.now();
+            if (lastHeartbeatAt == null ||
+                now.difference(lastHeartbeatAt) >= heartbeatInterval) {
+              lastHeartbeatAt = now;
+              yield const LLMStreamChunk(
+                textDelta: '',
+                statusMessage: 'Preparing tool call...',
+              );
+            }
             for (final d in deltas) {
               final idx = d.index;
               final acc = toolCallAccumulators.putIfAbsent(
@@ -699,6 +745,16 @@ class LLMService {
     }
 
     if (textBuffer.isEmpty && toolCallAccumulators.isEmpty) {
+      // On inactivity timeout, propagate immediately so callers can clear
+      // stale HTTP connections and retry cleanly instead of waiting a second
+      // full timeout on the same stalled client.
+      if (timedOut || streamError is TimeoutException) {
+        throw streamError ??
+            TimeoutException(
+              'LLM stream inactivity timeout after ${config.timeout.inSeconds}s',
+              config.timeout,
+            );
+      }
       try {
         final fallback = await _generateOpenAIWithClient(
           client,
@@ -722,6 +778,16 @@ class LLMService {
         }
         rethrow;
       }
+    }
+
+    // Guard against mid-stream drops: if the stream errored or timed out before
+    // receiving a finish_reason, reject the truncated fragment so callers can retry.
+    if ((timedOut || streamError != null) && !sawFinishReason) {
+      throw IncompleteStreamException(
+        'LLM stream terminated prematurely before completion',
+        partialText: textBuffer.toString(),
+        cause: streamError,
+      );
     }
 
     final toolCalls = <LLMToolCall>[];
@@ -2154,7 +2220,7 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
       );
     }
 
-    final bodyBytes = await streamed.stream.toBytes();
+    final bodyBytes = await streamed.stream.toBytes().timeout(timeout);
     final bodyStr = utf8.decode(bodyBytes);
 
     String patched = bodyStr;
@@ -2187,6 +2253,6 @@ class _OpenAiCompatiblePatchClient extends http.BaseClient {
 class _MistralPatchClient extends _OpenAiCompatiblePatchClient {
   _MistralPatchClient(
     super.inner, {
-    super.timeout = const Duration(minutes: 10),
+    super.timeout = const Duration(seconds: 180),
   }) : super(isMistral: true);
 }

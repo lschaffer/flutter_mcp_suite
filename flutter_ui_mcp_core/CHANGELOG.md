@@ -1,3 +1,10 @@
+## 1.5.21
+
+* **Request Timeout Configuration UI (`LlmAdvancedSettingsForm`, `LlmProfilesTab`)**:
+  * Added an optional `timeoutSecondsCtrl` and **Request Timeout (sec)** input field (`>= 10`s validation, `180`s default) to `LlmAdvancedSettingsForm`.
+  * Wired `_timeoutSecondsCtrl` in `LlmProfilesTab` when creating, editing, and saving `LlmConfig` profiles.
+  * Upgraded `dart_mcp_core` dependency to `^1.5.17` (resilient HTTP/stream retry, truncated stream guard, reasoning/tool-call heartbeats, and 180s default timeout).
+
 ## 1.5.20
 
 * **Fixed Mobile Export `"Share"` SnackBar Action (`DocumentExportService`)**:

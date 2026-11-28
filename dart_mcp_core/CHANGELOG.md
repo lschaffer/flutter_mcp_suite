@@ -1,3 +1,13 @@
+## 1.5.17
+
+- **Resilient HTTP / Stream Inactivity Retry, Truncated Stream Guard & Heartbeats (`McpAgentEngine`, `LLMService`)**:
+  - Lowered default `LlmConfig.timeoutSeconds` from `600` (10 min) to `180` (3 min), remaining configurable via `timeoutSeconds`.
+  - Bounded non-streaming HTTP body reads (`streamed.stream.toBytes().timeout(timeout)`) and clamped `connectTimeout` to `min(config.timeout, 60s)` in OpenAI / OpenAI-compatible / Mistral adapters.
+  - Added automatic retry with exponential backoff (`McpAgentEngine.maxLlmRetries = 2`, `llmRetryBaseDelay = Duration(seconds: 2)`) for transient LLM transport failures, HTTP 502/503/504/429 errors, inactivity timeouts, and prematurely truncated streams, clearing `LLMService.clearCache()` (and closing cached HTTP clients) before each retry and emitting `AgentLogEvent('LLM request stalled/failed — retrying (attempt X/Y)...')`.
+  - Added `IncompleteStreamException` and tracked `finishReason` / `isDone` completion markers in `LLMService._streamOpenAIWithClient` and `McpAgentEngine` so mid-stream SSE drops no longer silently terminate the loop with a truncated 1–3 word fragment.
+  - Added optional `LLMStreamChunk.statusMessage` and throttled heartbeat emissions (`'Model reasoning...'` / `'Preparing tool call...'` every 5s) forwarded as `AgentLogEvent` during reasoning and tool-call argument buffering.
+  - Added unit tests in `test/stream_resilience_test.dart`.
+
 ## 1.5.16
 
 - **Image Generator Configuration (`ImageGenConfig`) & Dependency Alignment**:

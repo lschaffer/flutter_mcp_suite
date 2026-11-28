@@ -452,6 +452,19 @@ class McpAgentEngine {
   static const int defaultMaxToolIterations = 400;
   final int maxToolIterations;
 
+  /// Default number of automatic retries for transient LLM transport errors,
+  /// inactivity timeouts, or prematurely truncated streams (total attempts = 1 + maxLlmRetries).
+  static const int defaultMaxLlmRetries = 2;
+
+  /// Default base backoff delay before retrying a stalled or failed LLM call.
+  static const Duration defaultLlmRetryBaseDelay = Duration(seconds: 2);
+
+  /// Maximum retries per LLM turn on transient errors / timeouts / incomplete streams.
+  final int maxLlmRetries;
+
+  /// Base exponential backoff delay between LLM retries.
+  final Duration llmRetryBaseDelay;
+
   /// Event stream controller for reactive consumers.
   final StreamController<AgentEvent> _eventController =
       StreamController<AgentEvent>.broadcast();
@@ -472,11 +485,44 @@ class McpAgentEngine {
 
   McpAgentEngine({
     this.maxToolIterations = defaultMaxToolIterations,
+    this.maxLlmRetries = defaultMaxLlmRetries,
+    this.llmRetryBaseDelay = defaultLlmRetryBaseDelay,
     this.enableLogging = false,
     this.hooks = const [],
     this.contextCompressor,
     this.workflowMemoryStore,
   });
+
+  static bool _isRetryableLlmError(Object error) {
+    if (error is TimeoutException || error is IncompleteStreamException) {
+      return true;
+    }
+    final msg = error.toString().toLowerCase();
+    return msg.contains('socketexception') ||
+        msg.contains('handshakeexception') ||
+        msg.contains('clientexception') ||
+        msg.contains('connection closed') ||
+        msg.contains('connection reset') ||
+        msg.contains('broken pipe') ||
+        msg.contains('timed out') ||
+        msg.contains('timeout') ||
+        msg.contains('http 502') ||
+        msg.contains('http 503') ||
+        msg.contains('http 504') ||
+        msg.contains('502 bad gateway') ||
+        msg.contains('503 service unavailable') ||
+        msg.contains('504 gateway timeout') ||
+        msg.contains('status code 502') ||
+        msg.contains('status code 503') ||
+        msg.contains('status code 504') ||
+        msg.contains('statuscode: 502') ||
+        msg.contains('statuscode: 503') ||
+        msg.contains('statuscode: 504') ||
+        msg.contains('status code 429') ||
+        msg.contains('statuscode: 429') ||
+        msg.contains('rate limit') ||
+        msg.contains('overloaded');
+  }
   void _log(String message) {
     if (enableLogging) {
       print('[McpAgentEngine] $message');
@@ -1317,51 +1363,88 @@ class McpAgentEngine {
           }
 
           _log('Generating LLM response (step ${stepIdx + 1})...');
-          final LLMResponse response;
-          if (agent.llmConfig.useStreaming || agent.llmConfig.isSlm) {
-            final textBuffer = StringBuffer();
-            LLMResponse? finalResponse;
-            try {
-              final stream = LLMService.generateStream(
-                config: agent.llmConfig,
-                messages: requestMsgs,
-                tools: mcpTools,
-                systemPrompt: callSystemPrompt,
-              ).timeout(
-                agent.llmConfig.timeout,
-                onTimeout: (sink) {
-                  _log(
-                    'Agent stream timed out after ${agent.llmConfig.timeout.inSeconds}s of inactivity.',
-                  );
-                  sink.close();
-                },
-              );
-              await for (final chunk in stream) {
-                if (_cancelTokens[agentKey] == true) break;
-                if (chunk.textDelta.isNotEmpty) {
-                  textBuffer.write(chunk.textDelta);
-                  emit(AgentTextChunkEvent(chunk.textDelta));
-                }
-                if (chunk.isDone) {
-                  finalResponse = chunk.finalResponse;
-                }
-              }
-            } catch (e) {
-              _log('Stream error or timeout in agent loop: $e');
-            }
+          final int maxAttempts = maxLlmRetries < 0 ? 1 : maxLlmRetries + 1;
+          LLMResponse? turnResponse;
+          for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             if (_cancelTokens[agentKey] == true) break;
-            response =
-                finalResponse ?? LLMResponse(text: textBuffer.toString());
-          } else {
-            response = await LLMService.generate(
-              config: agent.llmConfig,
-              messages: requestMsgs,
-              tools: mcpTools,
-              systemPrompt: callSystemPrompt,
-            );
+            try {
+              if (agent.llmConfig.useStreaming || agent.llmConfig.isSlm) {
+                final textBuffer = StringBuffer();
+                LLMResponse? finalResponse;
+                final stream = LLMService.generateStream(
+                  config: agent.llmConfig,
+                  messages: requestMsgs,
+                  tools: mcpTools,
+                  systemPrompt: callSystemPrompt,
+                ).timeout(
+                  agent.llmConfig.timeout,
+                  onTimeout: (sink) {
+                    _log(
+                      'Agent stream timed out after ${agent.llmConfig.timeout.inSeconds}s of inactivity.',
+                    );
+                    sink.addError(
+                      TimeoutException(
+                        'Agent stream timed out after ${agent.llmConfig.timeout.inSeconds}s of inactivity.',
+                        agent.llmConfig.timeout,
+                      ),
+                    );
+                    sink.close();
+                  },
+                );
+                await for (final chunk in stream) {
+                  if (_cancelTokens[agentKey] == true) break;
+                  if (chunk.statusMessage != null &&
+                      chunk.statusMessage!.isNotEmpty) {
+                    _log(chunk.statusMessage!);
+                    emit(AgentLogEvent(chunk.statusMessage!));
+                  }
+                  if (chunk.textDelta.isNotEmpty) {
+                    textBuffer.write(chunk.textDelta);
+                    emit(AgentTextChunkEvent(chunk.textDelta));
+                  }
+                  if (chunk.isDone) {
+                    finalResponse =
+                        chunk.finalResponse ??
+                        LLMResponse(text: textBuffer.toString());
+                  }
+                }
+                if (_cancelTokens[agentKey] == true) break;
+                if (finalResponse == null) {
+                  throw IncompleteStreamException(
+                    'LLM stream ended abruptly without a completion marker',
+                    partialText: textBuffer.toString(),
+                  );
+                }
+                turnResponse = finalResponse;
+              } else {
+                turnResponse = await LLMService.generate(
+                  config: agent.llmConfig,
+                  messages: requestMsgs,
+                  tools: mcpTools,
+                  systemPrompt: callSystemPrompt,
+                ).timeout(agent.llmConfig.timeout);
+              }
+              break;
+            } catch (e) {
+              if (_cancelTokens[agentKey] == true) break;
+              if (attempt < maxAttempts && _isRetryableLlmError(e)) {
+                LLMService.clearCache();
+                final retryMsg =
+                    'LLM request stalled/failed — retrying (attempt ${attempt + 1}/$maxAttempts)...';
+                _log('$retryMsg ($e)');
+                emit(AgentLogEvent(retryMsg));
+                final delay = llmRetryBaseDelay * (1 << (attempt - 1));
+                if (delay > Duration.zero) {
+                  await Future<void>.delayed(delay);
+                }
+                continue;
+              }
+              rethrow;
+            }
           }
 
-          if (_cancelTokens[agentKey] == true) break;
+          if (_cancelTokens[agentKey] == true || turnResponse == null) break;
+          final LLMResponse response = turnResponse;
 
           // After model call hook execution
           for (final hook in allHooks) {

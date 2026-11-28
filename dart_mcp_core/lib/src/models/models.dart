@@ -122,7 +122,7 @@ class LlmConfig {
     this.seed,
     this.maxToolOutputSize = 2560000,
     this.tokenWarningThreshold = 1500000,
-    this.timeoutSeconds = 600,
+    this.timeoutSeconds = 180,
     this.isSlm = false,
     this.isMultiModal = true,
     this.thinking = false,
@@ -131,9 +131,9 @@ class LlmConfig {
     this.useStreaming = false,
   });
 
-  /// Duration timeout for HTTP requests, defaulting to 10 minutes (600 seconds).
+  /// Duration timeout for HTTP requests, defaulting to 3 minutes (180 seconds).
   Duration get timeout =>
-      Duration(seconds: timeoutSeconds > 0 ? timeoutSeconds : 600);
+      Duration(seconds: timeoutSeconds > 0 ? timeoutSeconds : 180);
 
   /// Human-friendly display name, falling back to model name or provider label.
   String get displayName =>
@@ -295,7 +295,7 @@ class LlmConfig {
       tokenWarningThreshold: json['tokenWarningThreshold'] as int? ?? 1500000,
       timeoutSeconds: timeoutVal is int
           ? timeoutVal
-          : int.tryParse(timeoutVal?.toString() ?? '') ?? 600,
+          : int.tryParse(timeoutVal?.toString() ?? '') ?? 180,
       isSlm: json['isSlm'] as bool? ?? false,
       isMultiModal: json['isMultiModal'] as bool? ?? true,
       thinking: json['thinking'] as bool? ?? false,

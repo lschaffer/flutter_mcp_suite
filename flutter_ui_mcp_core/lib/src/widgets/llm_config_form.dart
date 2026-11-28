@@ -1369,6 +1369,7 @@ class LlmAdvancedSettingsForm extends StatelessWidget {
   final ValueChanged<bool> onUseStreamingChanged;
   final TextEditingController? maxToolCallsCtrl;
   final TextEditingController? turnLimitCtrl;
+  final TextEditingController? timeoutSecondsCtrl;
 
   const LlmAdvancedSettingsForm({
     super.key,
@@ -1392,6 +1393,7 @@ class LlmAdvancedSettingsForm extends StatelessWidget {
     required this.onUseStreamingChanged,
     this.maxToolCallsCtrl,
     this.turnLimitCtrl,
+    this.timeoutSecondsCtrl,
   });
 
   @override
@@ -1496,6 +1498,27 @@ class LlmAdvancedSettingsForm extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        if (timeoutSecondsCtrl != null)
+          TextFormField(
+            controller: timeoutSecondsCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Request Timeout (sec)',
+              hintText: '180 (3 min default)',
+              helperText:
+                  'HTTP / stream inactivity timeout in seconds (e.g. 120–600)',
+              helperStyle: TextStyle(fontSize: 10, color: Colors.grey),
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.timer_outlined),
+              isDense: true,
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              final n = int.tryParse(v.trim());
+              if (n == null || n < 10) return 'Must be >= 10 seconds';
+              return null;
+            },
           ),
         TextFormField(
           controller: maxToolOutputSizeCtrl,

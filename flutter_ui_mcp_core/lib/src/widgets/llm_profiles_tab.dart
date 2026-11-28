@@ -43,6 +43,9 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
     text: '30',
   );
   final TextEditingController _turnLimitCtrl = TextEditingController(text: '0');
+  final TextEditingController _timeoutSecondsCtrl = TextEditingController(
+    text: '180',
+  );
   final TextEditingController _maxToolOutputSizeCtrl = TextEditingController(
     text: '2560000',
   );
@@ -106,6 +109,7 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
     _maxTokensCtrl.dispose();
     _maxToolCallsCtrl.dispose();
     _turnLimitCtrl.dispose();
+    _timeoutSecondsCtrl.dispose();
     _maxToolOutputSizeCtrl.dispose();
     _tokenWarningThresholdCtrl.dispose();
     _topKCtrl.dispose();
@@ -129,6 +133,7 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
       _maxTokensCtrl.text = '0';
       _maxToolCallsCtrl.text = '30';
       _turnLimitCtrl.text = '0';
+      _timeoutSecondsCtrl.text = '180';
       _maxToolOutputSizeCtrl.text = '2560000';
       _tokenWarningThresholdCtrl.text = '1500000';
       _topKCtrl.clear();
@@ -157,6 +162,7 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
       _maxTokensCtrl.text = profile.maxTokens.toString();
       _maxToolCallsCtrl.text = profile.maxToolCalls.toString();
       _turnLimitCtrl.text = profile.turnLimit.toString();
+      _timeoutSecondsCtrl.text = profile.timeoutSeconds.toString();
       _maxToolOutputSizeCtrl.text = profile.maxToolOutputSize.toString();
       _tokenWarningThresholdCtrl.text = profile.tokenWarningThreshold
           .toString();
@@ -234,6 +240,7 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
       maxTokens: int.tryParse(_maxTokensCtrl.text.trim()) ?? 0,
       maxToolIterations: int.tryParse(_maxToolCallsCtrl.text.trim()) ?? 30,
       turnLimit: int.tryParse(_turnLimitCtrl.text.trim()) ?? 0,
+      timeoutSeconds: int.tryParse(_timeoutSecondsCtrl.text.trim()) ?? 180,
       maxToolOutputSize:
           int.tryParse(_maxToolOutputSizeCtrl.text.trim()) ?? 2560000,
       tokenWarningThreshold:
@@ -959,6 +966,7 @@ class _LlmProfilesTabState extends State<LlmProfilesTab>
                     setState(() => _useStreaming = val),
                 maxToolCallsCtrl: _maxToolCallsCtrl,
                 turnLimitCtrl: _turnLimitCtrl,
+                timeoutSecondsCtrl: _timeoutSecondsCtrl,
               ),
             ],
           ),

@@ -1,3 +1,8 @@
+## 1.5.21
+
+* **Synchronized Suite Upgrade**:
+  * Upgraded `dart_mcp_core` to `^1.5.17` (resilient HTTP/stream retry, truncated SSE stream guard, reasoning/tool-call heartbeats, 180s default timeout) and `flutter_ui_mcp_core` to `^1.5.21` (Request Timeout field in LLM Advanced Settings).
+
 ## 1.5.20
 
 * **Synchronized Suite Upgrade**:

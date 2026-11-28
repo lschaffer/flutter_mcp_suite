@@ -116,3 +116,22 @@ In `ExportDocumentDialog`, `_isMobile` is `!kIsWeb && (Platform.isAndroid || Pla
 - [x] On Android / iOS, invoke `SharePlus.instance.share(ShareParams(files: [XFile.fromData(bytes, name: fileName, mimeType: mimeType)], text: fileName, sharePositionOrigin: ...))` so **Share** works reliably after saving to either device storage or Google Drive (`content://`).
 - [x] Log or surface errors from `_openExportedFile()` instead of silently swallowing them in `catch (_) {}`.
 - [x] Run `dart analyze` / `flutter test` and bump `flutter_ui_mcp_core` version.
+
+---
+
+## 7. `dart_mcp_core` — Resilient HTTP/Stream Inactivity Retry & Truncated Stream Guard (`agents_engine.dart` / `llm_service.dart`)
+
+**Files:**
+- `dart_mcp_core/lib/src/agents/agents_engine.dart` (lines 1320–1365)
+- `dart_mcp_core/lib/src/llm/llm_service.dart`
+
+### Root Cause
+1. **Hung / Half-Open Cloud API Sockets**: When an OpenAI-compatible gateway (e.g. `https://inference.hetzner.com/v1` with `zai-org/GLM-5.3`) silently stalls or drops a keep-alive TCP socket after a tool call (e.g. `fs_find`), `McpAgentEngine` waits up to the full `agent.llmConfig.timeout` (e.g. `1200s` / 20 minutes) with zero bytes received, then aborts without retrying. Manually cancelling and retrying immediately succeeds on a fresh connection.
+2. **Mid-Stream EOF Treated as Final Response**: When an SSE stream drops mid-generation after emitting a 1–3 word fragment (e.g. `"One"` or `"missing import in"`), `agents_engine.dart` catches the stream error/EOF and falls back to `LLMResponse(text: textBuffer.toString())` with `toolCalls: []`, silently terminating the agent loop as if the model intentionally finished.
+3. **Silent Reasoning / Tool-Call Buffering**: Reasoning models (e.g. GLM-5.3) emit `reasoning_content` or large `tool_calls` JSON deltas before `delta.content`, during which no progress/heartbeat event is emitted to the UI.
+
+### Required Fixes
+- [x] **Automatic Retry on HTTP / Stream Inactivity Timeout**: Add a configurable retry (e.g. 1–2 retries with short exponential backoff, fresh HTTP connection) when an LLM call times out with zero bytes received or fails with a transient socket/502/503/504 error, emitting an `AgentLogEvent('LLM request stalled/failed — retrying (attempt 2/3)...')`.
+- [x] **Detect Abrupt / Incomplete SSE Streams**: Track whether the SSE stream terminated cleanly (`finish_reason` received or `[DONE]` sentinel) vs. dropped mid-stream with a socket error/timeout. On mid-stream drop before `finish_reason`, retry the turn (or surface a retryable error) instead of silently accepting a truncated 1–3 word fragment as the final assistant answer.
+- [x] **Emit Heartbeat / Reasoning Progress Events**: While receiving `reasoning_content` or `tool_calls` delta chunks during SSE streaming, emit throttled `AgentLogEvent` heartbeats (e.g. every 5–10s: `'Model reasoning...'` / `'Preparing tool call...'`) so UIs distinguish active generation from a hung provider socket.
+- [x] **Unit Tests & Release**: Add unit tests simulating a stalled socket retry and a mid-stream SSE drop before `[DONE]`, run `dart test` / `dart analyze`, and bump `dart_mcp_core` version.
